@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>♻️ משחק המיחזור</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #0d4a2a 0%, #1a6b3a 50%, #0d4a2a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        #game-container {
+            width: 980px;
+            max-width: 100%;
+            background: #f1f5f1;
+            border-radius: 22px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ── HEADER ── */
+        #header {
+            background: linear-gradient(90deg, #1a472a, #2d7a4f);
+            color: white;
+            padding: 14px 20px 10px;
+        }
+
+        #header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 9px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #level-display  { font-size: 1.3em; font-weight: bold; }
+        #progress-display { font-size: 0.95em; opacity: 0.85; }
+        #score-display  { font-size: 1.1em; }
+        #lives-display  { font-size: 1.3em; letter-spacing: 2px; }
+
+        #timer-container {
+            height: 11px;
+            background: rgba(255,255,255,0.22);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        #timer-bar {
+            height: 100%;
+            background: #4ade80;
+            border-radius: 6px;
+            width: 100%;
+            transition: width 1s linear, background-color 0.5s;
+        }
+
+        /* ── GAME AREA ── */
+        #game-area { padding: 18px 20px 22px; }
+
+        #new-bin-toast {
+            background: #ecfdf5;
+            border: 2px solid #22c55e;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-bottom: 14px;
+            font-size: 1.05em;
+            color: #14532d;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-10px); opacity: 0; }
+            to   { transform: translateY(0);     opacity: 1; }
+        }
+
+        /* ── ITEMS AREA ── */
+        #items-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-content: flex-start;
+            gap: 12px;
+            min-height: 185px;
+            background: white;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 18px;
+            border: 2px dashed #cbd5e1;
+            position: relative;
+        }
+
+        #items-hint {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.78em;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        .trash-item {
+            width: 88px;
+            height: 88px;
+            background: white;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 3px solid #e2e8f0;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            user-select: none;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+            font-size: 2.5em;
+        }
+
+        .item-name {
+            font-size: 0.27em;
+            color: #64748b;
+            margin-top: 3px;
+            font-weight: 500;
+        }
+
+        .trash-item:hover {
+            transform: translateY(-5px) scale(1.06);
+            border-color: #f59e0b;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+        }
+
+        .trash-item.selected {
+            border-color: #f59e0b;
+            background: #fffbeb;
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 0 0 4px rgba(245,158,11,0.25), 0 8px 18px rgba(0,0,0,0.15);
+        }
+
+        .trash-item.correct-anim {
+            animation: correctFly 0.48s ease-in forwards;
+            pointer-events: none;
+        }
+
+        .trash-item.wrong-anim {
+            animation: wrongShake 0.5s ease;
+            border-color: #ef4444 !important;
+            background: #fef2f2 !important;
+        }
+
+        @keyframes correctFly {
+            0%   { transform: scale(1.12) rotate(0deg);   opacity: 1; }
+            100% { transform: scale(0)    rotate(180deg); opacity: 0; }
+        }
+
+        @keyframes wrongShake {
+            0%,100% { transform: translateX(0); }
+            15%     { transform: translateX(-9px) rotate(-4deg); }
+            35%     { transform: translateX( 9px) rotate( 4deg); }
+            55%     { transform: translateX(-7px) rotate(-2deg); }
+            75%     { transform: translateX( 7px) rotate( 2deg); }
+        }
+
+        /* ── BINS ── */
+        #bins-area {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .bin {
+            flex: 1 1 100px;
+            max-width: 145px;
+            background: white;
+            border-radius: 16px;
+            padding: 12px 8px 11px;
+            text-align: center;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .bin:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+        }
+
+        .bin.bounce {
+            animation: binBounce 0.32s ease;
+        }
+
+        @keyframes binBounce {
+            0%   { transform: scale(1)    translateY(0); }
+            40%  { transform: scale(1.1)  translateY(-6px); }
+            100% { transform: scale(1)    translateY(0); }
+        }
+
+        .bin-icon  { font-size: 2.9em; display: block; margin-bottom: 5px; }
+        .bin-label { font-size: 0.95em; font-weight: bold; }
+
+        /* ── OVERLAY ── */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.78);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            backdrop-filter: blur(5px);
+        }
+
+        #overlay-card {
+            background: white;
+            border-radius: 24px;
+            padding: 42px 52px;
+            text-align: center;
+            max-width: 430px;
+            width: 92%;
+            box-shadow: 0 28px 56px rgba(0,0,0,0.4);
+        }
+
+        .ov-title {
+            font-size: 2.2em;
+            font-weight: bold;
+            margin-bottom: 14px;
+            line-height: 1.2;
+            color: #0f172a;
+        }
+
+        .ov-body {
+            font-size: 1.05em;
+            color: #475569;
+            line-height: 1.75;
+            margin-bottom: 26px;
+        }
+
+        .ov-body strong { color: #166534; }
+
+        .btn-main {
+            background: linear-gradient(135deg, #166534, #22c55e);
+            color: white;
+            border: none;
+            padding: 14px 36px;
+            border-radius: 50px;
+            font-size: 1.15em;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: transform 0.15s, box-shadow 0.15s;
+            display: inline-block;
+        }
+
+        .btn-main:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 22px rgba(34,197,94,0.4);
+        }
+
+        .btn-sec {
+            background: linear-gradient(135deg, #475569, #94a3b8);
+            color: white;
+            border: none;
+            padding: 11px 26px;
+            border-radius: 50px;
+            font-size: 1em;
+            cursor: pointer;
+            font-family: inherit;
+            transition: transform 0.15s;
+            margin-top: 12px;
+            display: inline-block;
+        }
+
+        .btn-sec:hover { transform: translateY(-2px); }
+
+        /* ── FLOATING SCORE ── */
+        .score-pop {
+            position: fixed;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #16a34a;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+            pointer-events: none;
+            z-index: 999;
+            animation: popFloat 0.9s ease-out forwards;
+        }
+
+        .score-pop.bad { color: #dc2626; }
+
+        @keyframes popFloat {
+            0%   { transform: translateY(0)    scale(0.8); opacity: 1; }
+            100% { transform: translateY(-75px) scale(1);  opacity: 0; }
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 580px) {
+            body { padding: 8px; }
+            #game-area { padding: 12px; }
+            .bin { flex-basis: 80px; padding: 9px 5px 8px; }
+            .bin-icon { font-size: 2.3em; }
+            .bin-label { font-size: 0.78em; }
+            .trash-item { width: 74px; height: 74px; font-size: 2.1em; }
+            #overlay-card { padding: 30px 28px; }
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+
+    <div id="header">
+        <div id="header-top">
+            <div id="level-display">🌍 שלב 1</div>
+            <div id="progress-display">נותרו: — פריטים</div>
+            <div id="score-display">ניקוד: 0</div>
+            <div id="lives-display">❤️❤️❤️</div>
+        </div>
+        <div id="timer-container"><div id="timer-bar"></div></div>
+    </div>
+
+    <div id="game-area">
+        <div id="new-bin-toast"></div>
+        <div id="items-area">
+            <span id="items-hint">לחץ על פריט → לחץ על הפח המתאים</span>
+        </div>
+        <div id="bins-area"></div>
+    </div>
+
+    <div id="overlay">
+        <div id="overlay-card">
+            <div class="ov-title">♻️ משחק המיחזור</div>
+            <div class="ov-body">
+                מיין את האשפה לפחי המיחזור הנכונים!<br>
+                בכל שלב: יותר אשפה, פחות זמן, ופח חדש.<br><br>
+                <strong>לחץ על פריט ← לחץ על הפח</strong><br><br>
+                ❤️❤️❤️ שלוש טעויות = סיום שלב
+            </div>
+            <button class="btn-main" onclick="startGame()">בואו נתחיל! ♻️</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════
+
+const BIN_TYPES = [
+    { id: 'paper',       label: 'נייר',        icon: '📄', color: '#1d4ed8', bg: '#eff6ff', border: '#93c5fd' },
+    { id: 'plastic',     label: 'פלסטיק',      icon: '🧴', color: '#a16207', bg: '#fefce8', border: '#fde047' },
+    { id: 'glass',       label: 'זכוכית',      icon: '🍶', color: '#15803d', bg: '#f0fdf4', border: '#86efac' },
+    { id: 'metal',       label: 'מתכת',        icon: '🥫', color: '#c2410c', bg: '#fff7ed', border: '#fdba74' },
+    { id: 'organic',     label: 'אורגני',      icon: '🌿', color: '#6d28d9', bg: '#faf5ff', border: '#c4b5fd' },
+    { id: 'electronics', label: 'אלקטרוניקה',  icon: '🔋', color: '#374151', bg: '#f9fafb', border: '#9ca3af' },
+];
+
+const WASTE_ITEMS = {
+    paper:       [ ['📰','עיתון'],   ['📦','קרטון'],     ['📚','ספר'],        ['📋','נייר'],     ['✉️','מעטפה'],    ['🗞️','מגזין'],   ['📓','מחברת'],      ['📄','דף']          ],
+    plastic:     [ ['🧴','בקבוק'],   ['🛍️','שקית'],     ['🥡','קופסה'],      ['🪣','דלי'],      ['🍼','בקבוק תינוק'],['🫗','כוס פלסטיק'],['💊','בקבוקון']                    ],
+    glass:       [ ['🍷','יין'],     ['🫙','צנצנת'],     ['🥛','כוס זכוכית'], ['🍺','בירה'],     ['🧪','צלוחית'],   ['🏺','אגרטל']                                           ],
+    metal:       [ ['🥫','פחית'],    ['🔑','מפתח'],      ['🍴','מזלג'],       ['🔩','בורג'],     ['🪙','מטבע'],     ['✂️','מספריים']                                         ],
+    organic:     [ ['🍎','תפוח'],    ['🍌','בננה'],      ['🥕','גזר'],        ['🍂','עלים'],     ['🥚','ביצה'],     ['🌽','תירס'],     ['🥬','חסה'],        ['🍊','תפוז']       ],
+    electronics: [ ['🔋','סוללה'],   ['📱','טלפון'],     ['💡','נורה'],       ['🖥️','מחשב'],    ['⌨️','מקלדת'],   ['🖨️','מדפסת'],   ['📡','אנטנה']                          ],
+};
+
+// [bin_count, item_count, time_seconds]
+const LEVELS = [
+    [2,  8,  60],
+    [3, 12,  55],
+    [4, 16,  50],
+    [5, 20,  45],
+    [6, 25,  40],
+];
+
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+
+let level      = 1;
+let score      = 0;
+let lives      = 3;
+let selected   = null;
+let items      = [];
+let activeBins = [];
+let timerTick  = null;
+let timeLeft   = 0;
+let totalTime  = 0;
+let gameActive = false;
+
+// ══════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════
+
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function buildItems(binIds, count) {
+    const list = [];
+    const perBin = Math.floor(count / binIds.length);
+    const extra  = count % binIds.length;
+
+    binIds.forEach((binId, i) => {
+        const pool = shuffle(WASTE_ITEMS[binId]);
+        const n = perBin + (i < extra ? 1 : 0);
+        for (let j = 0; j < n; j++) {
+            const [emoji, name] = pool[j % pool.length];
+            list.push({ id: list.length, emoji, name, binId });
+        }
+    });
+
+    return shuffle(list);
+}
+
+// ══════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════
+
+function updateHUD() {
+    document.getElementById('level-display').textContent    = `🌍 שלב ${level}`;
+    document.getElementById('score-display').textContent    = `ניקוד: ${score}`;
+    document.getElementById('lives-display').textContent    = '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
+    document.getElementById('progress-display').textContent = `נותרו: ${items.length} פריטים`;
+}
+
+function renderBins() {
+    const area = document.getElementById('bins-area');
+    area.innerHTML = '';
+    activeBins.forEach(binId => {
+        const b   = BIN_TYPES.find(x => x.id === binId);
+        const div = document.createElement('div');
+        div.className = 'bin';
+        div.id        = 'bin-' + binId;
+        div.style.cssText = `border-color:${b.border}; background:${b.bg};`;
+        div.innerHTML = `<span class="bin-icon">${b.icon}</span><span class="bin-label" style="color:${b.color}">${b.label}</span>`;
+        div.onclick   = () => dropItem(binId);
+        area.appendChild(div);
+    });
+}
+
+function renderItems() {
+    const area = document.getElementById('items-area');
+    area.innerHTML = '<span id="items-hint">לחץ על פריט ← לחץ על הפח המתאים</span>';
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'trash-item';
+        div.id        = 'item-' + item.id;
+        div.innerHTML = `${item.emoji}<span class="item-name">${item.name}</span>`;
+        div.onclick   = () => selectItem(item.id);
+        area.appendChild(div);
+    });
+}
+
+// ══════════════════════════════════════
+//  TIMER
+// ══════════════════════════════════════
+
+function startTimer() {
+    clearInterval(timerTick);
+    const bar = document.getElementById('timer-bar');
+    bar.style.transition      = 'none';
+    bar.style.width           = '100%';
+    bar.style.backgroundColor = '#4ade80';
+    bar.offsetHeight; // reflow
+    bar.style.transition = 'width 1s linear, background-color 0.5s';
+
+    timerTick = setInterval(() => {
+        timeLeft--;
+        const pct = (timeLeft / totalTime) * 100;
+        bar.style.width = pct + '%';
+        if      (pct <= 20) bar.style.backgroundColor = '#ef4444';
+        else if (pct <= 50) bar.style.backgroundColor = '#f59e0b';
+
+        if (timeLeft <= 0) {
+            clearInterval(timerTick);
+            if (gameActive) endLevel(false, '⏰ נגמר הזמן!');
+        }
+    }, 1000);
+}
+
+// ══════════════════════════════════════
+//  GAME LOGIC
+// ══════════════════════════════════════
+
+function startGame() {
+    level = 1;
+    score = 0;
+    hideOverlay();
+    beginLevel();
+}
+
+function beginLevel() {
+    gameActive = true;
+    lives      = 3;
+    selected   = null;
+
+    const [binCount, itemCount, time] = LEVELS[level - 1];
+    activeBins = BIN_TYPES.slice(0, binCount).map(b => b.id);
+    items      = buildItems(activeBins, itemCount);
+    totalTime  = time;
+    timeLeft   = time;
+
+    updateHUD();
+    renderBins();
+    renderItems();
+    startTimer();
+
+    if (level > 1) {
+        const newBin = BIN_TYPES[binCount - 1];
+        showToast(`🆕 פח חדש: ${newBin.icon} ${newBin.label}!`);
+    }
+}
+
+function selectItem(id) {
+    if (!gameActive) return;
+
+    if (selected === id) {
+        document.getElementById('item-' + id)?.classList.remove('selected');
+        selected = null;
+        return;
+    }
+
+    if (selected !== null) {
+        document.getElementById('item-' + selected)?.classList.remove('selected');
+    }
+
+    selected = id;
+    document.getElementById('item-' + id)?.classList.add('selected');
+}
+
+function dropItem(binId) {
+    if (!gameActive || selected === null) return;
+
+    const item = items.find(i => i.id === selected);
+    if (!item) return;
+
+    const el    = document.getElementById('item-' + selected);
+    const binEl = document.getElementById('bin-' + binId);
+
+    if (item.binId === binId) {
+        // ✅ CORRECT
+        score += 10;
+        el?.classList.remove('selected');
+        el?.classList.add('correct-anim');
+        floatScore(el, '+10', false);
+        binEl?.classList.add('bounce');
+        setTimeout(() => binEl?.classList.remove('bounce'), 350);
+
+        const doneId = selected;
+        selected = null;
+
+        setTimeout(() => {
+            items = items.filter(i => i.id !== doneId);
+            document.getElementById('item-' + doneId)?.remove();
+            updateHUD();
+
+            if (items.length === 0) {
+                clearInterval(timerTick);
+                gameActive = false;
+                const bonus = Math.floor(timeLeft * 2);
+                score += bonus;
+                updateHUD();
+                setTimeout(() => endLevel(true, bonus), 420);
+            }
+        }, 470);
+
+    } else {
+        // ❌ WRONG
+        lives--;
+        el?.classList.remove('selected');
+        el?.classList.add('wrong-anim');
+        floatScore(el, '-❤️', true);
+        selected = null;
+        updateHUD();
+        setTimeout(() => el?.classList.remove('wrong-anim'), 540);
+
+        if (lives <= 0) {
+            clearInterval(timerTick);
+            gameActive = false;
+            setTimeout(() => endLevel(false, '💔 נגמרו החיים!'), 620);
+        }
+    }
+}
+
+// ══════════════════════════════════════
+//  LEVEL END
+// ══════════════════════════════════════
+
+function endLevel(success, bonusOrMsg) {
+    if (success) {
+        const bonus = bonusOrMsg;
+        if (level >= LEVELS.length) {
+            showOverlay(
+                '🏆 ניצחת!',
+                `סיימת את כל ${LEVELS.length} השלבים!<br>ניקוד סופי: <strong>${score}</strong>`,
+                [{ label: '🔄 שחק שוב', fn: 'startGame()' }]
+            );
+        } else {
+            const nextBin = BIN_TYPES[LEVELS[level][0] - 1];
+            showOverlay(
+                `✅ שלב ${level} הושלם!`,
+                `בונוס זמן: <strong>+${bonus} נקודות</strong><br>ניקוד: <strong>${score}</strong><br><br>פח חדש בשלב הבא: ${nextBin.icon} <strong>${nextBin.label}</strong>`,
+                [{ label: `שלב ${level + 1} ▶️`, fn: 'nextLevel()' }]
+            );
+        }
+    } else {
+        showOverlay(
+            bonusOrMsg,
+            `שלב ${level} | ניקוד: <strong>${score}</strong>`,
+            [
+                { label: '🔁 נסה שוב',     fn: 'retryLevel()' },
+                { label: '🏠 התחל מחדש',   fn: 'startGame()',  sec: true },
+            ]
+        );
+    }
+}
+
+function nextLevel()  { level++;      hideOverlay(); beginLevel(); }
+function retryLevel() {               hideOverlay(); beginLevel(); }
+
+// ══════════════════════════════════════
+//  OVERLAY
+// ══════════════════════════════════════
+
+function showOverlay(title, body, buttons) {
+    const card = document.getElementById('overlay-card');
+    const btns = buttons.map(b =>
+        `<button class="${b.sec ? 'btn-sec' : 'btn-main'}" onclick="${b.fn}">${b.label}</button>`
+    ).join('<br>');
+    card.innerHTML = `
+        <div class="ov-title">${title}</div>
+        <div class="ov-body">${body}</div>
+        ${btns}
+    `;
+    document.getElementById('overlay').style.display = 'flex';
+}
+
+function hideOverlay() {
+    document.getElementById('overlay').style.display = 'none';
+}
+
+// ══════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════
+
+function showToast(msg) {
+    const t = document.getElementById('new-bin-toast');
+    t.textContent    = msg;
+    t.style.display  = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+
+function floatScore(el, text, bad) {
+    if (!el) return;
+    const rect  = el.getBoundingClientRect();
+    const pop   = document.createElement('div');
+    pop.className = 'score-pop' + (bad ? ' bad' : '');
+    pop.textContent = text;
+    pop.style.left  = (rect.left + rect.width  / 2 - 18) + 'px';
+    pop.style.top   = (rect.top  - 8) + 'px';
+    document.body.appendChild(pop);
+    setTimeout(() => pop.remove(), 920);
+}
+</script>
+</body>
+</html>

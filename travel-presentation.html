@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הטיול הגדול של דר</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;700;900&family=Cinzel+Decorative:wght@700;900&family=Philosopher:ital,wght@0,400;0,700;1,400&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --dur: 0.75s;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Noto Serif Hebrew', 'Philosopher', serif;
+      background: #000;
+      user-select: none;
+    }
+
+    /* ── SLIDE BASE ── */
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.97) translateY(8px);
+      transition: opacity var(--dur) cubic-bezier(.4,0,.2,1),
+                  transform var(--dur) cubic-bezier(.4,0,.2,1);
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: scale(1) translateY(0);
+    }
+    .slide.leaving {
+      opacity: 0;
+      transform: scale(1.03) translateY(-8px);
+    }
+
+    /* ── NAVIGATION ── */
+    .nav {
+      position: fixed;
+      bottom: 1.8rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.55rem 1.4rem;
+      border-radius: 3rem;
+    }
+    .nav-btn {
+      background: none;
+      border: 1.5px solid rgba(255,255,255,0.45);
+      color: white;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.15); border-color: white; transform: scale(1.1); }
+    .dots {
+      display: flex;
+      gap: 0.35rem;
+    }
+    .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .dot.active { background: white; transform: scale(1.5); }
+    .counter {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      font-family: 'Philosopher', serif;
+      min-width: 3.5rem;
+      text-align: center;
+    }
+
+    /* ── CONTENT GRID ── */
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 0 2.5rem;
+      width: 90%;
+      max-width: 1060px;
+      z-index: 10;
+      position: relative;
+      align-items: stretch;
+    }
+    .col-left { display: flex; flex-direction: column; }
+
+    /* ── Country image card ── */
+    .country-img {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 12px 50px rgba(0,0,0,0.55);
+    }
+    .country-img img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: brightness(0.72) saturate(1.2);
+      transition: transform 6s ease;
+    }
+    .slide.active .country-img img { transform: scale(1.06); }
+    .img-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top,
+        rgba(0,0,0,0.88) 0%,
+        rgba(0,0,0,0.3)  45%,
+        transparent       75%
+      );
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 1.6rem 1.4rem;
+      text-align: right;
+    }
+    .flag { font-size: 2.2rem; margin-bottom: 0.4rem; display: block; }
+    .stop-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.45em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 0.2rem;
+    }
+    .name-en {
+      font-size: 0.7rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      opacity: 0.5;
+      margin-bottom: 0.15rem;
+      font-family: 'Philosopher', serif;
+    }
+    .name-he {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 900;
+      line-height: 1.05;
+      margin-bottom: 0.7rem;
+    }
+    .tagline {
+      font-size: 0.92rem;
+      font-weight: 300;
+      line-height: 1.65;
+      opacity: 0.82;
+    }
+    .highlights {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      justify-content: center;
+    }
+    .h-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.65rem;
+      border-right: 3px solid;
+      background: rgba(255,255,255,0.05);
+      text-align: right;
+      transition: background 0.2s;
+    }
+    .h-item:hover { background: rgba(255,255,255,0.1); }
+    .h-icon { font-size: 1.25rem; flex-shrink: 0; margin-top: 2px; }
+    .h-body { font-size: 0.9rem; line-height: 1.55; opacity: 0.88; }
+    .h-title { font-weight: 700; display: block; font-size: 0.97rem; margin-bottom: 0.18rem; }
+
+    /* Stagger animation on slide entry */
+    .slide.active .country-img,
+    .slide.active .highlights {
+      animation: fadeSlideIn 0.65s cubic-bezier(.4,0,.2,1) forwards;
+    }
+    .slide.active .country-img { animation-delay: 0.05s; opacity: 0; }
+    .slide.active .highlights  { animation-delay: 0.2s;  opacity: 0; }
+    .slide.active .h-item:nth-child(1) { animation: fadeSlideIn 0.5s ease 0.28s forwards; opacity: 0; }
+    .slide.active .h-item:nth-child(2) { animation: fadeSlideIn 0.5s ease 0.36s forwards; opacity: 0; }
+    .slide.active .h-item:nth-child(3) { animation: fadeSlideIn 0.5s ease 0.44s forwards; opacity: 0; }
+    .slide.active .h-item:nth-child(4) { animation: fadeSlideIn 0.5s ease 0.52s forwards; opacity: 0; }
+    .slide.active .h-item:nth-child(5) { animation: fadeSlideIn 0.5s ease 0.60s forwards; opacity: 0; }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 1 — TITLE
+    ══════════════════════════════════════════════════ */
+    .s-title {
+      background: #080c1e;
+      flex-direction: column;
+    }
+    .stars-layer {
+      position: absolute;
+      inset: 0;
+    }
+    .route-line {
+      position: absolute;
+      bottom: 14%;
+      left: 4%;
+      right: 4%;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255,200,60,0.6) 15%,
+        rgba(200,16,46,0.5) 30%,
+        rgba(139,90,43,0.5) 42%,
+        rgba(194,98,45,0.5) 52%,
+        rgba(0,180,216,0.5) 65%,
+        rgba(255,183,197,0.6) 78%,
+        rgba(255,107,0,0.5) 88%,
+        transparent 100%
+      );
+    }
+    .plane {
+      position: absolute;
+      font-size: 1rem;
+      bottom: 13%;
+      animation: flyAcross 12s linear infinite;
+      opacity: 0.8;
+    }
+    @keyframes flyAcross {
+      0%   { left: 2%; }
+      100% { left: 95%; }
+    }
+    .country-tags {
+      position: absolute;
+      bottom: 8.5%;
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .ctag {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.38);
+      font-family: 'Philosopher', serif;
+    }
+    .title-center {
+      text-align: center;
+      z-index: 2;
+      position: relative;
+    }
+    .title-badge {
+      display: inline-block;
+      font-size: 0.62rem;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: rgba(240,180,60,0.8);
+      margin-bottom: 1.5rem;
+      font-family: 'Philosopher', serif;
+    }
+    .title-h1 {
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      text-shadow: 0 0 80px rgba(240,180,60,0.4), 0 0 160px rgba(240,180,60,0.15);
+    }
+    .title-h1 .gold { color: #f0b43c; }
+    .title-sub {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.25em;
+      margin-top: 1.5rem;
+      font-family: 'Philosopher', serif;
+    }
+    .title-stats {
+      display: flex;
+      gap: 3.5rem;
+      justify-content: center;
+      margin-top: 2.5rem;
+    }
+    .stat-num {
+      display: block;
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #f0b43c;
+      line-height: 1;
+    }
+    .stat-label {
+      display: block;
+      font-size: 0.6rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      margin-top: 0.3rem;
+      font-family: 'Philosopher', serif;
+    }
+    .slide.s-title.active .title-badge   { animation: fadeSlideIn 0.7s ease 0.1s forwards; opacity: 0; }
+    .slide.s-title.active .title-h1      { animation: fadeSlideIn 0.7s ease 0.25s forwards; opacity: 0; }
+    .slide.s-title.active .title-sub     { animation: fadeSlideIn 0.7s ease 0.4s forwards; opacity: 0; }
+    .slide.s-title.active .title-stats   { animation: fadeSlideIn 0.7s ease 0.55s forwards; opacity: 0; }
+    .slide.s-title.active .route-line,
+    .slide.s-title.active .country-tags  { animation: fadeSlideIn 0.7s ease 0.9s forwards; opacity: 0; }
+    .slide.s-title.active .country-img,
+    .slide.s-title.active .highlights    { animation: none; opacity: 1; }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 2 — THAILAND
+    ══════════════════════════════════════════════════ */
+    .s-thailand {
+      background: #12060000;
+      background-color: #120600;
+    }
+    .thai-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 60% at 15% 55%, rgba(210,120,15,0.45) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 50% at 85% 20%, rgba(180,60,10,0.3) 0%, transparent 60%),
+        #120600;
+    }
+    .thai-diamonds {
+      position: absolute; inset: 0;
+      opacity: 0.055;
+      background-image:
+        repeating-linear-gradient(45deg,  #c8a040 0, #c8a040 1px, transparent 1px, transparent 28px),
+        repeating-linear-gradient(-45deg, #c8a040 0, #c8a040 1px, transparent 1px, transparent 28px);
+    }
+    /* Temple silhouette using clip-path layered divs */
+    .thai-temple {
+      position: absolute;
+      bottom: 0; right: 3%;
+      width: 220px; height: 300px;
+      opacity: 0.11;
+    }
+    .thai-spire {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 260px;
+      background: linear-gradient(0deg, #c8a040 0%, #e8d080 80%, #f5e9b0 100%);
+      clip-path: polygon(30% 100%, 30% 55%, 20% 40%, 50% 0%, 80% 40%, 70% 55%, 70% 100%);
+    }
+    .thai-base {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 160px; height: 80px;
+      background: #c8a040;
+      clip-path: polygon(0% 100%, 5% 0%, 95% 0%, 100% 100%);
+    }
+    .s-thailand .stop-label { color: #c8a040; }
+    .s-thailand .name-en    { color: #c8a040; }
+    .s-thailand .name-he    { color: #f5e8c0; text-shadow: 0 0 40px rgba(200,160,64,0.3); }
+    .s-thailand .tagline    { color: rgba(245,232,192,0.72); }
+    .s-thailand .h-item     { border-color: #c8a040; }
+    .s-thailand .h-body     { color: rgba(245,232,192,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 3 — VIETNAM
+    ══════════════════════════════════════════════════ */
+    .s-vietnam { background-color: #0d0008; }
+    .viet-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 55% 55% at 25% 65%, rgba(180,0,35,0.55) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 45% at 75% 25%, rgba(200,16,46,0.3) 0%, transparent 55%),
+        #0d0008;
+    }
+    /* Lanterns */
+    .lanterns {
+      position: absolute; top: 4%; right: 6%;
+      display: flex; gap: 1.8rem;
+      align-items: flex-start;
+    }
+    .lnt { display: flex; flex-direction: column; align-items: center; }
+    .lnt:nth-child(2) { margin-top: 22px; animation-delay: -1.2s !important; }
+    .lnt:nth-child(3) { animation-delay: -2.4s !important; }
+    .lnt-string {
+      width: 2px; height: 30px;
+      background: rgba(255,220,100,0.3);
+    }
+    .lnt-cap {
+      width: 36px; height: 10px;
+      border-radius: 50% 50% 0 0;
+      background: rgba(255,200,80,0.5);
+    }
+    .lnt-body {
+      width: 38px; height: 54px;
+      border-radius: 50%;
+      position: relative;
+      animation: sway 3.5s ease-in-out infinite;
+    }
+    .lnt-tail {
+      width: 2px; height: 14px;
+      background: rgba(255,200,80,0.3);
+    }
+    @keyframes sway {
+      0%,100% { transform: rotate(-4deg); }
+      50%      { transform: rotate(4deg); }
+    }
+    .lnt:nth-child(1) .lnt-body { background: radial-gradient(circle at 38% 38%, #ff8080, #c8102e); box-shadow: 0 0 22px rgba(200,16,46,0.7); }
+    .lnt:nth-child(2) .lnt-body { background: radial-gradient(circle at 38% 38%, #ffe080, #d4820a); box-shadow: 0 0 22px rgba(212,130,10,0.7); }
+    .lnt:nth-child(3) .lnt-body { background: radial-gradient(circle at 38% 38%, #90ff90, #1a5e35); box-shadow: 0 0 22px rgba(26,94,53,0.7); }
+    .s-vietnam .stop-label { color: #ffd93d; }
+    .s-vietnam .name-en    { color: rgba(200,16,46,0.65); }
+    .s-vietnam .name-he    { color: #fff0f0; text-shadow: 0 0 40px rgba(200,16,46,0.4); }
+    .s-vietnam .tagline    { color: rgba(255,240,240,0.72); }
+    .s-vietnam .h-item     { border-color: #c8102e; }
+    .s-vietnam .h-body     { color: rgba(255,240,240,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 4 — LAOS
+    ══════════════════════════════════════════════════ */
+    .s-laos { background-color: #0a0608; }
+    .laos-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 35%, rgba(200,130,50,0.3) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 15% 75%, rgba(140,70,110,0.2) 0%, transparent 50%),
+        #0a0608;
+    }
+    .laos-mountains {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 220px; opacity: 0.09;
+      background: linear-gradient(transparent 30%, #c0924a 100%);
+      clip-path: polygon(0% 100%, 0% 58%, 8% 28%, 16% 52%, 25% 15%, 35% 48%, 44% 8%, 54% 42%, 62% 22%, 72% 46%, 82% 18%, 90% 42%, 100% 30%, 100% 100%);
+    }
+    /* Lotus CSS art */
+    .laos-lotus {
+      position: absolute; bottom: 12%; left: 4%;
+      width: 100px; height: 100px;
+      opacity: 0.1;
+    }
+    .lotus-petal {
+      position: absolute;
+      width: 28px; height: 50px;
+      background: linear-gradient(#f0b88a, #d4874a);
+      border-radius: 50% 50% 30% 30%;
+      left: 50%; top: 50%;
+      transform-origin: 50% 100%;
+    }
+    .s-laos .stop-label { color: #e8b870; }
+    .s-laos .name-en    { color: rgba(232,184,112,0.5); }
+    .s-laos .name-he    { color: #f5ead8; text-shadow: 0 0 40px rgba(200,140,60,0.25); }
+    .s-laos .tagline    { color: rgba(245,234,216,0.72); }
+    .s-laos .h-item     { border-color: #e8b870; }
+    .s-laos .h-body     { color: rgba(245,234,216,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 5 — CAMBODIA
+    ══════════════════════════════════════════════════ */
+    .s-cambodia { background-color: #0e0700; }
+    .camb-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 55% 55% at 65% 40%, rgba(180,78,25,0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 15% 65%, rgba(100,55,10,0.3) 0%, transparent 55%),
+        #0e0700;
+    }
+    .camb-grid {
+      position: absolute; inset: 0; opacity: 0.035;
+      background-image:
+        repeating-linear-gradient(0deg,   #c2622d 0, transparent 1px, transparent 22px, #c2622d 22px, transparent 23px),
+        repeating-linear-gradient(90deg,  #c2622d 0, transparent 1px, transparent 32px, #c2622d 32px, transparent 33px);
+    }
+    /* Angkor Wat silhouette */
+    .angkor {
+      position: absolute; bottom: 0; right: 2%;
+      width: 260px; height: 240px;
+      opacity: 0.1;
+    }
+    .a-tower { position: absolute; bottom: 40px; background: #c8824a; }
+    .a-c { width: 64px; height: 170px; left: 98px;
+      clip-path: polygon(20% 100%, 20% 45%, 10% 30%, 50% 0%, 90% 30%, 80% 45%, 80% 100%); }
+    .a-l { width: 50px; height: 130px; left: 34px;
+      clip-path: polygon(20% 100%, 20% 45%, 10% 30%, 50% 0%, 90% 30%, 80% 45%, 80% 100%); }
+    .a-r { width: 50px; height: 130px; right: 26px;
+      clip-path: polygon(20% 100%, 20% 45%, 10% 30%, 50% 0%, 90% 30%, 80% 45%, 80% 100%); }
+    .a-base { position: absolute; bottom: 0; left: 0; right: 0; height: 45px;
+      background: #8b4513; }
+    .a-wall { position: absolute; bottom: 40px; left: 0; right: 0; height: 12px;
+      background: #a05828; }
+    .s-cambodia .stop-label { color: #e8a840; }
+    .s-cambodia .name-en    { color: rgba(194,98,45,0.6); }
+    .s-cambodia .name-he    { color: #f5e0c5; text-shadow: 0 0 40px rgba(180,80,30,0.35); }
+    .s-cambodia .tagline    { color: rgba(245,224,197,0.72); }
+    .s-cambodia .h-item     { border-color: #c2622d; }
+    .s-cambodia .h-body     { color: rgba(245,224,197,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 6 — PHILIPPINES
+    ══════════════════════════════════════════════════ */
+    .s-philippines { background-color: #000e1e; }
+    .phil-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 60% at 55% 35%, rgba(0,140,210,0.5) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 85% 65%, rgba(0,190,230,0.25) 0%, transparent 50%),
+        linear-gradient(180deg, #000e1e 0%, #001428 55%, #000e1e 100%);
+    }
+    /* Ocean shimmer */
+    .ocean {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 180px; overflow: hidden;
+    }
+    .wave-line {
+      position: absolute; left: -20%; right: -20%;
+      border-radius: 50%;
+      border: 1.5px solid;
+      animation: waveRise ease-in-out infinite alternate;
+    }
+    .wave-line:nth-child(1) { height: 120px; bottom: -50px; border-color: rgba(0,180,216,0.25); animation-duration: 4s; }
+    .wave-line:nth-child(2) { height: 90px;  bottom: -35px; border-color: rgba(0,180,216,0.18); animation-duration: 5.5s; animation-delay: -2s; }
+    .wave-line:nth-child(3) { height: 60px;  bottom: -20px; border-color: rgba(0,180,216,0.12); animation-duration: 3.5s; animation-delay: -1s; }
+    @keyframes waveRise {
+      from { transform: translateY(0); }
+      to   { transform: translateY(-12px); }
+    }
+    /* Islands */
+    .islands {
+      position: absolute; bottom: 10%; right: 4%;
+      display: flex; align-items: flex-end; gap: 8px;
+      opacity: 0.12;
+    }
+    .isl { background: #00b4d8; border-radius: 50% 50% 0 0; }
+    .isl-1 { width: 70px; height: 35px; }
+    .isl-2 { width: 110px; height: 58px; }
+    .isl-3 { width: 55px; height: 28px; }
+    /* Palm tree suggestion */
+    .palm { position: absolute; right: 180px; bottom: 8%; opacity: 0.1; }
+    .palm-trunk { width: 4px; height: 60px; background: #00b4d8; margin: 0 auto; }
+    .palm-leaf { width: 30px; height: 8px; background: #00b4d8; border-radius: 0 50% 50% 0; position: absolute; top: 5px; transform-origin: left center; }
+    .s-philippines .stop-label { color: #00c8e8; }
+    .s-philippines .name-en    { color: rgba(0,180,216,0.5); }
+    .s-philippines .name-he    { color: #e0f7ff; text-shadow: 0 0 40px rgba(0,180,216,0.4); }
+    .s-philippines .tagline    { color: rgba(224,247,255,0.72); }
+    .s-philippines .h-item     { border-color: #00b4d8; }
+    .s-philippines .h-body     { color: rgba(224,247,255,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 7 — JAPAN
+    ══════════════════════════════════════════════════ */
+    .s-japan { background-color: #060810; }
+    .japan-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 50% 50% at 25% 55%, rgba(255,100,140,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 45% at 75% 30%, rgba(20,35,100,0.5) 0%, transparent 55%),
+        #060810;
+    }
+    /* Torii gate */
+    .torii {
+      position: absolute; bottom: 0; right: 4%;
+      width: 200px; height: 280px;
+      opacity: 0.085;
+    }
+    .torii-top {
+      position: absolute; top: 0; left: -10px; right: -10px;
+      height: 18px; background: #e8102a;
+      border-radius: 3px;
+    }
+    .torii-top::after {
+      content: ''; position: absolute; top: -12px; left: 5px; right: 5px;
+      height: 14px; background: #e8102a;
+      clip-path: polygon(0% 100%, 5% 0%, 95% 0%, 100% 100%);
+    }
+    .torii-beam {
+      position: absolute; top: 28px; left: -5px; right: -5px;
+      height: 12px; background: #e8102a;
+    }
+    .torii-pillar {
+      position: absolute; top: 35px; bottom: 0;
+      width: 22px; background: #e8102a; border-radius: 2px;
+    }
+    .torii-pillar.left  { left: 30px; }
+    .torii-pillar.right { right: 30px; }
+    /* Sakura petals */
+    .petals-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .petal {
+      position: absolute;
+      border-radius: 50% 0 50% 0;
+      animation: petalFall linear infinite;
+      opacity: 0;
+    }
+    @keyframes petalFall {
+      0%   { transform: translateY(-30px) rotate(0deg);   opacity: 0; }
+      10%  { opacity: 0.7; }
+      90%  { opacity: 0.3; }
+      100% { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+    }
+    /* Fuji */
+    .fuji-wrap {
+      position: absolute; bottom: 0; right: 210px;
+      width: 240px; height: 180px; opacity: 0.06;
+    }
+    .fuji-body {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      border-left: 120px solid transparent;
+      border-right: 120px solid transparent;
+      border-bottom: 170px solid #c0cce0;
+    }
+    .fuji-snow {
+      position: absolute; bottom: 155px; left: 50%; transform: translateX(-50%);
+      border-left: 40px solid transparent;
+      border-right: 40px solid transparent;
+      border-bottom: 34px solid white;
+    }
+    .s-japan .stop-label { color: #ffb7c5; }
+    .s-japan .name-en    { color: rgba(255,183,197,0.45); }
+    .s-japan .name-he    { color: #f0f0ff; text-shadow: 0 0 40px rgba(255,183,197,0.35); }
+    .s-japan .tagline    { color: rgba(240,240,255,0.72); }
+    .s-japan .h-item     { border-color: #ffb7c5; }
+    .s-japan .h-body     { color: rgba(240,240,255,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 8 — NORTH INDIA
+    ══════════════════════════════════════════════════ */
+    .s-india { background-color: #0c0008; }
+    .india-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 50% 55% at 40% 40%, rgba(210,0,90,0.45) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 75% 60%, rgba(210,80,0,0.35) 0%, transparent 50%),
+        radial-gradient(ellipse 35% 35% at 15% 70%, rgba(120,0,190,0.2) 0%, transparent 45%),
+        #0c0008;
+    }
+    /* Jali / geometric pattern */
+    .india-jali {
+      position: absolute; inset: 0; opacity: 0.04;
+      background-image:
+        repeating-linear-gradient(30deg,  #ff6b00 0, transparent 1px, transparent 18px),
+        repeating-linear-gradient(-30deg, #ff006e 0, transparent 1px, transparent 18px),
+        repeating-linear-gradient(90deg,  #a855f7 0, transparent 1px, transparent 18px);
+    }
+    /* Mandala */
+    .mandala {
+      position: absolute; right: -8%; top: 50%; transform: translateY(-50%);
+      width: 380px; height: 380px;
+      animation: mandala-spin 80s linear infinite;
+    }
+    .mandala-ring {
+      position: absolute; border-radius: 50%;
+      border-style: solid; border-color: rgba(255,107,0,0.25);
+    }
+    .mandala-ring:nth-child(1) { inset: 0;   border-width: 1px; }
+    .mandala-ring:nth-child(2) { inset: 25px; border-width: 1px; border-color: rgba(255,0,110,0.2); }
+    .mandala-ring:nth-child(3) { inset: 50px; border-width: 1px; border-color: rgba(168,85,247,0.2); }
+    .mandala-ring:nth-child(4) { inset: 75px; border-width: 1.5px; border-color: rgba(255,107,0,0.3); }
+    .mandala-ring:nth-child(5) { inset: 100px; border-width: 1px; border-color: rgba(255,0,110,0.25); }
+    .mandala-ring:nth-child(6) { inset: 130px; border-width: 1.5px; border-color: rgba(255,107,0,0.35); }
+    /* petal marks on mandala */
+    .mandala::before, .mandala::after {
+      content: '';
+      position: absolute; inset: 60px; border-radius: 50%;
+      border: 1px dashed rgba(255,107,0,0.15);
+    }
+    .mandala::after { inset: 90px; border-color: rgba(255,0,110,0.15); transform: rotate(30deg); }
+    @keyframes mandala-spin {
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+    /* Taj silhouette */
+    .taj {
+      position: absolute; bottom: 0; left: 3%;
+      width: 160px; height: 160px;
+      opacity: 0.08;
+    }
+    .taj-dome {
+      position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 55px;
+      border-radius: 50% 50% 0 0;
+      background: #ff6b00;
+    }
+    .taj-dome::before {
+      content: '';
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      width: 6px; height: 18px; background: #ff6b00;
+      border-radius: 50% 50% 0 0;
+    }
+    .taj-body {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 120px; height: 65px; background: #e8a040;
+    }
+    .taj-arch {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 30px; height: 40px;
+      background: #0c0008;
+      border-radius: 50% 50% 0 0;
+    }
+    .taj-minaret {
+      position: absolute; bottom: 0;
+      width: 14px; height: 90px; background: #e8a040;
+    }
+    .taj-minaret.tl { left: 5px; }
+    .taj-minaret.tr { right: 5px; }
+    .taj-minaret::before {
+      content: '';
+      position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+      width: 14px; height: 14px; background: #ff6b00; border-radius: 50%;
+    }
+    .s-india .stop-label { color: #ff6b00; }
+    .s-india .name-en    { color: rgba(255,107,0,0.45); }
+    .s-india .name-he    { color: #ffe8f5; text-shadow: 0 0 40px rgba(220,0,100,0.45); }
+    .s-india .tagline    { color: rgba(255,232,245,0.72); }
+    .s-india .h-item     { border-color: #ff006e; }
+    .s-india .h-body     { color: rgba(255,232,245,0.85); }
+  </style>
+</head>
+<body>
+
+<!-- ══ SLIDE 1: TITLE ══════════════════════════════════════ -->
+<div class="slide s-title active">
+  <canvas class="stars-layer" id="starsCanvas"></canvas>
+  <div class="title-center">
+    <div class="title-badge">2024 – 2025 &nbsp;·&nbsp; 8 חודשים בדרך</div>
+    <h1 class="title-h1">הטיול הגדול<br>של <span class="gold">דר</span></h1>
+    <p class="title-sub">תאילנד &nbsp;·&nbsp; ויאטנם &nbsp;·&nbsp; לאוס &nbsp;·&nbsp; קמבודיה &nbsp;·&nbsp; פיליפינים &nbsp;·&nbsp; יפן &nbsp;·&nbsp; הודו</p>
+    <div class="title-stats">
+      <div><span class="stat-num">8</span><span class="stat-label">חודשים</span></div>
+      <div><span class="stat-num">7</span><span class="stat-label">מדינות</span></div>
+      <div><span class="stat-num">∞</span><span class="stat-label">זכרונות</span></div>
+    </div>
+  </div>
+  <div class="route-line"></div>
+  <span class="plane">✈</span>
+  <div class="country-tags">
+    <span class="ctag">🇹🇭 תאילנד</span>
+    <span class="ctag">🇻🇳 ויאטנם</span>
+    <span class="ctag">🇱🇦 לאוס</span>
+    <span class="ctag">🇰🇭 קמבודיה</span>
+    <span class="ctag">🇵🇭 פיליפינים</span>
+    <span class="ctag">🇯🇵 יפן</span>
+    <span class="ctag">🇮🇳 הודו הצפונית</span>
+  </div>
+</div>
+
+<!-- ══ SLIDE 2: THAILAND ════════════════════════════════════ -->
+<div class="slide s-thailand">
+  <div class="thai-bg"></div>
+  <div class="thai-diamonds"></div>
+  <div class="thai-temple">
+    <div class="thai-spire"></div>
+    <div class="thai-base"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/thailand,temple,bangkok" alt="Thailand" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇹🇭</span>
+          <div class="stop-label">עצור ראשון</div>
+          <div class="name-en">THAILAND</div>
+          <h2 class="name-he">תאילנד</h2>
+          <p class="tagline">הכניסה הקלאסית לטיול הגדול. ריחות של למונגרס, חיוכים בכל פינה, ומסיבות שלא נגמרות על החוף.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🛕</span><div class="h-body"><span class="h-title">בנגקוק — הפתיחה</span>קאו סן רוד, מקדש ואט פו, שוק הלילה, Pad Thai ב-40 באט ומריחואנה חוקית</div></div>
+      <div class="h-item"><span class="h-icon">🐘</span><div class="h-body"><span class="h-title">צ'יאנג מאי — הצפון</span>מקלט פילים אתי, שוק הנייט בזאר, קורס בישול תאי אותנטי, מנזרי ההרים</div></div>
+      <div class="h-item"><span class="h-icon">🌕</span><div class="h-body"><span class="h-title">Full Moon Party — קו פנגאן</span>המסיבה המיתית על חוף הדאד, 30,000 איש, צבעי ניאון על הגוף, זריחה על הים</div></div>
+      <div class="h-item"><span class="h-icon">🤿</span><div class="h-body"><span class="h-title">קו טאו — הסמכת PADI</span>הסמכת צלילה הזולה בעולם, שוניות אלמוגים עוצרות נשימה, כרישי לוול</div></div>
+      <div class="h-item"><span class="h-icon">🏔️</span><div class="h-body"><span class="h-title">פאי — כפר ההיפים</span>ערפל בהרים, וות'רפולים, מלא ישראלים, צימר בג'ונגל ב-200 באט</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 3: VIETNAM ════════════════════════════════════ -->
+<div class="slide s-vietnam">
+  <div class="viet-bg"></div>
+  <div class="lanterns">
+    <div class="lnt"><div class="lnt-string"></div><div class="lnt-cap"></div><div class="lnt-body"></div><div class="lnt-tail"></div></div>
+    <div class="lnt"><div class="lnt-string"></div><div class="lnt-cap"></div><div class="lnt-body"></div><div class="lnt-tail"></div></div>
+    <div class="lnt"><div class="lnt-string"></div><div class="lnt-cap"></div><div class="lnt-body"></div><div class="lnt-tail"></div></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/vietnam,halong,bay" alt="Vietnam" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇻🇳</span>
+          <div class="stop-label">עצור שני</div>
+          <div class="name-en">VIETNAM</div>
+          <h2 class="name-he">ויאטנם</h2>
+          <p class="tagline">ארץ ארוכה ומדהימה. מהדלתא הירוקה בדרום ועד הרי הסאפה בצפון. ה-Bánh Mì הכי טובים בחיים.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🌊</span><div class="h-body"><span class="h-title">מפרץ הא לונג</span>שייט 3 ימים בין סלעי הגיר האגדיים, קיאקים, שקיעות שיגעו אותך</div></div>
+      <div class="h-item"><span class="h-icon">🏮</span><div class="h-body"><span class="h-title">הוי אן — עיר הפנסים</span>שמלה תפורה תוך 24 שעות ב-$20, סירה בנהר, פנסי נייר על המים</div></div>
+      <div class="h-item"><span class="h-icon">🏍️</span><div class="h-body"><span class="h-title">Easy Rider — מסלול הדרקון</span>רכיבת אופנוע ממעבר הר Hai Van — נוף מרהיב שמשנה פרספקטיבה</div></div>
+      <div class="h-item"><span class="h-icon">🍺</span><div class="h-body"><span class="h-title">האנוי — Bia Hoi</span>בירה טרייה ב-25 סנט, ישיבה על כסא שקשוק ברחוב, פו ב-$1, החיים</div></div>
+      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">סאפה — טרקים עם מיעוטים</span>שדות אורז מדורגים, לינה אצל משפחות H'mong, ערפל שנוגע בהרים</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 4: LAOS ════════════════════════════════════════ -->
+<div class="slide s-laos">
+  <div class="laos-bg"></div>
+  <div class="laos-mountains"></div>
+  <div class="laos-lotus">
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(0deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(45deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(90deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(135deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(180deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(225deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(270deg)"></div>
+    <div class="lotus-petal" style="transform: translateX(-50%) translateY(-100%) rotate(315deg)"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/laos,mekong,river" alt="Laos" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇱🇦</span>
+          <div class="stop-label">עצור שלישי</div>
+          <div class="name-en">LAOS</div>
+          <h2 class="name-he">לאוס</h2>
+          <p class="tagline">המדינה שמאלצת אותך להאט. אין כאן למה למהר, וזה בדיוק הנקודה. השלווה הכי עמוקה שתרגיש.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🧡</span><div class="h-body"><span class="h-title">לואנג פראבאנג — טקס הנזירים</span>בשחר: מאות נזירים בכתום-סגול מקבלים אוכל ברחוב — רגע שלעולם לא ישכח</div></div>
+      <div class="h-item"><span class="h-icon">💧</span><div class="h-body"><span class="h-title">מפלי קואנג סי</span>מים טורקיז שלא ייאמן, בריכות טבע מדורגות, קפיצה מסלע, קופים ביער</div></div>
+      <div class="h-item"><span class="h-icon">🍺</span><div class="h-body"><span class="h-title">וואנג ויאנג — הפאדי</span>טיובינג בנהר, ברים על המים, בריכות אינפיניטי על הקארסט, לילות בלי סוף</div></div>
+      <div class="h-item"><span class="h-icon">🐬</span><div class="h-body"><span class="h-title">4,000 אי — Si Phan Don</span>הדולפינים האירוואדי, האמוק בצל, שום אינטרנט, שלווה שהיא כמעט כאובה</div></div>
+      <div class="h-item"><span class="h-icon">🚢</span><div class="h-body"><span class="h-title">Slow Boat על המקונג</span>שני ימי שייט עצלני מתאילנד ללאוס — הנוף, הבירה, ההכרויות בדרך</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 5: CAMBODIA ════════════════════════════════════ -->
+<div class="slide s-cambodia">
+  <div class="camb-bg"></div>
+  <div class="camb-grid"></div>
+  <div class="angkor">
+    <div class="a-tower a-l"></div>
+    <div class="a-tower a-c"></div>
+    <div class="a-tower a-r"></div>
+    <div class="a-wall"></div>
+    <div class="a-base"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/angkor,wat,cambodia" alt="Cambodia" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇰🇭</span>
+          <div class="stop-label">עצור רביעי</div>
+          <div class="name-en">CAMBODIA</div>
+          <h2 class="name-he">קמבודיה</h2>
+          <p class="tagline">מדינה שסבלה אינסוף וכעת מחייכת. אנגקור וואט בזריחה — רגע שישאר איתך לנצח.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🌄</span><div class="h-body"><span class="h-title">אנגקור וואט — הזריחה</span>קום ב-4:30, ממתין בחשיכה, ואז השמש עולה אדומה על אחד מניסי העולם</div></div>
+      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">Ta Prohm — מקדשי הג'ונגל</span>עצי ענק שבלעו קירות אבן, ג'ונגל מנצח את ההיסטוריה, תחושת לארה קרופט</div></div>
+      <div class="h-item"><span class="h-icon">💔</span><div class="h-body"><span class="h-title">פנום פן — שדות ההרג</span>ביקור כואב ב-Tuol Sleng ובשדות ההרג — היסטוריה שחייבים להבין</div></div>
+      <div class="h-item"><span class="h-icon">🍻</span><div class="h-body"><span class="h-title">Pub Street — סיאם ריפ</span>Beer Tower, ברים עם בריכה, מסיבות הוסטל, Fish & Chips ב-$3</div></div>
+      <div class="h-item"><span class="h-icon">🏝️</span><div class="h-body"><span class="h-title">קו רונג — גן עדן</span>חוף לבן בלי רשת, ביולומינסנטיות בלילה, קברניט מפוקפק עד האי</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 6: PHILIPPINES ════════════════════════════════ -->
+<div class="slide s-philippines">
+  <div class="phil-bg"></div>
+  <div class="ocean">
+    <div class="wave-line"></div>
+    <div class="wave-line"></div>
+    <div class="wave-line"></div>
+  </div>
+  <div class="islands">
+    <div class="isl isl-1"></div>
+    <div class="isl isl-2"></div>
+    <div class="isl isl-3"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/philippines,palawan,island" alt="Philippines" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇵🇭</span>
+          <div class="stop-label">עצור חמישי</div>
+          <div class="name-en">PHILIPPINES</div>
+          <h2 class="name-he">פיליפינים</h2>
+          <p class="tagline">7,641 אי. קשה לבחור, קל לאהוב. אנגלית שוטפת, אנשים שמחים, ים שיגרום לך לשכוח שם.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">⛵</span><div class="h-body"><span class="h-title">אל נידו — Island Hopping</span>ארבעה איים ביום אחד, לגונות סמויות, שנורקל עם ליים ורוכסים ים עצומים</div></div>
+      <div class="h-item"><span class="h-icon">🏄</span><div class="h-body"><span class="h-title">סיארגאו — גלישה ו-Cloud 9</span>הגל הכי מפורסם בפיליפינים, כביש הקוקוסים, וילה ב-$15 לילה</div></div>
+      <div class="h-item"><span class="h-icon">🍫</span><div class="h-body"><span class="h-title">בוהול — גבעות השוקולד</span>1,268 גבעות אחידות שנראות מחרפנות, טארסיר — היצור הכי קטן והכי חמוד</div></div>
+      <div class="h-item"><span class="h-icon">🌊</span><div class="h-body"><span class="h-title">פלאוואן — נהר תת-קרקעי</span>שייט בסירה מתחת לאדמה — אחת מ-7 פלאי הטבע החדשים של העולם</div></div>
+      <div class="h-item"><span class="h-icon">🎉</span><div class="h-body"><span class="h-title">הוסטלים ובליינות</span>הפיליפינים = הפירוחים הכי חברותיים, המסיבות הכי ספונטניות, הסנסט הכי טוב</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 7: JAPAN ══════════════════════════════════════ -->
+<div class="slide s-japan">
+  <div class="japan-bg"></div>
+  <div class="petals-wrap" id="petalsWrap"></div>
+  <div class="fuji-wrap">
+    <div class="fuji-body"></div>
+    <div class="fuji-snow"></div>
+  </div>
+  <div class="torii">
+    <div class="torii-top"></div>
+    <div class="torii-beam"></div>
+    <div class="torii-pillar left"></div>
+    <div class="torii-pillar right"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/japan,kyoto,torii" alt="Japan" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇯🇵</span>
+          <div class="stop-label">עצור שישי</div>
+          <div class="name-en">JAPAN</div>
+          <h2 class="name-he">יפן</h2>
+          <p class="tagline">המקום שמשנה אותך. ניקיון, דיוק, עומק תרבותי ואוכל שאחריו שום מקום לא מספיק.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🗼</span><div class="h-body"><span class="h-title">טוקיו — עיר הסחרחורת</span>שיבויה קרוסינג, שינג'וקו בלילה, Izakaya ב-Omoide Yokocho, אקיהבארה</div></div>
+      <div class="h-item"><span class="h-icon">⛩️</span><div class="h-body"><span class="h-title">קיוטו — נשמת יפן</span>פושימי אינארי בשחר לפני ההמונים, גיון, יער הבמבוק, Ryokan עם אונסן פרטי</div></div>
+      <div class="h-item"><span class="h-icon">🍜</span><div class="h-body"><span class="h-title">אוסקה — בירת האוכל</span>Takoyaki, Okonomiyaki, Ramen עד 2 בלילה — "Eat until you drop" כמדיניות</div></div>
+      <div class="h-item"><span class="h-icon">🦌</span><div class="h-body"><span class="h-title">נארה + הירושימה</span>אייל שמגרד ממך ניירות, ואחר כך — האנדרת הגרעינית הכי מרגשת שתבקר בה</div></div>
+      <div class="h-item"><span class="h-icon">♨️</span><div class="h-body"><span class="h-title">הקונה — פוג'י ואונסן</span>הר פוג'י בשלג, אמבטיה חמה בחוץ בקור, שלג יורד — יפן בשיאה</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 8: NORTH INDIA ════════════════════════════════ -->
+<div class="slide s-india">
+  <div class="india-bg"></div>
+  <div class="india-jali"></div>
+  <div class="mandala">
+    <div class="mandala-ring"></div>
+    <div class="mandala-ring"></div>
+    <div class="mandala-ring"></div>
+    <div class="mandala-ring"></div>
+    <div class="mandala-ring"></div>
+    <div class="mandala-ring"></div>
+  </div>
+  <div class="taj">
+    <div class="taj-minaret tl"></div>
+    <div class="taj-minaret tr"></div>
+    <div class="taj-dome"></div>
+    <div class="taj-body"></div>
+    <div class="taj-arch"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/india,taj,mahal" alt="North India" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇮🇳</span>
+          <div class="stop-label">עצור שביעי ואחרון</div>
+          <div class="name-en">NORTH INDIA</div>
+          <h2 class="name-he">הודו הצפונית</h2>
+          <p class="tagline">כאוס מקסים, צבעים שוברי עיניים, ריחות שלא תשכח. הודו לא מדינה — היא חוויה.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🕯️</span><div class="h-body"><span class="h-title">ואראנסי — הגנגס הקדוש</span>טקס Ganga Aarti בשקיעה, שייט בנהר בשחר, מחזה שריפות ה-Ghats — חיים ומוות</div></div>
+      <div class="h-item"><span class="h-icon">🧘</span><div class="h-body"><span class="h-title">ריישיקש — יוגה וראפטינג</span>האשרם של הביטלס, שיעורי יוגה עם נוף להרים, ראפטינג מסוכן בגנגס</div></div>
+      <div class="h-item"><span class="h-icon">🏯</span><div class="h-body"><span class="h-title">ג'יפור — העיר הוורודה</span>Amber Fort, ארמון הרוחות, שוק הבדים, גמל בשחר, Lassi מה-Blue Lassi</div></div>
+      <div class="h-item"><span class="h-icon">🌅</span><div class="h-body"><span class="h-title">הטאג' מהאל — אגרה</span>הגעת בשחר. ראית את זה. אין מילים. כן, בכית קצת. אין בושה.</div></div>
+      <div class="h-item"><span class="h-icon">☸️</span><div class="h-body"><span class="h-title">דרמסלה — הדלאי לאמה</span>מקלט הטיבטים, מנזרים, קרמה קפה, שיחות עם פליטים — נקודת סיום מושלמת</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NAVIGATION ════════════════════════════════════════════ -->
+<div class="nav">
+  <button class="nav-btn" onclick="navigate(1)">&#8592;</button>
+  <div class="dots" id="dotsContainer"></div>
+  <div class="counter" id="counter">1 / 8</div>
+  <button class="nav-btn" onclick="navigate(-1)">&#8594;</button>
+</div>
+
+<script>
+  /* ── Stars canvas ── */
+  const canvas = document.getElementById('starsCanvas');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  for (let i = 0; i < 280; i++) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = Math.random() * 1.2 + 0.1;
+    const a = Math.random() * 0.8 + 0.1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = i % 20 === 0
+      ? `rgba(255,220,130,${a})`
+      : `rgba(255,255,255,${a})`;
+    ctx.fill();
+  }
+
+  /* ── Sakura petals ── */
+  const petalsWrap = document.getElementById('petalsWrap');
+  const petalColors = ['rgba(255,183,197,0.65)','rgba(255,210,220,0.55)','rgba(255,160,180,0.5)'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('div');
+    p.className = 'petal';
+    const sz = Math.random() * 9 + 4;
+    p.style.width  = sz + 'px';
+    p.style.height = sz + 'px';
+    p.style.left   = Math.random() * 100 + '%';
+    p.style.background = petalColors[Math.floor(Math.random() * petalColors.length)];
+    p.style.animationDuration  = (Math.random() * 10 + 7) + 's';
+    p.style.animationDelay     = -(Math.random() * 18)    + 's';
+    petalsWrap.appendChild(p);
+  }
+
+  /* ── Slide navigation ── */
+  const slides  = document.querySelectorAll('.slide');
+  const dots    = document.getElementById('dotsContainer');
+  const counter = document.getElementById('counter');
+  const total   = slides.length;
+  let current = 0;
+  let locked  = false;
+
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dots.appendChild(d);
+  });
+
+  function updateUI() {
+    counter.textContent = (current + 1) + ' / ' + total;
+    dots.querySelectorAll('.dot').forEach((d, i) =>
+      d.classList.toggle('active', i === current)
+    );
+  }
+
+  function navigate(dir) { goTo(current + dir); }
+
+  function goTo(n) {
+    if (locked) return;
+    const next = ((n % total) + total) % total;
+    if (next === current) return;
+
+    locked = true;
+    slides[current].classList.remove('active');
+    slides[current].classList.add('leaving');
+
+    const prev = current;
+    current = next;
+    slides[current].classList.add('active');
+
+    setTimeout(() => {
+      slides[prev].classList.remove('leaving');
+      locked = false;
+    }, 800);
+
+    updateUI();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowDown') navigate(1);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp')   navigate(-1);
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End')  goTo(total - 1);
+  });
+
+  /* Touch swipe */
+  let touchX = 0;
+  document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) navigate(dx < 0 ? 1 : -1);
+  });
+
+  updateUI();
+</script>
+</body>
+</html>

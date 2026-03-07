@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>הטיול הגדול של דר</title>
+  <title>מזרח — הטיול הגדול של דר</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;700;900&family=Cinzel+Decorative:wght@700;900&family=Philosopher:ital,wght@0,400;0,700;1,400&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -327,7 +327,48 @@
     .slide.s-title.active .highlights    { animation: none; opacity: 1; }
 
     /* ══════════════════════════════════════════════════
-       SLIDE 2 — THAILAND
+       SLIDE 2 — ETHIOPIA
+    ══════════════════════════════════════════════════ */
+    .s-ethiopia { background-color: #080501; }
+    .eth-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 55% at 30% 50%, rgba(200,150,0,0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 45% at 78% 30%, rgba(180,20,20,0.3) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 60% 75%, rgba(30,140,60,0.2) 0%, transparent 50%),
+        #080501;
+    }
+    /* Acacia tree silhouette */
+    .acacia {
+      position: absolute; bottom: 0; right: 5%;
+      width: 180px; height: 220px; opacity: 0.1;
+    }
+    .acacia-trunk {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 16px; height: 120px; background: #c8a040;
+    }
+    .acacia-canopy {
+      position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+      width: 160px; height: 80px;
+      border-radius: 50% 50% 20% 20%;
+      background: linear-gradient(to bottom, #c8a040, #a07020);
+    }
+    /* Ethiopian cross pattern */
+    .eth-pattern {
+      position: absolute; inset: 0; opacity: 0.035;
+      background-image:
+        repeating-linear-gradient(0deg,   #f0c040 0, transparent 1px, transparent 28px, #f0c040 28px, transparent 29px),
+        repeating-linear-gradient(90deg,  #f0c040 0, transparent 1px, transparent 28px, #f0c040 28px, transparent 29px);
+    }
+    .s-ethiopia .stop-label { color: #f0c040; }
+    .s-ethiopia .name-en    { color: rgba(240,192,64,0.5); }
+    .s-ethiopia .name-he    { color: #fff8e0; text-shadow: 0 0 40px rgba(200,150,0,0.4); }
+    .s-ethiopia .tagline    { color: rgba(255,248,224,0.72); }
+    .s-ethiopia .h-item     { border-color: #22a847; }
+    .s-ethiopia .h-body     { color: rgba(255,248,224,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 3 — THAILAND
     ══════════════════════════════════════════════════ */
     .s-thailand {
       background: #12060000;
@@ -631,7 +672,73 @@
     .s-japan .h-body     { color: rgba(240,240,255,0.85); }
 
     /* ══════════════════════════════════════════════════
-       SLIDE 8 — NORTH INDIA
+       SLIDE 9 — PORTUGAL
+    ══════════════════════════════════════════════════ */
+    .s-portugal { background-color: #040810; }
+    .port-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 55% 55% at 30% 50%, rgba(0,90,190,0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 45% at 78% 30%, rgba(190,60,20,0.3) 0%, transparent 55%),
+        #040810;
+    }
+    /* Azulejo tile pattern */
+    .port-tiles {
+      position: absolute; inset: 0; opacity: 0.045;
+      background-image:
+        repeating-linear-gradient(45deg,  #1a6faf 0, #1a6faf 1px, transparent 1px, transparent 22px),
+        repeating-linear-gradient(-45deg, #1a6faf 0, #1a6faf 1px, transparent 1px, transparent 22px);
+    }
+    /* Rooster silhouette (Galo de Barcelos) */
+    .galo {
+      position: absolute; bottom: 0; right: 4%;
+      width: 140px; height: 200px; opacity: 0.08;
+    }
+    .galo-body {
+      position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 90px;
+      border-radius: 50% 50% 40% 40%;
+      background: #c8102e;
+    }
+    .galo-tail {
+      position: absolute; bottom: 60px; right: 10px;
+      width: 50px; height: 80px;
+      background: #e8a020;
+      clip-path: polygon(0% 100%, 40% 0%, 80% 20%, 100% 60%, 60% 100%);
+    }
+    .galo-head {
+      position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+      width: 35px; height: 35px; border-radius: 50%;
+      background: #c8102e;
+    }
+    .galo-comb {
+      position: absolute; bottom: 135px; left: 50%; transform: translateX(-50%);
+      width: 20px; height: 18px;
+      background: #e8a020;
+      clip-path: polygon(0% 100%, 15% 0%, 50% 40%, 85% 0%, 100% 100%);
+    }
+    /* Wave/ocean hint */
+    .port-wave {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 120px; overflow: hidden;
+    }
+    .port-wave-line {
+      position: absolute; left: -20%; right: -20%;
+      border-radius: 50%;
+      border: 1.5px solid;
+      animation: waveRise ease-in-out infinite alternate;
+    }
+    .port-wave-line:nth-child(1) { height: 100px; bottom: -45px; border-color: rgba(0,90,190,0.2); animation-duration: 5s; }
+    .port-wave-line:nth-child(2) { height: 70px;  bottom: -30px; border-color: rgba(0,90,190,0.15); animation-duration: 4s; animation-delay: -2s; }
+    .s-portugal .stop-label { color: #4da6e8; }
+    .s-portugal .name-en    { color: rgba(77,166,232,0.5); }
+    .s-portugal .name-he    { color: #e8f4ff; text-shadow: 0 0 40px rgba(0,100,200,0.4); }
+    .s-portugal .tagline    { color: rgba(232,244,255,0.72); }
+    .s-portugal .h-item     { border-color: #1a6faf; }
+    .s-portugal .h-body     { color: rgba(232,244,255,0.85); }
+
+    /* ══════════════════════════════════════════════════
+       SLIDE 10 — NORTH INDIA
     ══════════════════════════════════════════════════ */
     .s-india { background-color: #0c0008; }
     .india-bg {
@@ -791,29 +898,61 @@
 <div class="slide s-title active">
   <canvas class="stars-layer" id="starsCanvas"></canvas>
   <div class="title-center">
-    <div class="title-badge">2024 – 2025 &nbsp;·&nbsp; 8 חודשים בדרך</div>
-    <h1 class="title-h1">הטיול הגדול<br>של <span class="gold">דר</span></h1>
-    <p class="title-sub">תאילנד &nbsp;·&nbsp; ויאטנם &nbsp;·&nbsp; לאוס &nbsp;·&nbsp; קמבודיה &nbsp;·&nbsp; פיליפינים &nbsp;·&nbsp; יפן &nbsp;·&nbsp; הודו</p>
+    <div class="title-badge">נובמבר 2024 – יולי 2025 &nbsp;·&nbsp; 8 חודשים בדרך</div>
+    <h1 class="title-h1"><span class="gold">מזרח</span><br>הטיול הגדול של דר</h1>
+    <p class="title-sub">אתיופיה &nbsp;·&nbsp; תאילנד &nbsp;·&nbsp; ויאטנם &nbsp;·&nbsp; לאוס &nbsp;·&nbsp; קמבודיה &nbsp;·&nbsp; פיליפינים &nbsp;·&nbsp; יפן &nbsp;·&nbsp; פורטוגל &nbsp;·&nbsp; הודו</p>
     <div class="title-stats">
       <div><span class="stat-num">8</span><span class="stat-label">חודשים</span></div>
-      <div><span class="stat-num">7</span><span class="stat-label">מדינות</span></div>
-      <div><span class="stat-num">∞</span><span class="stat-label">זכרונות</span></div>
+      <div><span class="stat-num">9</span><span class="stat-label">מדינות</span></div>
+      <div><span class="stat-num">60K</span><span class="stat-label">קילומטר</span></div>
     </div>
   </div>
   <div class="route-line"></div>
   <span class="plane">✈</span>
   <div class="country-tags">
+    <span class="ctag">🇪🇹 אתיופיה</span>
     <span class="ctag">🇹🇭 תאילנד</span>
     <span class="ctag">🇻🇳 ויאטנם</span>
     <span class="ctag">🇱🇦 לאוס</span>
     <span class="ctag">🇰🇭 קמבודיה</span>
     <span class="ctag">🇵🇭 פיליפינים</span>
     <span class="ctag">🇯🇵 יפן</span>
-    <span class="ctag">🇮🇳 הודו הצפונית</span>
+    <span class="ctag">🇵🇹 פורטוגל</span>
+    <span class="ctag">🇮🇳 הודו</span>
   </div>
 </div>
 
-<!-- ══ SLIDE 2: THAILAND ════════════════════════════════════ -->
+<!-- ══ SLIDE 2: ETHIOPIA ═══════════════════════════════════ -->
+<div class="slide s-ethiopia">
+  <div class="eth-bg"></div>
+  <div class="eth-pattern"></div>
+  <div class="acacia">
+    <div class="acacia-trunk"></div>
+    <div class="acacia-canopy"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/addis,ababa,ethiopia,africa" alt="Ethiopia" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇪🇹</span>
+          <div class="stop-label">עצור ראשון — טרנזיט</div>
+          <div class="name-en">ETHIOPIA</div>
+          <h2 class="name-he">אתיופיה</h2>
+          <p class="tagline">עצירת טרנזיט של יום בדרך למזרח. אדיס אבבה — הנחיתה הראשונה, והתחנה שפתחה את הכל.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">✈️</span><div class="h-body"><span class="h-title">אדיס אבבה — שער לאפריקה</span>נחיתה ראשונה. 24 שעות בעיר על גובה 2,355 מטר, לפני הטיסה הבאה לתאילנד</div></div>
+      <div class="h-item"><span class="h-icon">☕</span><div class="h-body"><span class="h-title">טקס הקפה האתיופי</span>אתיופיה — מולדת הקפה. שלוש כוסות, בישול מסורתי על גחלים, ריח שממלא את החדר</div></div>
+      <div class="h-item"><span class="h-icon">🌍</span><div class="h-body"><span class="h-title">שווקים וסמטאות</span>שווקי צבע, ארכיטקטורה קולוניאלית, ואוכל רחוב אתיופי — חמשה חושים מלאים בפחות מ-24 שעות</div></div>
+      <div class="h-item"><span class="h-icon">🛫</span><div class="h-body"><span class="h-title">Ethiopian Airlines — ה-Hub של יבשת שלמה</span>שדה התעופה המקשר כל יבשת אפריקה. נקודת מוצא לשמונה חודשים של מסע</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 3: THAILAND ════════════════════════════════════ -->
 <div class="slide s-thailand">
   <div class="thai-bg"></div>
   <div class="thai-diamonds"></div>
@@ -827,19 +966,19 @@
         <img src="https://loremflickr.com/400/520/thailand,temple,bangkok" alt="Thailand" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇹🇭</span>
-          <div class="stop-label">עצור ראשון</div>
+          <div class="stop-label">עצור שני</div>
           <div class="name-en">THAILAND</div>
           <h2 class="name-he">תאילנד</h2>
-          <p class="tagline">הכניסה הקלאסית לטיול הגדול. ריחות של למונגרס, חיוכים בכל פינה, ומסיבות שלא נגמרות על החוף.</p>
+          <p class="tagline">הכניסה למזרח — ישר לצפון. פילים, ג'ונגל, חופים טורקיז ו-Full Moon Party על חוף הים.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🛕</span><div class="h-body"><span class="h-title">בנגקוק — הפתיחה</span>קאו סן רוד, מקדש ואט פו, שוק הלילה, Pad Thai ב-40 באט ומריחואנה חוקית</div></div>
-      <div class="h-item"><span class="h-icon">🐘</span><div class="h-body"><span class="h-title">צ'יאנג מאי — הצפון</span>מקלט פילים אתי, שוק הנייט בזאר, קורס בישול תאי אותנטי, מנזרי ההרים</div></div>
-      <div class="h-item"><span class="h-icon">🌕</span><div class="h-body"><span class="h-title">Full Moon Party — קו פנגאן</span>המסיבה המיתית על חוף הדאד, 30,000 איש, צבעי ניאון על הגוף, זריחה על הים</div></div>
-      <div class="h-item"><span class="h-icon">🤿</span><div class="h-body"><span class="h-title">קו טאו — הסמכת PADI</span>הסמכת צלילה הזולה בעולם, שוניות אלמוגים עוצרות נשימה, כרישי לוול</div></div>
-      <div class="h-item"><span class="h-icon">🏔️</span><div class="h-body"><span class="h-title">פאי — כפר ההיפים</span>ערפל בהרים, וות'רפולים, מלא ישראלים, צימר בג'ונגל ב-200 באט</div></div>
+      <div class="h-item"><span class="h-icon">🐘</span><div class="h-body"><span class="h-title">צ'יאנג מאי — הצפון</span>מקלט פילים אתי, שוק הלילה המפורסם, ומנזרי ההרים. נקודת הכניסה הקלאסית לתאילנד</div></div>
+      <div class="h-item"><span class="h-icon">🏔️</span><div class="h-body"><span class="h-title">פאי — כפר ההרים</span>ערפל בוקר, מפלים, ג'ונגל וקהילה בינלאומית קטנה וחמה. שבוע שלם ביעד שמאלץ להאט</div></div>
+      <div class="h-item"><span class="h-icon">🤿</span><div class="h-body"><span class="h-title">קו טאו — שנורקל ושקיעות</span>חופים שקטים, שוניות אלמוגים, צבי ים וכרישי לוול. מהאיים הכי יפים במפרץ תאילנד</div></div>
+      <div class="h-item"><span class="h-icon">🌕</span><div class="h-body"><span class="h-title">קו פנגאן — Full Moon Party</span>המסיבה המיתית שמתרחשת אחת לחודש על חוף הים. אלפי אנשים מכל העולם, ניאון ושחר על הגלים</div></div>
+      <div class="h-item"><span class="h-icon">🛕</span><div class="h-body"><span class="h-title">בנגקוק — הסיום</span>ואט פו, שוק הלילה, ה-Pad Thai הכי טוב, ושופינג. הבירה הסוערת שסוגרת את הפרק התאילנדי</div></div>
     </div>
   </div>
 </div>
@@ -858,19 +997,19 @@
         <img src="https://loremflickr.com/400/520/vietnam,halong,bay" alt="Vietnam" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇻🇳</span>
-          <div class="stop-label">עצור שני</div>
+          <div class="stop-label">עצור שלישי</div>
           <div class="name-en">VIETNAM</div>
           <h2 class="name-he">ויאטנם</h2>
-          <p class="tagline">ארץ ארוכה ומדהימה. מהדלתא הירוקה בדרום ועד הרי הסאפה בצפון. ה-Bánh Mì הכי טובים בחיים.</p>
+          <p class="tagline">ארץ ארוכה ומדהימה. מלופ הא ג'יאנג בצפון הקיצוני ועד הו צ'י מין סיטי בדרום — 40 יום.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🌊</span><div class="h-body"><span class="h-title">מפרץ הא לונג</span>שייט 3 ימים בין סלעי הגיר האגדיים, קיאקים, שקיעות שיגעו אותך</div></div>
-      <div class="h-item"><span class="h-icon">🏮</span><div class="h-body"><span class="h-title">הוי אן — עיר הפנסים</span>שמלה תפורה תוך 24 שעות ב-$20, סירה בנהר, פנסי נייר על המים</div></div>
-      <div class="h-item"><span class="h-icon">🏍️</span><div class="h-body"><span class="h-title">Easy Rider — מסלול הדרקון</span>רכיבת אופנוע ממעבר הר Hai Van — נוף מרהיב שמשנה פרספקטיבה</div></div>
-      <div class="h-item"><span class="h-icon">🍺</span><div class="h-body"><span class="h-title">האנוי — Bia Hoi</span>בירה טרייה ב-25 סנט, ישיבה על כסא שקשוק ברחוב, פו ב-$1, החיים</div></div>
-      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">סאפה — טרקים עם מיעוטים</span>שדות אורז מדורגים, לינה אצל משפחות H'mong, ערפל שנוגע בהרים</div></div>
+      <div class="h-item"><span class="h-icon">🏍️</span><div class="h-body"><span class="h-title">הא ג'יאנג לופ — הצפון הקיצוני</span>מסלול אופנועים בין הרים, תהומות וכפרי מיעוטים. אחד המסלולים המרהיבים ביותר בדרום-מזרח אסיה</div></div>
+      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">סאפה + קאט בא + טאם קוק</span>שדות אורז מדורגים בסאפה, שייט בין סלעי הגיר של קאט בא, ומערות ניין קיין בטאם קוק</div></div>
+      <div class="h-item"><span class="h-icon">🕳️</span><div class="h-body"><span class="h-title">פונג ניה — המערה הגדולה בעולם</span>מערת פאראדייס, ג'ונגל ראשוני ושייט תת-קרקעי — אחת החוויות הגיאוגרפיות הנדירות בעולם</div></div>
+      <div class="h-item"><span class="h-icon">🏮</span><div class="h-body"><span class="h-title">הוי אן + דה לאט + מוי נה</span>פנסי נייר על הנהר, כפר ערפל בהרים, ודיונות חול אדומות על חוף הים — ויאטנם בכל גווניה</div></div>
+      <div class="h-item"><span class="h-icon">🛵</span><div class="h-body"><span class="h-title">הו צ'י מין סיטי — הדרום</span>מטרופולין רועש ומרגש. מנהרות קו צ'י, שוק בן תאן, Street food ברחובות שלא נרדמים</div></div>
     </div>
   </div>
 </div>
@@ -895,19 +1034,19 @@
         <img src="https://loremflickr.com/400/520/laos,mekong,river" alt="Laos" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇱🇦</span>
-          <div class="stop-label">עצור שלישי</div>
+          <div class="stop-label">עצור רביעי</div>
           <div class="name-en">LAOS</div>
           <h2 class="name-he">לאוס</h2>
-          <p class="tagline">המדינה שמאלצת אותך להאט. אין כאן למה למהר, וזה בדיוק הנקודה. השלווה הכי עמוקה שתרגיש.</p>
+          <p class="tagline">המדינה שמאלצת אותך להאט. מהרים של נונג ח'יאו ועד האיים של דון דט — לאוס בכל עומקה.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🧡</span><div class="h-body"><span class="h-title">לואנג פראבאנג — טקס הנזירים</span>בשחר: מאות נזירים בכתום-סגול מקבלים אוכל ברחוב — רגע שלעולם לא ישכח</div></div>
-      <div class="h-item"><span class="h-icon">💧</span><div class="h-body"><span class="h-title">מפלי קואנג סי</span>מים טורקיז שלא ייאמן, בריכות טבע מדורגות, קפיצה מסלע, קופים ביער</div></div>
-      <div class="h-item"><span class="h-icon">🍺</span><div class="h-body"><span class="h-title">וואנג ויאנג — הפאדי</span>טיובינג בנהר, ברים על המים, בריכות אינפיניטי על הקארסט, לילות בלי סוף</div></div>
-      <div class="h-item"><span class="h-icon">🐬</span><div class="h-body"><span class="h-title">4,000 אי — Si Phan Don</span>הדולפינים האירוואדי, האמוק בצל, שום אינטרנט, שלווה שהיא כמעט כאובה</div></div>
-      <div class="h-item"><span class="h-icon">🚢</span><div class="h-body"><span class="h-title">Slow Boat על המקונג</span>שני ימי שייט עצלני מתאילנד ללאוס — הנוף, הבירה, ההכרויות בדרך</div></div>
+      <div class="h-item"><span class="h-icon">🏔️</span><div class="h-body"><span class="h-title">נונג ח'יאו + מואנג נגוי</span>כפרים על נהר נאם או, פסגות קארסט וסירות עץ. מהמקומות השקטים והיפים ביותר בדרום-מזרח אסיה</div></div>
+      <div class="h-item"><span class="h-icon">🧡</span><div class="h-body"><span class="h-title">לואנג פראבאנג — עיר מורשת עולמית</span>טקס הנזירים בשחר, מפלי קואנג סי הטורקיז ועיר קולוניאלית שנשמרה כמעט ללא שינוי</div></div>
+      <div class="h-item"><span class="h-icon">🧗</span><div class="h-body"><span class="h-title">וואנג ויאנג — פעילות בטבע</span>טיובינג בנהר, טיפוס, בריכות אינפיניטי על רקע פסגות קארסט — עיירה קטנה עם אנרגיה גדולה</div></div>
+      <div class="h-item"><span class="h-icon">🕳️</span><div class="h-body"><span class="h-title">תאח'ק לופ — מערת קונג לור</span>7.5 ק"מ של שייט בסירה בחשיכה מוחלטת דרך מחשוף הר. אחד מפלאי הטבע של לאוס</div></div>
+      <div class="h-item"><span class="h-icon">🐬</span><div class="h-body"><span class="h-title">Si Phan Don — 4,000 האיים</span>דולפיני האירוואדי הנדירים, האמוקים על שפת המקונג ושלווה שקשה למצוא בעולם המערבי</div></div>
     </div>
   </div>
 </div>
@@ -929,19 +1068,19 @@
         <img src="https://loremflickr.com/400/520/angkor,wat,cambodia" alt="Cambodia" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇰🇭</span>
-          <div class="stop-label">עצור רביעי</div>
+          <div class="stop-label">עצור חמישי</div>
           <div class="name-en">CAMBODIA</div>
           <h2 class="name-he">קמבודיה</h2>
-          <p class="tagline">מדינה שסבלה אינסוף וכעת מחייכת. אנגקור וואט בזריחה — רגע שישאר איתך לנצח.</p>
+          <p class="tagline">זריחה על אנגקור, קו רונג, פנום פן ואז קמפוט. מדינה שסבלה אינסוף — ועדיין מחייכת.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🌄</span><div class="h-body"><span class="h-title">אנגקור וואט — הזריחה</span>קום ב-4:30, ממתין בחשיכה, ואז השמש עולה אדומה על אחד מניסי העולם</div></div>
-      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">Ta Prohm — מקדשי הג'ונגל</span>עצי ענק שבלעו קירות אבן, ג'ונגל מנצח את ההיסטוריה, תחושת לארה קרופט</div></div>
-      <div class="h-item"><span class="h-icon">💔</span><div class="h-body"><span class="h-title">פנום פן — שדות ההרג</span>ביקור כואב ב-Tuol Sleng ובשדות ההרג — היסטוריה שחייבים להבין</div></div>
-      <div class="h-item"><span class="h-icon">🍻</span><div class="h-body"><span class="h-title">Pub Street — סיאם ריפ</span>Beer Tower, ברים עם בריכה, מסיבות הוסטל, Fish & Chips ב-$3</div></div>
-      <div class="h-item"><span class="h-icon">🏝️</span><div class="h-body"><span class="h-title">קו רונג — גן עדן</span>חוף לבן בלי רשת, ביולומינסנטיות בלילה, קברניט מפוקפק עד האי</div></div>
+      <div class="h-item"><span class="h-icon">🌄</span><div class="h-body"><span class="h-title">סיאם ריפ — אנגקור וואט בזריחה</span>קימה לפני שחר, המתנה בחשיכה, ואז השמש עולה אדומה על המקדש העתיק. רגע שנחרת בזיכרון</div></div>
+      <div class="h-item"><span class="h-icon">🏝️</span><div class="h-body"><span class="h-title">קו רונג — אי ללא רשת</span>חוף לבן ללא רשת סלולרית, ביולומינסנציה בלילה והאמוקים ביום. הטבע בצורתו הטהורה</div></div>
+      <div class="h-item"><span class="h-icon">🌊</span><div class="h-body"><span class="h-title">קו רונג סמלואם — הסמוי יותר</span>האי השכן — שקט, מבודד, וכמעט בלי תיירים. ים שקוף ושקיעות שאין עוד כמותן</div></div>
+      <div class="h-item"><span class="h-icon">💔</span><div class="h-body"><span class="h-title">פנום פן — Tuol Sleng ושדות ההרג</span>עדות לאחד הפשעים הגדולים של המאה ה-20. ביקור שחובה לעשות כדי להבין את קמבודיה</div></div>
+      <div class="h-item"><span class="h-icon">🦀</span><div class="h-body"><span class="h-title">קמפוט — עיר הנהר הקולוניאלית</span>ארכיטקטורה צרפתית ישנה, קאיאקים, פלפל קמבודי מפורסם ומוזיקה חיה בשפת הנהר</div></div>
     </div>
   </div>
 </div>
@@ -965,19 +1104,19 @@
         <img src="https://loremflickr.com/400/520/philippines,palawan,island" alt="Philippines" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇵🇭</span>
-          <div class="stop-label">עצור חמישי</div>
+          <div class="stop-label">עצור שישי</div>
           <div class="name-en">PHILIPPINES</div>
           <h2 class="name-he">פיליפינים</h2>
-          <p class="tagline">7,641 אי. קשה לבחור, קל לאהוב. אנגלית שוטפת, אנשים שמחים, ים שיגרום לך לשכוח שם.</p>
+          <p class="tagline">7,641 אי, ועצירה ב-8 מהם. פלאוואן, ויסאיאס וסיארגאו — כל אזור עם אופי משלו.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">⛵</span><div class="h-body"><span class="h-title">אל נידו — Island Hopping</span>ארבעה איים ביום אחד, לגונות סמויות, שנורקל עם ליים ורוכסים ים עצומים</div></div>
-      <div class="h-item"><span class="h-icon">🏄</span><div class="h-body"><span class="h-title">סיארגאו — גלישה ו-Cloud 9</span>הגל הכי מפורסם בפיליפינים, כביש הקוקוסים, וילה ב-$15 לילה</div></div>
-      <div class="h-item"><span class="h-icon">🍫</span><div class="h-body"><span class="h-title">בוהול — גבעות השוקולד</span>1,268 גבעות אחידות שנראות מחרפנות, טארסיר — היצור הכי קטן והכי חמוד</div></div>
-      <div class="h-item"><span class="h-icon">🌊</span><div class="h-body"><span class="h-title">פלאוואן — נהר תת-קרקעי</span>שייט בסירה מתחת לאדמה — אחת מ-7 פלאי הטבע החדשים של העולם</div></div>
-      <div class="h-item"><span class="h-icon">🎉</span><div class="h-body"><span class="h-title">הוסטלים ובליינות</span>הפיליפינים = הפירוחים הכי חברותיים, המסיבות הכי ספונטניות, הסנסט הכי טוב</div></div>
+      <div class="h-item"><span class="h-icon">⛵</span><div class="h-body"><span class="h-title">פורט בארטון + אל נידו — פלאוואן</span>מפרץ בקסם: Island Hopping בין לגונות סמויות, שנורקל עם צבי ים ומים שצבעם לא נראה אמיתי</div></div>
+      <div class="h-item"><span class="h-icon">🤿</span><div class="h-body"><span class="h-title">קורון — שרידי ספינות WWII</span>צלילה על ספינות מלחמה יפניות שקעו ב-1944 — אחד מאתרי הצלילה המרשימים בדרום-מזרח אסיה</div></div>
+      <div class="h-item"><span class="h-icon">🐠</span><div class="h-body"><span class="h-title">מואלבואל + סיקיחור</span>שנורקל עם עדרי מיליוני סרדינים ב-Moalboal, ואי סיקיחור המסתורי עם מפלים ובריכות טבע</div></div>
+      <div class="h-item"><span class="h-icon">🏄</span><div class="h-body"><span class="h-title">סיארגאו — בירת הגלישה</span>Cloud 9 — אחד הגלים הטובים ביותר בעולם. כביש הקוקוסים, חופים שקטים ואווירה כפרית</div></div>
+      <div class="h-item"><span class="h-icon">🏙️</span><div class="h-body"><span class="h-title">סבו + מנילה — הסיום</span>עיר נמל היסטורית ובירה ססגונית. נקודת היציאה לפרק הבא — יפן</div></div>
     </div>
   </div>
 </div>
@@ -1002,24 +1141,61 @@
         <img src="https://loremflickr.com/400/520/japan,kyoto,torii" alt="Japan" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇯🇵</span>
-          <div class="stop-label">עצור שישי</div>
+          <div class="stop-label">עצור שביעי</div>
           <div class="name-en">JAPAN</div>
           <h2 class="name-he">יפן</h2>
-          <p class="tagline">המקום שמשנה אותך. ניקיון, דיוק, עומק תרבותי ואוכל שאחריו שום מקום לא מספיק.</p>
+          <p class="tagline">המקום שמשנה אותך. טוקיו, הקונה, קיוטו, אוסקה, נארה, ניקו — שלושה שבועות של עומק.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🗼</span><div class="h-body"><span class="h-title">טוקיו — עיר הסחרחורת</span>שיבויה קרוסינג, שינג'וקו בלילה, Izakaya ב-Omoide Yokocho, אקיהבארה</div></div>
-      <div class="h-item"><span class="h-icon">⛩️</span><div class="h-body"><span class="h-title">קיוטו — נשמת יפן</span>פושימי אינארי בשחר לפני ההמונים, גיון, יער הבמבוק, Ryokan עם אונסן פרטי</div></div>
-      <div class="h-item"><span class="h-icon">🍜</span><div class="h-body"><span class="h-title">אוסקה — בירת האוכל</span>Takoyaki, Okonomiyaki, Ramen עד 2 בלילה — "Eat until you drop" כמדיניות</div></div>
-      <div class="h-item"><span class="h-icon">🦌</span><div class="h-body"><span class="h-title">נארה + הירושימה</span>אייל שמגרד ממך ניירות, ואחר כך — האנדרת הגרעינית הכי מרגשת שתבקר בה</div></div>
-      <div class="h-item"><span class="h-icon">♨️</span><div class="h-body"><span class="h-title">הקונה — פוג'י ואונסן</span>הר פוג'י בשלג, אמבטיה חמה בחוץ בקור, שלג יורד — יפן בשיאה</div></div>
+      <div class="h-item"><span class="h-icon">🗼</span><div class="h-body"><span class="h-title">טוקיו — עיר ללא תחליף</span>שיבויה קרוסינג, שינג'וקו, Omoide Yokocho ואקיהבארה. עיר שמציעה עולם שלם בכל שכונה</div></div>
+      <div class="h-item"><span class="h-icon">♨️</span><div class="h-body"><span class="h-title">הקונה — פוג'י ואונסן</span>הר פוג'י מכוסה שלג, Ryokan מסורתי ואמבטיה חמה בחוץ בחורף — יפן בצורתה הקלאסית</div></div>
+      <div class="h-item"><span class="h-icon">⛩️</span><div class="h-body"><span class="h-title">קיוטו + נארה + אוסקה</span>פושימי אינארי בשחר, יער הבמבוק, פארק הצבאים בנארה, ו-Street food של אוסקה עד לפנות בוקר</div></div>
+      <div class="h-item"><span class="h-icon">🌸</span><div class="h-body"><span class="h-title">קיוטו בעונת הסאקורה</span>פריחת הדובדבן המפורסמת — שבילים מכוסים בורוד, פארקים שנצבעים מחדש. יפן ברגעה הכי יפה</div></div>
+      <div class="h-item"><span class="h-icon">🏯</span><div class="h-body"><span class="h-title">ניקו — מקדשים ביער</span>מקדשי Toshogu בתוך יער ענק, מפלים ואגמים — עצירת סיום מושלמת לפני העזיבה</div></div>
     </div>
   </div>
 </div>
 
-<!-- ══ SLIDE 8: NORTH INDIA ════════════════════════════════ -->
+<!-- ══ SLIDE 9: PORTUGAL ══════════════════════════════════ -->
+<div class="slide s-portugal">
+  <div class="port-bg"></div>
+  <div class="port-tiles"></div>
+  <div class="port-wave">
+    <div class="port-wave-line"></div>
+    <div class="port-wave-line"></div>
+  </div>
+  <div class="galo">
+    <div class="galo-tail"></div>
+    <div class="galo-body"></div>
+    <div class="galo-head"></div>
+    <div class="galo-comb"></div>
+  </div>
+  <div class="content">
+    <div class="col-left">
+      <div class="country-img">
+        <img src="https://loremflickr.com/400/520/lisbon,portugal,azulejo" alt="Portugal" loading="lazy">
+        <div class="img-overlay">
+          <span class="flag">🇵🇹</span>
+          <div class="stop-label">עצור שמיני — הפתעת הדרך</div>
+          <div class="name-en">PORTUGAL</div>
+          <h2 class="name-he">פורטוגל</h2>
+          <p class="tagline">בין יפן להודו — חצר אחורית של אירופה. ליסבון ואיי האזורס. לא מתוכנן, בלתי נשכח.</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlights">
+      <div class="h-item"><span class="h-icon">🍊</span><div class="h-body"><span class="h-title">ליסבון — עיר על גבעות</span>טרם קארוס, אריחי אזולחו, פסטל דה נאטה, Fado בלילה — עיר שמרגישה כמו פגישה ישנה</div></div>
+      <div class="h-item"><span class="h-icon">🌋</span><div class="h-body"><span class="h-title">סאו מיגל — האי הירוק</span>האזורס: בריכות חמות גיאותרמיות על שפת הים, לגונות ירוקות בקלדרה, לווייתנים מהסירה</div></div>
+      <div class="h-item"><span class="h-icon">♨️</span><div class="h-body"><span class="h-title">Caldeira Velha — ג'קוזי טבעי</span>מפל חם בתוך יער. מים חמים מהאדמה. 25 אפריל, שמש, ולא מאמין שזה אמיתי</div></div>
+      <div class="h-item"><span class="h-icon">🐋</span><div class="h-body"><span class="h-title">צפייה בלווייתנים</span>האזורס = המקום הכי טוב בעולם ללוויתנים. שייט קצר מהחוף ופתאום — ספרם ועוד ספרם</div></div>
+      <div class="h-item"><span class="h-icon">✈️</span><div class="h-body"><span class="h-title">חזרה קצרה הביתה</span>11 ימים שבין שני פרקים של המסע. ואז — המטוס להודו. הפרק האחרון מתחיל</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 10: NORTH INDIA ══════════════════════════════ -->
 <div class="slide s-india">
   <div class="india-bg"></div>
   <div class="india-jali"></div>
@@ -1044,19 +1220,19 @@
         <img src="https://loremflickr.com/400/520/india,taj,mahal" alt="North India" loading="lazy">
         <div class="img-overlay">
           <span class="flag">🇮🇳</span>
-          <div class="stop-label">עצור שביעי ואחרון</div>
-          <div class="name-en">NORTH INDIA</div>
-          <h2 class="name-he">הודו הצפונית</h2>
-          <p class="tagline">כאוס מקסים, צבעים שוברי עיניים, ריחות שלא תשכח. הודו לא מדינה — היא חוויה.</p>
+          <div class="stop-label">עצור תשיעי ואחרון</div>
+          <div class="name-en">NORTH INDIA — HIMACHAL</div>
+          <h2 class="name-he">הימאצ'ל פראדש</h2>
+          <p class="tagline">הימאצ'ל פראדש — הודו של ההרים. מדהרמסלה ועד עמק ספיטי, דרך כפרים בגובה 4,500 מטר.</p>
         </div>
       </div>
     </div>
     <div class="highlights">
-      <div class="h-item"><span class="h-icon">🕯️</span><div class="h-body"><span class="h-title">ואראנסי — הגנגס הקדוש</span>טקס Ganga Aarti בשקיעה, שייט בנהר בשחר, מחזה שריפות ה-Ghats — חיים ומוות</div></div>
-      <div class="h-item"><span class="h-icon">🧘</span><div class="h-body"><span class="h-title">ריישיקש — יוגה וראפטינג</span>האשרם של הביטלס, שיעורי יוגה עם נוף להרים, ראפטינג מסוכן בגנגס</div></div>
-      <div class="h-item"><span class="h-icon">🏯</span><div class="h-body"><span class="h-title">ג'יפור — העיר הוורודה</span>Amber Fort, ארמון הרוחות, שוק הבדים, גמל בשחר, Lassi מה-Blue Lassi</div></div>
-      <div class="h-item"><span class="h-icon">🌅</span><div class="h-body"><span class="h-title">הטאג' מהאל — אגרה</span>הגעת בשחר. ראית את זה. אין מילים. כן, בכית קצת. אין בושה.</div></div>
-      <div class="h-item"><span class="h-icon">☸️</span><div class="h-body"><span class="h-title">דרמסלה — הדלאי לאמה</span>מקלט הטיבטים, מנזרים, קרמה קפה, שיחות עם פליטים — נקודת סיום מושלמת</div></div>
+      <div class="h-item"><span class="h-icon">☸️</span><div class="h-body"><span class="h-title">דהרמסלה — מושב הממשלה הטיבטית</span>מקלט הדלאי לאמה, מנזרים בודהיסטים, יוגה ושיחות עם פליטים טיבטים. 16 ימים של עומק</div></div>
+      <div class="h-item"><span class="h-icon">🌿</span><div class="h-body"><span class="h-title">קסול + פולגה — עמק פארבאטי</span>קסול על שפת נחל פארבאטי, ופולגה — כפר נידח ללא כביש שמגיעים אליו ברגל בלבד</div></div>
+      <div class="h-item"><span class="h-icon">🏔️</span><div class="h-body"><span class="h-title">מנאלי — שער ההרים</span>עיירת הנופש הגבוהה של הימאצ'ל. נקודת המוצא לכל המסלולים אל הכפרים בגובה</div></div>
+      <div class="h-item"><span class="h-icon">🛤️</span><div class="h-body"><span class="h-title">מסלול ספיטי — ג'יבי עד לוסאר</span>ג'יבי, סרהאן, צ'יטקול — הכפר הגבוה ביותר בהודו, נאקו, קאזה ולוסאר. נוף שמאתגר כל תיאור</div></div>
+      <div class="h-item"><span class="h-icon">🌌</span><div class="h-body"><span class="h-title">עמק ספיטי — 4,500 מטר</span>מנזרים בודהיסטים עתיקים, כפרים מדבריים וכוכבים ללא זיהום אור. אחד האזורים הנדירים בעולם</div></div>
     </div>
   </div>
 </div>
@@ -1065,7 +1241,7 @@
 <div class="nav">
   <button class="nav-btn" onclick="navigate(1)">&#8592;</button>
   <div class="dots" id="dotsContainer"></div>
-  <div class="counter" id="counter">1 / 8</div>
+  <div class="counter" id="counter">1 / 10</div>
   <button class="nav-btn" onclick="navigate(-1)">&#8594;</button>
 </div>
 

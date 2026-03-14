@@ -46,6 +46,12 @@ async function initDB() {
       fiber_g NUMERIC(6,1),
       notes TEXT
     );
+    CREATE TABLE IF NOT EXISTS weight_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      logged_at DATE NOT NULL DEFAULT CURRENT_DATE,
+      weight_kg NUMERIC(5,1) NOT NULL
+    );
   `);
   console.log('DB ready');
 }
@@ -294,6 +300,40 @@ app.get('/api/stats/monthly', auth, async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'שגיאת שרת' });
   }
+});
+
+// ─── Weight log endpoints ─────────────────────────────────────────────────────
+app.post('/api/weight', auth, async (req, res) => {
+  const { weight_kg, logged_at } = req.body;
+  if (!weight_kg || isNaN(+weight_kg)) return res.status(400).json({ error: 'משקל לא תקין' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO weight_logs (user_id, weight_kg, logged_at) VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE)) RETURNING id, logged_at::text, weight_kg`,
+      [req.user.id, +weight_kg, logged_at || null]
+    );
+    res.json(rows[0]);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
+});
+
+app.get('/api/weight', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, logged_at::text, weight_kg FROM weight_logs WHERE user_id=$1 ORDER BY logged_at ASC LIMIT 90`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
+});
+
+app.delete('/api/weight/:id', auth, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM weight_logs WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'לא נמצא' });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────

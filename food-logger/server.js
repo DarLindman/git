@@ -237,6 +237,36 @@ app.delete('/api/food/:id', auth, async (req, res) => {
   }
 });
 
+// ─── Streak ───────────────────────────────────────────────────────────────────
+app.get('/api/streak', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT logged_at::date AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
+      [req.user.id]
+    );
+    const days = rows.map(r => r.day.toISOString().slice(0, 10));
+    if (!days.length) return res.json({ streak: 0 });
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    // streak counts from today or yesterday onwards
+    if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0 });
+    let streak = 0;
+    let cursor = days[0];
+    for (const day of days) {
+      if (day === cursor) {
+        streak++;
+        const d = new Date(cursor);
+        d.setDate(d.getDate() - 1);
+        cursor = d.toISOString().slice(0, 10);
+      } else break;
+    }
+    res.json({ streak });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'שגיאת שרת' });
+  }
+});
+
 // ─── Statistics ───────────────────────────────────────────────────────────────
 // Weekly summary — returns 7 days of daily totals
 app.get('/api/stats/weekly', auth, async (req, res) => {

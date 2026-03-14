@@ -202,6 +202,120 @@ body::after {
 .fu-7 { animation-delay: 520ms; }
 
 /* ════════════════════════════════════════
+   DASHBOARD
+════════════════════════════════════════ */
+.dash-wrap {
+  padding: 40px 20px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dash-hero {
+  margin-bottom: 4px;
+}
+.dash-greeting {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: 34px;
+  color: var(--text);
+  line-height: 1.1;
+}
+.dash-username {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 4px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.dash-cal-top {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dash-cal-sep, .dash-cal-unit {
+  font-size: 16px;
+  color: var(--text2);
+  font-weight: 400;
+}
+.dash-cal-track {
+  height: 8px;
+  background: var(--surface2);
+  border-radius: 4px;
+  margin: 12px 0 8px;
+  overflow: hidden;
+}
+.dash-cal-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dash-cal-fill.over { background: #e85d5d; }
+.dash-cal-sub {
+  font-size: 12px;
+  color: var(--text2);
+}
+.dash-row {
+  display: flex;
+  gap: 12px;
+}
+.dash-streak-card {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.dash-streak-num {
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.dash-streak-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 6px;
+}
+.dash-macro-card {
+  flex: 2;
+  display: flex;
+  align-items: center;
+}
+.dash-macro-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+}
+.dash-macro-val {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
+.dash-macro-lbl {
+  font-size: 11px;
+  color: var(--text2);
+  text-align: center;
+  margin-top: 3px;
+}
+.dash-cta {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 17px;
+  padding: 16px;
+}
+.dash-cta-ghost {
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* ════════════════════════════════════════
    AUTH
 ════════════════════════════════════════ */
 #screen-auth {
@@ -513,7 +627,7 @@ input::placeholder { color: var(--muted); }
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.3px;
   cursor: pointer;
@@ -1370,6 +1484,41 @@ input::placeholder { color: var(--muted); }
   </div>
 </div>
 
+<!-- ════════════════ DASHBOARD ════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <div class="dash-wrap">
+    <div class="dash-hero">
+      <div class="dash-greeting" id="dash-greeting">בוקר טוב ☀️</div>
+      <div class="dash-username" id="dash-username"></div>
+    </div>
+
+    <div class="card">
+      <div class="dash-cal-top">
+        <span id="dash-cal-eaten">0</span><span class="dash-cal-sep"> / </span><span id="dash-cal-goal">—</span><span class="dash-cal-unit"> קל'</span>
+      </div>
+      <div class="dash-cal-track"><div class="dash-cal-fill" id="dash-cal-fill"></div></div>
+      <div class="dash-cal-sub" id="dash-cal-sub">טוען...</div>
+    </div>
+
+    <div class="dash-row">
+      <div class="card dash-streak-card">
+        <div class="dash-streak-num" id="dash-streak">—</div>
+        <div class="dash-streak-label">ימים ברצף 🔥</div>
+      </div>
+      <div class="card dash-macro-card">
+        <div class="dash-macro-row">
+          <div><div class="dash-macro-val" id="dash-pro">—</div><div class="dash-macro-lbl">חלבון</div></div>
+          <div><div class="dash-macro-val" id="dash-carb">—</div><div class="dash-macro-lbl">פחמ'</div></div>
+          <div><div class="dash-macro-val" id="dash-fat">—</div><div class="dash-macro-lbl">שומן</div></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary dash-cta" onclick="navigate('camera')">＋ הוסף ארוחה</button>
+    <button class="btn-ghost dash-cta-ghost" onclick="navigate('home')">📋 יומן היום</button>
+  </div>
+</div>
+
 <!-- ════════════════ HOME (DIARY) ════════════════ -->
 <div id="screen-home" class="screen">
   <div class="topbar">
@@ -1594,11 +1743,14 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ BOTTOM NAV ════════════════ -->
 <nav class="bottom-nav" id="bottom-nav" style="display:none">
-  <button class="nav-item active" id="nav-home" onclick="navigate('home')">
+  <button class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')">
+    <span class="nav-icon">🏠</span><span>בית</span>
+  </button>
+  <button class="nav-item" id="nav-home" onclick="navigate('home')">
     <span class="nav-icon">📋</span><span>יומן</span>
   </button>
   <button class="nav-item" id="nav-stats" onclick="navigate('stats')">
-    <span class="nav-icon">📊</span><span>סטטיסטיקות</span>
+    <span class="nav-icon">📊</span><span>סטטס</span>
   </button>
   <button class="nav-item nav-camera" id="nav-camera" onclick="navigate('camera')">＋</button>
   <button class="nav-item" id="nav-weight" onclick="navigate('weight')">
@@ -1959,7 +2111,7 @@ async function setLoggedIn(t, u) {
   // Load weight logs at startup so calcRecommendedCal always has current weight
   try { weightLogs = await apiFetch('/api/weight'); } catch {}
   updateSettingsProfileSub();
-  navigate('home');
+  navigate('dashboard');
 }
 
 function doLogout() {
@@ -2079,9 +2231,51 @@ function navigate(screen) {
   const navEl = document.getElementById(`nav-${screen}`);
   if (navEl) navEl.classList.add('active');
   currentScreen = screen;
+  if (screen === 'dashboard') loadDashboard();
   if (screen === 'home') loadDiary();
   if (screen === 'stats') loadStats();
   if (screen === 'weight') loadWeightScreen();
+}
+
+// ════════════════════════════════════════════════════
+// Dashboard
+// ════════════════════════════════════════════════════
+async function loadDashboard() {
+  const h = new Date().getHours();
+  const greeting = h < 5 ? 'לילה טוב 🌙' : h < 12 ? 'בוקר טוב ☀️' : h < 17 ? 'צהריים טובים 🌤' : h < 21 ? 'ערב טוב 🌅' : 'לילה טוב 🌙';
+  document.getElementById('dash-greeting').textContent = greeting;
+  document.getElementById('dash-username').textContent = username ? `שלום, ${username}` : '';
+
+  try {
+    const entries = await apiFetch(`/api/food?date=${todayStr()}`);
+    const cal  = entries.reduce((s, e) => s + (+e.calories  || 0), 0);
+    const pro  = entries.reduce((s, e) => s + (+e.protein_g || 0), 0);
+    const carb = entries.reduce((s, e) => s + (+e.carbs_g   || 0), 0);
+    const fat  = entries.reduce((s, e) => s + (+e.fat_g     || 0), 0);
+    document.getElementById('dash-cal-eaten').textContent = cal;
+    document.getElementById('dash-pro').textContent  = Math.round(pro)  + 'g';
+    document.getElementById('dash-carb').textContent = Math.round(carb) + 'g';
+    document.getElementById('dash-fat').textContent  = Math.round(fat)  + 'g';
+    const goal = calcRecommendedCal(userProfile);
+    if (goal) {
+      document.getElementById('dash-cal-goal').textContent = goal;
+      const pct = Math.min(100, (cal / goal) * 100);
+      const fill = document.getElementById('dash-cal-fill');
+      fill.style.width = pct + '%';
+      fill.classList.toggle('over', cal > goal);
+      const remain = goal - cal;
+      document.getElementById('dash-cal-sub').textContent = remain > 0
+        ? `נשארו ${remain} קל' להיום`
+        : remain === 0 ? 'הגעת ליעד! 🎉' : `חרגת ב-${Math.abs(remain)} קל' 💪`;
+    } else {
+      document.getElementById('dash-cal-sub').textContent = 'הגדר יעד קלוריות בהגדרות';
+    }
+  } catch {}
+
+  try {
+    const { streak } = await apiFetch('/api/streak');
+    document.getElementById('dash-streak').textContent = streak;
+  } catch {}
 }
 
 // ════════════════════════════════════════════════════
@@ -2339,7 +2533,7 @@ async function saveEntry() {
   try {
     await apiFetch('/api/food', { method: 'POST', body: JSON.stringify(body) });
     diaryDate = todayStr();
-    navigate('home');
+    navigate('dashboard');
     showToast('✅ נשמר ביומן!');
     capturedImageBase64 = null;
     document.getElementById('preview-img').style.display = 'none';

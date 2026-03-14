@@ -1504,9 +1504,10 @@ function calcRecommendedCal(profile) {
   if (!p) return 0;
   const { gender, height, activity, goalKg } = p;
   // Always use latest weight log for current user; fall back to stored profile weight
+  // weightLogs is ordered ASC by date from server, so last element is newest
   let weight = +p.weight || 0;
   if (!profile && weightLogs.length) {
-    const latestLog = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at))[0];
+    const latestLog = weightLogs[weightLogs.length - 1];
     if (+latestLog.weight_kg > 0) weight = +latestLog.weight_kg;
   }
   const age = profileAge(p);
@@ -1771,8 +1772,7 @@ function setMpGoal(v) {
 }
 
 function updateMpPreview() {
-  const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-  const currentWeight = sorted.length ? +sorted[0].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
+  const currentWeight = weightLogs.length ? +weightLogs[weightLogs.length - 1].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
   const profile = {
     gender: mpGender,
     birthDate: document.getElementById('mp-birthdate').value || '',
@@ -1786,8 +1786,7 @@ function updateMpPreview() {
 }
 
 async function saveMpProfile() {
-  const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-  const currentWeight = sorted.length ? +sorted[0].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
+  const currentWeight = weightLogs.length ? +weightLogs[weightLogs.length - 1].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
   const profile = {
     gender: mpGender,
     birthDate: document.getElementById('mp-birthdate').value || '',
@@ -2343,15 +2342,15 @@ function renderWeightList() {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚖️</div><p>אין מדידות עדיין</p></div>`;
     return;
   }
-  // Update profile weight from latest log
-  const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-  const latestWeight = +sorted[0].weight_kg;
+  // Update profile weight from latest log (last item = newest, server orders ASC)
+  const latestWeight = +weightLogs[weightLogs.length - 1].weight_kg;
   if (userProfile && latestWeight) {
     userProfile.weight = latestWeight;
     localStorage.setItem('fl_profile', JSON.stringify(userProfile));
     apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(userProfile) }).catch(() => {});
   }
-  el.innerHTML = sorted.map(w => `
+  // Display newest first
+  el.innerHTML = [...weightLogs].reverse().map(w => `
     <div class="weight-entry">
       <button class="delete-btn" onclick="deleteWeightLog(${w.id})">🗑️</button>
       <div class="weight-entry-info">

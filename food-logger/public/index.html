@@ -1171,7 +1171,7 @@ input::placeholder { color: var(--muted); }
   <div class="welcome-wrap">
     <div class="welcome-icon fu fu-1">🥗</div>
     <div class="welcome-title fu fu-2">יומן<em>.</em></div>
-    <div class="welcome-subtitle fu fu-3">Your Personal Food Logger</div>
+    <div class="welcome-subtitle fu fu-3">יומן האוכל האישי שלך</div>
     <div class="welcome-features">
       <div class="welcome-feature fu fu-4">
         <div class="welcome-feature-icon">📸</div>
@@ -1200,7 +1200,7 @@ input::placeholder { color: var(--muted); }
       <button class="btn btn-ghost" onclick="goToAuth('login')">יש לי חשבון</button>
     </div>
     <div class="welcome-footer fu fu-7">
-      <a href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener">Instagram</a> &middot; By Dar
+      By Dar &middot; <a href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener">Instagram</a>
     </div>
   </div>
 </div>
@@ -1364,10 +1364,10 @@ input::placeholder { color: var(--muted); }
         <div class="form-group"><label>שם האוכל</label><input id="res-name" type="text"></div>
         <div class="nutrition-grid">
           <div class="nut-field"><label>קלוריות (kcal)</label><input id="res-cal" type="number"></div>
-          <div class="nut-field"><label>חלבון (גרמ')</label><input id="res-pro" type="number" step="0.1"></div>
-          <div class="nut-field"><label>פחמימות (גרמ')</label><input id="res-carb" type="number" step="0.1"></div>
-          <div class="nut-field"><label>שומן (גרמ')</label><input id="res-fat" type="number" step="0.1"></div>
-          <div class="nut-field"><label>סיבים (גרמ')</label><input id="res-fiber" type="number" step="0.1"></div>
+          <div class="nut-field"><label>חלבון (גרם)</label><input id="res-pro" type="number" step="0.1"></div>
+          <div class="nut-field"><label>פחמימות (גרם)</label><input id="res-carb" type="number" step="0.1"></div>
+          <div class="nut-field"><label>שומן (גרם)</label><input id="res-fat" type="number" step="0.1"></div>
+          <div class="nut-field"><label>סיבים (גרם)</label><input id="res-fiber" type="number" step="0.1"></div>
         </div>
         <div class="card-title" style="margin-top:14px">סוג ארוחה</div>
         <div class="meal-select">
@@ -2454,7 +2454,8 @@ function renderWeightChart() {
     return;
   }
 
-  const W = 300, H = 120, BOTTOM = 18, TOP = 10;
+  const W = 300, H = 130, LEFT = 38, RIGHT = 8, TOP = 10, BOTTOM = 22;
+  const chartW = W - LEFT - RIGHT;
   const chartH = H - BOTTOM - TOP;
   const n = weightLogs.length;
   const weights = weightLogs.map(w => +w.weight_kg);
@@ -2463,7 +2464,7 @@ function renderWeightChart() {
   const range = maxW - minW || 1;
 
   const pts = weightLogs.map((w, i) => {
-    const x = n === 1 ? W / 2 : 10 + (i / (n - 1)) * (W - 20);
+    const x = LEFT + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
     const y = TOP + chartH - ((+w.weight_kg - minW) / range) * chartH;
     return { x, y, w };
   });
@@ -2478,16 +2479,16 @@ function renderWeightChart() {
     `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#5eead4" stroke="#0d0b09" stroke-width="1.5"/>`
   ).join('') : '';
 
-  // Y labels (min/max)
+  // Y labels on left side (min/max)
   const yLabels = `
-    <text x="${W - 4}" y="${(TOP + chartH).toFixed(1)}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${minW.toFixed(1)}</text>
-    <text x="${W - 4}" y="${(TOP + 8).toFixed(1)}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${maxW.toFixed(1)}</text>
+    <text x="${LEFT - 4}" y="${(TOP + chartH).toFixed(1)}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${minW.toFixed(1)}</text>
+    <text x="${LEFT - 4}" y="${(TOP + 8).toFixed(1)}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${maxW.toFixed(1)}</text>
   `;
 
   // X labels: first and last date
   const xLabels = n > 1 ? `
-    <text x="10" y="${H - 3}" text-anchor="start" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[0].logged_at)}</text>
-    <text x="${W - 10}" y="${H - 3}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[n-1].logged_at)}</text>
+    <text x="${LEFT}" y="${H - 4}" text-anchor="start" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[0].logged_at)}</text>
+    <text x="${W - RIGHT}" y="${H - 4}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[n-1].logged_at)}</text>
   ` : '';
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
@@ -2547,7 +2548,7 @@ function renderDonut(svgId, legendId, totals) {
   document.getElementById(legendId).innerHTML = segments.map(s => `
     <div class="legend-item">
       <div class="legend-dot" style="background:${s.color}"></div>
-      <span><b>${s.label}</b> ${s.grams} גרמ' (${Math.round(s.pct * 100)}%)</span>
+      <span><b>${s.label}</b> ${s.grams} גרם (${Math.round(s.pct * 100)}%)</span>
     </div>
   `).join('');
 }
@@ -2578,7 +2579,7 @@ function renderMacroProgressBars(t) {
   ];
   return items.map(item => `
     <div class="prog-row">
-      <div class="prog-label"><span>${item.label}</span><span style="font-family:'IBM Plex Mono',monospace">${item.val} גרמ'</span></div>
+      <div class="prog-label"><span>${item.label}</span><span style="font-family:'IBM Plex Mono',monospace">${item.val} גרם</span></div>
       <div class="prog-track"><div class="prog-fill" style="width:${Math.min(item.val / item.target * 100, 100)}%;background:${item.color}"></div></div>
     </div>
   `).join('');

@@ -58,6 +58,131 @@ body::after {
 .screen.active { display: flex; }
 
 /* ════════════════════════════════════════
+   WELCOME
+════════════════════════════════════════ */
+#screen-welcome {
+  padding-bottom: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+}
+#screen-welcome::before {
+  content: '';
+  position: absolute;
+  top: -15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, rgba(232,112,58,0.13) 0%, transparent 65%);
+  pointer-events: none;
+}
+.welcome-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(400px, 100%);
+  padding: 48px 24px 36px;
+  min-height: 100dvh;
+  justify-content: center;
+}
+.welcome-icon {
+  width: 76px;
+  height: 76px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  font-size: 36px;
+}
+.welcome-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 52px;
+  color: var(--text);
+  line-height: 0.9;
+  letter-spacing: -2px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.welcome-title em { color: var(--accent); font-style: normal; }
+.welcome-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 36px;
+}
+.welcome-features {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.welcome-feature {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.welcome-feature-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.welcome-feature-text h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.welcome-feature-text p {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.45;
+}
+.welcome-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.welcome-footer {
+  margin-top: 28px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.welcome-footer a { color: #E1306C; text-decoration: none; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fu { animation: fadeUp .45s ease both; }
+.fu-1 { animation-delay: 0ms; }
+.fu-2 { animation-delay: 90ms; }
+.fu-3 { animation-delay: 180ms; }
+.fu-4 { animation-delay: 270ms; }
+.fu-5 { animation-delay: 360ms; }
+.fu-6 { animation-delay: 450ms; }
+.fu-7 { animation-delay: 520ms; }
+
+/* ════════════════════════════════════════
    AUTH
 ════════════════════════════════════════ */
 #screen-auth {
@@ -1041,8 +1166,47 @@ input::placeholder { color: var(--muted); }
 </head>
 <body>
 
+<!-- ════════════════ WELCOME ════════════════ -->
+<div id="screen-welcome" class="screen">
+  <div class="welcome-wrap">
+    <div class="welcome-icon fu fu-1">🥗</div>
+    <div class="welcome-title fu fu-2">יומן<em>.</em></div>
+    <div class="welcome-subtitle fu fu-3">Your Personal Food Logger</div>
+    <div class="welcome-features">
+      <div class="welcome-feature fu fu-4">
+        <div class="welcome-feature-icon">📸</div>
+        <div class="welcome-feature-text">
+          <h4>ניתוח תמונות AI</h4>
+          <p>צלם את הצלחת — בינה מלאכותית תזהה את האוכל ותחשב ערכים תזונתיים</p>
+        </div>
+      </div>
+      <div class="welcome-feature fu fu-5">
+        <div class="welcome-feature-icon">📊</div>
+        <div class="welcome-feature-text">
+          <h4>מעקב מאקרו מלא</h4>
+          <p>קלוריות, חלבון, פחמימות, שומן וסיבים — הכל במקום אחד</p>
+        </div>
+      </div>
+      <div class="welcome-feature fu fu-6">
+        <div class="welcome-feature-icon">📈</div>
+        <div class="welcome-feature-text">
+          <h4>גרפים וסטטיסטיקות</h4>
+          <p>מעקב שבועי, חודשי ושנתי — ראה את ההתקדמות שלך לאורך זמן</p>
+        </div>
+      </div>
+    </div>
+    <div class="welcome-actions fu fu-7">
+      <button class="btn btn-primary" onclick="goToAuth('register')">התחל עכשיו</button>
+      <button class="btn btn-ghost" onclick="goToAuth('login')">יש לי חשבון</button>
+    </div>
+    <div class="welcome-footer fu fu-7">
+      <a href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener">Instagram</a> &middot; By Dar
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════ AUTH ════════════════ -->
-<div id="screen-auth" class="screen active">
+<div id="screen-auth" class="screen">
   <div class="auth-wrap">
     <div class="auth-wordmark">יומן<em>.</em></div>
     <div class="auth-sub">יומן האוכל האישי שלך</div>
@@ -1582,6 +1746,11 @@ function switchAuthTab(tab) {
   document.getElementById('auth-login').style.display = tab === 'login' ? '' : 'none';
   document.getElementById('auth-register').style.display = tab === 'register' ? '' : 'none';
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', (i === 0) === (tab === 'login')));
+}
+
+function goToAuth(tab = 'register') {
+  navigate('auth');
+  switchAuthTab(tab);
 }
 
 async function doLogin() {
@@ -2438,6 +2607,8 @@ loadProfile();
 
 if (token) {
   setLoggedIn(token, username);
+} else {
+  navigate('welcome');
 }
 
 document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });

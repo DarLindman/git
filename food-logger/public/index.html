@@ -959,7 +959,7 @@ input::placeholder { color: var(--muted); }
 ════════════════════════════════════════ */
 .chart-wrap {
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 .chart-wrap svg {
   width: 100%;
@@ -2454,7 +2454,7 @@ function renderWeightChart() {
     return;
   }
 
-  const W = 300, H = 130, LEFT = 38, RIGHT = 8, TOP = 10, BOTTOM = 22;
+  const W = 300, H = 130, LEFT = 38, RIGHT = 24, TOP = 12, BOTTOM = 24;
   const chartW = W - LEFT - RIGHT;
   const chartH = H - BOTTOM - TOP;
   const n = weightLogs.length;

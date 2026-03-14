@@ -1401,7 +1401,7 @@ input::placeholder { color: var(--muted); }
           <button class="meal-opt" data-meal="snack" onclick="selectMeal(this)">🍎 חטיף</button>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="saveEntry()" style="margin-top:4px">שמור ביומן</button>
+      <button class="btn btn-primary" id="save-entry-btn" onclick="saveEntry()" style="margin-top:4px">שמור ביומן</button>
     </div>
     <div id="analysis-error" class="error-msg" style="margin-top:16px"></div>
   </div>
@@ -2222,6 +2222,10 @@ function selectMeal(btn) {
 }
 
 async function saveEntry() {
+  const saveBtn = document.getElementById('save-entry-btn');
+  if (saveBtn.disabled) return;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'שומר...';
   const body = {
     meal_type: selectedMeal,
     food_name: document.getElementById('res-name').value.trim() || 'אוכל לא ידוע',
@@ -2242,7 +2246,11 @@ async function saveEntry() {
     document.querySelector('.cam-placeholder').style.display = '';
     document.getElementById('analyze-btn').disabled = true;
     document.getElementById('file-input').value = '';
-  } catch (e) { showToast('שגיאה בשמירה: ' + e.message); }
+  } catch (e) {
+    showToast('שגיאה בשמירה: ' + e.message);
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'שמור ביומן';
+  }
 }
 
 // ════════════════════════════════════════════════════

@@ -1162,6 +1162,27 @@ input::placeholder { color: var(--muted); }
 .toast.show { opacity: 1; }
 
 
+/* ════════════════════════════════════════
+   DESKTOP (min-width: 768px)
+════════════════════════════════════════ */
+@media (min-width: 768px) {
+  .topbar-title { font-size: 28px; }
+  .topbar-sub { font-size: 14px; }
+  .topbar-brand-title { font-size: 13px; }
+  .topbar-brand-sub { font-size: 11px; }
+  .topbar-brand-ig svg { width: 13px !important; height: 13px !important; }
+
+  .bottom-nav { bottom: 20px; padding: 10px 18px; gap: 8px; }
+  .nav-item { font-size: 12px; gap: 4px; }
+  .nav-item .nav-icon { font-size: 26px; }
+  .nav-item.nav-camera { width: 60px; height: 60px; min-width: 60px; font-size: 28px; }
+
+  .welcome-title { font-size: 64px; }
+  .welcome-subtitle { font-size: 14px; }
+  .welcome-feature-icon { font-size: 28px; }
+  .welcome-feature-text h4 { font-size: 16px; }
+  .welcome-feature-text p { font-size: 13px; }
+}
 </style>
 </head>
 <body>
@@ -1998,8 +2019,9 @@ function changeDay(n) {
 }
 
 async function loadDiary() {
-  document.getElementById('diary-date-label').textContent = formatDate(diaryDate);
   try {
+    const label = document.getElementById('diary-date-label');
+    if (label) label.textContent = formatDate(diaryDate);
     const entries = await apiFetch(`/api/food?date=${diaryDate}`);
     renderMealList(entries);
     renderDailySummary(entries);
@@ -2203,6 +2225,7 @@ async function saveEntry() {
     carbs_g: +document.getElementById('res-carb').value || 0,
     fat_g: +document.getElementById('res-fat').value || 0,
     fiber_g: +document.getElementById('res-fiber').value || 0,
+    logged_at: todayStr() + 'T12:00:00', // use local date to avoid UTC timezone mismatch
   };
   try {
     await apiFetch('/api/food', { method: 'POST', body: JSON.stringify(body) });
@@ -2485,10 +2508,12 @@ function renderWeightChart() {
     <text x="${LEFT - 4}" y="${(TOP + 8).toFixed(1)}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${maxW.toFixed(1)}</text>
   `;
 
-  // X labels: first and last date
+  // X labels: first and last date (only show last if different from first)
+  const firstDate = formatDateShort(weightLogs[0].logged_at);
+  const lastDate = formatDateShort(weightLogs[n-1].logged_at);
   const xLabels = n > 1 ? `
-    <text x="${LEFT}" y="${H - 4}" text-anchor="start" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[0].logged_at)}</text>
-    <text x="${W - RIGHT}" y="${H - 4}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${formatDateShort(weightLogs[n-1].logged_at)}</text>
+    <text x="${LEFT}" y="${H - 4}" text-anchor="start" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${firstDate}</text>
+    ${firstDate !== lastDate ? `<text x="${W - RIGHT}" y="${H - 4}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${lastDate}</text>` : ''}
   ` : '';
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">

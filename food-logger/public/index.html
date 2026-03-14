@@ -1907,7 +1907,7 @@ function renderMealList(entries) {
         <div class="food-name">${e.food_name}</div>
         <div class="food-meta">
           <span class="meal-badge ${MEAL_BADGE[e.meal_type] || ''}">${MEAL_LABELS[e.meal_type] || e.meal_type}</span>
-          ח${Math.round(e.protein_g || 0)}·פ${Math.round(e.carbs_g || 0)}·ש${Math.round(e.fat_g || 0)}
+          חל'${Math.round(e.protein_g || 0)}·פח'${Math.round(e.carbs_g || 0)}·שו'${Math.round(e.fat_g || 0)}
         </div>
       </div>
       <div class="food-cal">${Math.round(e.calories || 0)}<small>קל׳</small></div>
@@ -2262,9 +2262,9 @@ async function addWeightLog() {
     weightLogs = await apiFetch('/api/weight');
     renderWeightChart();
     renderWeightList();
-    // weightLogs refreshed — calcRecommendedCal now auto-reads latest weight
+    // weightLogs refreshed — update all calorie displays
     updateSettingsProfileSub();
-    if (currentScreen === 'home') loadDiary();
+    loadDiary(); // refresh home screen calorie bar regardless of current screen
     showToast('המשקל נשמר');
   } catch (e) { document.getElementById('weight-add-error').textContent = e.message; }
 }

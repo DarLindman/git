@@ -2310,12 +2310,19 @@ async function loadWeeklyStats() {
     const rec = calcRecommendedCal();
     renderStatAvgBox('weekly-avg-box', rows, rec, "ממוצע קל' יומי");
     const chartEl = document.getElementById('weekly-chart');
-    if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
-    const todayS = todayStr();
-    chartEl.innerHTML = renderLineChart(rows, {
+    // Build last 6 days (excluding today), filling zeros for missing days
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const chartDays = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(yesterday); d.setDate(yesterday.getDate() - i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const found = rows.find(r => r.day.slice(0,10) === ds);
+      chartDays.push(found || { day: ds, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
+    }
+    chartEl.innerHTML = renderLineChart(chartDays, {
       getValue: r => +r.calories || 0,
       getLabel: r => formatDateShort(r.day.slice(0, 10)),
-      isToday: r => r.day.slice(0, 10) === todayS,
+      isToday: () => false,
       recommended: rec,
     });
     renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);

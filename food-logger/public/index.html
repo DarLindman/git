@@ -1510,8 +1510,9 @@ function calcRecommendedCal(profile) {
   const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, vactive: 1.9 };
   const tdee = bmr * (mult[activity] || 1.2);
   // goalKg is per week; 1 kg ≈ 7700 kcal → daily adjustment = goalKg * 7700 / 7
+  // positive goalKg (gain) → add calories; negative goalKg (lose) → subtract
   const adj = (+goalKg || 0) * 7700 / 7;
-  return Math.max(Math.round(tdee - adj), 1000);
+  return Math.max(Math.round(tdee + adj), 1000);
 }
 
 // Populate dropdown selects for profile fields
@@ -2263,6 +2264,7 @@ async function addWeightLog() {
         localStorage.setItem('fl_profile', JSON.stringify(userProfile));
         try { await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(userProfile) }); } catch {}
         updateSettingsProfileSub();
+        if (currentScreen === 'home') loadDiary();
       }
     }
     showToast('המשקל נשמר');

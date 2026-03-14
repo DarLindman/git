@@ -328,7 +328,8 @@ app.get('/api/stats/yearly', auth, async (req, res) => {
         SUM(protein_g) AS protein_g,
         SUM(carbs_g) AS carbs_g,
         SUM(fat_g) AS fat_g,
-        SUM(fiber_g) AS fiber_g
+        SUM(fiber_g) AS fiber_g,
+        COUNT(DISTINCT logged_at::date) AS day_count
       FROM food_logs
       WHERE user_id=$1
         AND EXTRACT(YEAR FROM logged_at) = COALESCE($2::integer, EXTRACT(YEAR FROM CURRENT_DATE))

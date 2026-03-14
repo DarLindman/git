@@ -339,6 +339,31 @@ app.delete('/api/weight/:id', auth, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
 });
 
+// Yearly summary — returns monthly totals for a year
+app.get('/api/stats/yearly', auth, async (req, res) => {
+  const { year } = req.query; // YYYY, defaults to current year
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        TO_CHAR(logged_at, 'YYYY-MM') AS month,
+        SUM(calories) AS calories,
+        SUM(protein_g) AS protein_g,
+        SUM(carbs_g) AS carbs_g,
+        SUM(fat_g) AS fat_g,
+        SUM(fiber_g) AS fiber_g
+      FROM food_logs
+      WHERE user_id=$1
+        AND EXTRACT(YEAR FROM logged_at) = COALESCE($2::integer, EXTRACT(YEAR FROM CURRENT_DATE))
+      GROUP BY month
+      ORDER BY month ASC
+    `, [req.user.id, year || null]);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'שגיאת שרת' });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 initDB().then(() => {
   app.listen(port, () => console.log(`Food Logger running on http://localhost:${port}`));

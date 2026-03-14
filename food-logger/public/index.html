@@ -1029,6 +1029,29 @@ input::placeholder { color: var(--muted); }
 }
 
 .toast.show { opacity: 1; }
+
+/* Goal buttons */
+.goal-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+.goal-btn {
+  flex: 1;
+  min-width: 40px;
+  padding: 8px 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace;
+  transition: all .15s;
+  text-align: center;
+}
+.goal-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
 </style>
 </head>
 <body>
@@ -1070,11 +1093,22 @@ input::placeholder { color: var(--muted); }
           <button class="toggle-btn" id="reg-female-btn" onclick="setRegGender('female')">👩 אישה</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
           <div class="form-group" style="margin-bottom:0"><label>גיל</label><input id="reg-age" type="number" min="10" max="120" placeholder="25"></div>
           <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><input id="reg-height" type="number" min="100" max="250" placeholder="170"></div>
           <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><input id="reg-weight" type="number" min="30" max="300" step="0.5" placeholder="70"></div>
-          <div class="form-group" style="margin-bottom:0"><label>יעד ק"ג/חודש</label><input id="reg-goal" type="number" min="-4" max="4" step="0.5" placeholder="0"></div>
+        </div>
+        <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
+        <div class="goal-row" id="reg-goal-list">
+          <button class="goal-btn" data-val="-1" onclick="setRegGoal(-1)">-1</button>
+          <button class="goal-btn" data-val="-0.75" onclick="setRegGoal(-0.75)">-¾</button>
+          <button class="goal-btn" data-val="-0.5" onclick="setRegGoal(-0.5)">-½</button>
+          <button class="goal-btn" data-val="-0.25" onclick="setRegGoal(-0.25)">-¼</button>
+          <button class="goal-btn selected" data-val="0" onclick="setRegGoal(0)">0</button>
+          <button class="goal-btn" data-val="0.25" onclick="setRegGoal(0.25)">+¼</button>
+          <button class="goal-btn" data-val="0.5" onclick="setRegGoal(0.5)">+½</button>
+          <button class="goal-btn" data-val="0.75" onclick="setRegGoal(0.75)">+¾</button>
+          <button class="goal-btn" data-val="1" onclick="setRegGoal(1)">+1</button>
         </div>
 
         <label style="margin-bottom:8px">רמת פעילות</label>
@@ -1105,10 +1139,9 @@ input::placeholder { color: var(--muted); }
   </div>
   <div class="page">
     <div class="date-nav">
-      <!-- RTL: first button is on RIGHT = next day -->
-      <button onclick="changeDay(1)">&#8250;</button>
-      <div class="date-display" id="diary-date-label"></div>
       <button onclick="changeDay(-1)">&#8249;</button>
+      <div class="date-display" id="diary-date-label"></div>
+      <button onclick="changeDay(1)">&#8250;</button>
     </div>
 
     <div class="card" id="daily-summary-card">
@@ -1199,25 +1232,12 @@ input::placeholder { color: var(--muted); }
   <div class="topbar"><div class="topbar-title">סטטיסטיקות</div></div>
   <div class="page">
     <div class="stats-tabs">
-      <button class="stats-tab active" onclick="switchStats('daily')">יומי</button>
-      <button class="stats-tab" onclick="switchStats('weekly')">שבועי</button>
+      <button class="stats-tab active" onclick="switchStats('weekly')">שבועי</button>
       <button class="stats-tab" onclick="switchStats('monthly')">חודשי</button>
+      <button class="stats-tab" onclick="switchStats('yearly')">שנתי</button>
     </div>
 
-    <div id="stats-daily">
-      <div class="date-nav">
-        <!-- RTL: first button is on RIGHT = next day -->
-        <button onclick="statsChangeDay(1)">&#8250;</button>
-        <div class="date-display" id="stats-day-label"></div>
-        <button onclick="statsChangeDay(-1)">&#8249;</button>
-      </div>
-      <div class="card" id="stats-daily-card">
-        <div class="card-title">פילוח מאקרו</div>
-        <div id="stats-daily-content"><div class="empty-state"><div class="empty-icon">📊</div><p>אין נתונים</p></div></div>
-      </div>
-    </div>
-
-    <div id="stats-weekly" style="display:none">
+    <div id="stats-weekly">
       <div id="weekly-avg-box"></div>
       <div class="card">
         <div class="card-title">7 ימים אחרונים — קלוריות</div>
@@ -1231,10 +1251,9 @@ input::placeholder { color: var(--muted); }
 
     <div id="stats-monthly" style="display:none">
       <div class="date-nav">
-        <!-- RTL: first button is on RIGHT = next month -->
-        <button onclick="statsChangeMonth(1)">&#8250;</button>
-        <div class="date-display" id="stats-month-label"></div>
         <button onclick="statsChangeMonth(-1)">&#8249;</button>
+        <div class="date-display" id="stats-month-label"></div>
+        <button onclick="statsChangeMonth(1)">&#8250;</button>
       </div>
       <div id="monthly-avg-box"></div>
       <div class="card">
@@ -1242,8 +1261,25 @@ input::placeholder { color: var(--muted); }
         <div class="chart-wrap" id="monthly-chart"></div>
       </div>
       <div class="card">
-        <div class="card-title">סיכום חודשי</div>
-        <div id="monthly-summary"></div>
+        <div class="card-title">ממוצע חודשי — מאקרו</div>
+        <div id="monthly-macro"></div>
+      </div>
+    </div>
+
+    <div id="stats-yearly" style="display:none">
+      <div class="date-nav">
+        <button onclick="statsChangeYear(-1)">&#8249;</button>
+        <div class="date-display" id="stats-year-label"></div>
+        <button onclick="statsChangeYear(1)">&#8250;</button>
+      </div>
+      <div id="yearly-avg-box"></div>
+      <div class="card">
+        <div class="card-title">קלוריות לפי חודש</div>
+        <div class="chart-wrap" id="yearly-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">ממוצע שנתי — מאקרו</div>
+        <div id="yearly-macro"></div>
       </div>
     </div>
   </div>
@@ -1349,11 +1385,22 @@ input::placeholder { color: var(--muted); }
       <button class="toggle-btn" id="mp-female-btn" onclick="setMpGender('female')">👩 אישה</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
       <div class="form-group" style="margin-bottom:0"><label>גיל</label><input id="mp-age" type="number" min="10" max="120" placeholder="25" oninput="updateMpPreview()"></div>
       <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><input id="mp-height" type="number" min="100" max="250" placeholder="170" oninput="updateMpPreview()"></div>
       <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><input id="mp-weight" type="number" min="30" max="300" step="0.5" placeholder="70" oninput="updateMpPreview()"></div>
-      <div class="form-group" style="margin-bottom:0"><label>יעד ק"ג/חודש</label><input id="mp-goal" type="number" min="-4" max="4" step="0.5" placeholder="0" oninput="updateMpPreview()"></div>
+    </div>
+    <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
+    <div class="goal-row" id="mp-goal-list">
+      <button class="goal-btn" data-val="-1" onclick="setMpGoal(-1)">-1</button>
+      <button class="goal-btn" data-val="-0.75" onclick="setMpGoal(-0.75)">-¾</button>
+      <button class="goal-btn" data-val="-0.5" onclick="setMpGoal(-0.5)">-½</button>
+      <button class="goal-btn" data-val="-0.25" onclick="setMpGoal(-0.25)">-¼</button>
+      <button class="goal-btn selected" data-val="0" onclick="setMpGoal(0)">0</button>
+      <button class="goal-btn" data-val="0.25" onclick="setMpGoal(0.25)">+¼</button>
+      <button class="goal-btn" data-val="0.5" onclick="setMpGoal(0.5)">+½</button>
+      <button class="goal-btn" data-val="0.75" onclick="setMpGoal(0.75)">+¾</button>
+      <button class="goal-btn" data-val="1" onclick="setMpGoal(1)">+1</button>
     </div>
 
     <label style="margin-bottom:8px">רמת פעילות</label>
@@ -1387,14 +1434,17 @@ let statsMonth = todayStr().slice(0, 7);
 let selectedMeal = 'lunch';
 let capturedImageBase64 = null;
 let capturedMime = 'image/jpeg';
-let currentStatsTab = 'daily';
+let currentStatsTab = 'weekly';
 let userProfile = null;
 let pendingToken = null;
 let pendingUsername = null;
 let regGender = 'male';
 let regActivity = 'light';
+let regGoalKg = 0;
 let mpGender = 'male';
 let mpActivity = 'light';
+let mpGoalKg = 0;
+let statsYear = new Date().getFullYear().toString();
 let weightLogs = [];
 
 // ════════════════════════════════════════════════════
@@ -1454,7 +1504,8 @@ function calcRecommendedCal(profile) {
   bmr += gender === 'male' ? 5 : -161;
   const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, vactive: 1.9 };
   const tdee = bmr * (mult[activity] || 1.2);
-  const adj = (+goalKg || 0) * 7700 / 30;
+  // goalKg is per week; 1 kg ≈ 7700 kcal → daily adjustment = goalKg * 7700 / 7
+  const adj = (+goalKg || 0) * 7700 / 7;
   return Math.max(Math.round(tdee - adj), 1000);
 }
 
@@ -1512,10 +1563,14 @@ async function doRegister() {
     // Reset reg profile state
     regGender = 'male';
     regActivity = 'light';
+    regGoalKg = 0;
     document.getElementById('reg-male-btn').classList.add('selected');
     document.getElementById('reg-female-btn').classList.remove('selected');
     document.querySelectorAll('#reg-activity-list .activity-opt').forEach(b => {
       b.classList.toggle('selected', b.dataset.val === 'light');
+    });
+    document.querySelectorAll('#reg-goal-list .goal-btn').forEach(b => {
+      b.classList.toggle('selected', +b.dataset.val === 0);
     });
   } catch (e) { document.getElementById('auth-error2').textContent = e.message; }
 }
@@ -1533,13 +1588,28 @@ function setRegActivity(a) {
   });
 }
 
-function saveRegProfile() {
+function setRegGoal(v) {
+  regGoalKg = v;
+  document.querySelectorAll('#reg-goal-list .goal-btn').forEach(b => {
+    b.classList.toggle('selected', +b.dataset.val === v);
+  });
+}
+
+async function saveRegProfile() {
   const age = +document.getElementById('reg-age').value || 0;
   const height = +document.getElementById('reg-height').value || 0;
   const weight = +document.getElementById('reg-weight').value || 0;
-  const goalKg = +document.getElementById('reg-goal').value || 0;
-  const profile = { gender: regGender, age, height, weight, activity: regActivity, goalKg };
+  const profile = { gender: regGender, age, height, weight, activity: regActivity, goalKg: regGoalKg };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
+  // Auto-log registration weight
+  if (weight > 0 && pendingToken) {
+    const savedToken = token;
+    token = pendingToken;
+    try {
+      await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }) });
+    } catch(e) { /* non-critical */ }
+    token = savedToken;
+  }
   finishLogin();
 }
 
@@ -1595,22 +1665,29 @@ function openProfileModal() {
   if (userProfile) {
     mpGender = userProfile.gender || 'male';
     mpActivity = userProfile.activity || 'light';
+    mpGoalKg = userProfile.goalKg || 0;
     document.getElementById('mp-age').value = userProfile.age || '';
     document.getElementById('mp-height').value = userProfile.height || '';
     document.getElementById('mp-weight').value = userProfile.weight || '';
-    document.getElementById('mp-goal').value = userProfile.goalKg || '';
   } else {
     mpGender = 'male';
     mpActivity = 'light';
+    mpGoalKg = 0;
     document.getElementById('mp-age').value = '';
     document.getElementById('mp-height').value = '';
     document.getElementById('mp-weight').value = '';
-    document.getElementById('mp-goal').value = '';
   }
   document.getElementById('mp-male-btn').classList.toggle('selected', mpGender === 'male');
   document.getElementById('mp-female-btn').classList.toggle('selected', mpGender === 'female');
   document.querySelectorAll('#mp-activity-list .activity-opt').forEach(b => {
     b.classList.toggle('selected', b.dataset.val === mpActivity);
+  });
+  // Find closest goal option
+  const goalOpts = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1];
+  const closest = goalOpts.reduce((a, b) => Math.abs(b - mpGoalKg) < Math.abs(a - mpGoalKg) ? b : a);
+  mpGoalKg = closest;
+  document.querySelectorAll('#mp-goal-list .goal-btn').forEach(b => {
+    b.classList.toggle('selected', +b.dataset.val === mpGoalKg);
   });
   updateMpPreview();
   openModal('modal-profile');
@@ -1631,6 +1708,14 @@ function setMpActivity(a) {
   updateMpPreview();
 }
 
+function setMpGoal(v) {
+  mpGoalKg = v;
+  document.querySelectorAll('#mp-goal-list .goal-btn').forEach(b => {
+    b.classList.toggle('selected', +b.dataset.val === v);
+  });
+  updateMpPreview();
+}
+
 function updateMpPreview() {
   const profile = {
     gender: mpGender,
@@ -1638,7 +1723,7 @@ function updateMpPreview() {
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,
-    goalKg: +document.getElementById('mp-goal').value || 0,
+    goalKg: mpGoalKg,
   };
   const rec = calcRecommendedCal(profile);
   document.getElementById('mp-cal-preview').textContent = rec > 0 ? `${rec} קל'` : '—';
@@ -1651,7 +1736,7 @@ function saveMpProfile() {
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,
-    goalKg: +document.getElementById('mp-goal').value || 0,
+    goalKg: mpGoalKg,
   };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
   userProfile = profile;
@@ -1860,44 +1945,21 @@ function switchStats(tab) {
   currentStatsTab = tab;
   const tabs = document.querySelectorAll('.stats-tab');
   tabs.forEach(t => t.classList.remove('active'));
-  const idx = ['daily','weekly','monthly'].indexOf(tab);
+  const idx = ['weekly','monthly','yearly'].indexOf(tab);
   if (tabs[idx]) tabs[idx].classList.add('active');
-  ['daily','weekly','monthly'].forEach(t => {
+  ['weekly','monthly','yearly'].forEach(t => {
     document.getElementById(`stats-${t}`).style.display = t === tab ? '' : 'none';
   });
   loadStats();
 }
 
-function statsChangeDay(n) { statsDate = addDays(statsDate, n); loadStats(); }
 function statsChangeMonth(n) { statsMonth = addMonths(statsMonth, n); loadStats(); }
+function statsChangeYear(n) { statsYear = String(+statsYear + n); loadStats(); }
 
 async function loadStats() {
-  if (currentStatsTab === 'daily') await loadDailyStats();
   if (currentStatsTab === 'weekly') await loadWeeklyStats();
   if (currentStatsTab === 'monthly') await loadMonthlyStats();
-}
-
-async function loadDailyStats() {
-  document.getElementById('stats-day-label').textContent = formatDate(statsDate);
-  try {
-    const data = await apiFetch(`/api/stats/daily?date=${statsDate}`);
-    const el = document.getElementById('stats-daily-content');
-    if (!data.totals.calories) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>אין נתונים ליום זה</p></div>`;
-      return;
-    }
-    const t = data.totals;
-    el.innerHTML = `
-      <div class="macro-row">
-        <div class="macro-pill mp-cal"><div class="mp-val">${Math.round(t.calories)}</div><div class="mp-label">קלוריות</div></div>
-        <div class="macro-pill mp-pro"><div class="mp-val">${Math.round(t.protein_g)}</div><div class="mp-label">חלבון</div></div>
-        <div class="macro-pill mp-carb"><div class="mp-val">${Math.round(t.carbs_g)}</div><div class="mp-label">פחמימות</div></div>
-        <div class="macro-pill mp-fat"><div class="mp-val">${Math.round(t.fat_g)}</div><div class="mp-label">שומן</div></div>
-      </div>
-      ${renderDonutHTML(t)}
-      ${renderMacroProgressBars(t)}
-    `;
-  } catch { }
+  if (currentStatsTab === 'yearly') await loadYearlyStats();
 }
 
 async function loadWeeklyStats() {
@@ -1928,20 +1990,15 @@ async function loadWeeklyStats() {
       avgBoxEl.innerHTML = '';
     }
 
-    // Bar chart
+    // Line chart
     const chartEl = document.getElementById('weekly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
 
-    const days = ['א','ב','ג','ד','ה','ו','ש'];
     const todayS = todayStr();
-    chartEl.innerHTML = renderVerticalBarChart(rows, {
+    chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
-      getLabel: r => {
-        const [y, m, d] = r.day.split('-').map(Number);
-        const date = new Date(y, m - 1, d);
-        return days[date.getDay()];
-      },
-      isToday: r => r.day === todayS,
+      getLabel: r => formatDateShort(r.day.slice(0, 10)),
+      isToday: r => r.day.slice(0, 10) === todayS,
       recommended: rec,
     });
 
@@ -1988,79 +2045,146 @@ async function loadMonthlyStats() {
       avgBoxEl.innerHTML = '';
     }
 
-    // Bar chart
+    // Line chart
     const chartEl = document.getElementById('monthly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
 
     const todayS = todayStr();
-    chartEl.innerHTML = renderVerticalBarChart(rows, {
+    chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
-      getLabel: r => {
-        const [y, m, d] = r.day.split('-').map(Number);
-        return String(d);
-      },
-      isToday: r => r.day === todayS,
+      getLabel: r => String(+r.day.slice(8, 10)),
+      isToday: r => r.day.slice(0, 10) === todayS,
       recommended: rec,
     });
 
-    // Monthly summary
-    const tot = rows.reduce((a, r) => ({
+    // Macro avgs
+    const avg = rows.reduce((a, r) => ({
       cal: a.cal + (+r.calories || 0),
       pro: a.pro + (+r.protein_g || 0),
       carb: a.carb + (+r.carbs_g || 0),
       fat: a.fat + (+r.fat_g || 0),
-    }), { cal: 0, pro: 0, carb: 0, fat: 0 });
-
-    document.getElementById('monthly-summary').innerHTML = `
-      <div class="macro-row">
-        <div class="macro-pill mp-cal"><div class="mp-val">${Math.round(tot.cal)}</div><div class="mp-label">סה"כ קל׳</div></div>
-        <div class="macro-pill mp-pro"><div class="mp-val">${Math.round(tot.pro / rows.length)}</div><div class="mp-label">ממוצע חלבון</div></div>
-        <div class="macro-pill mp-carb"><div class="mp-val">${Math.round(tot.carb / rows.length)}</div><div class="mp-label">ממוצע פח׳</div></div>
-        <div class="macro-pill mp-fat"><div class="mp-val">${Math.round(tot.fat / rows.length)}</div><div class="mp-label">ממוצע שומן</div></div>
-      </div>
-      <p style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center">${rows.length} ימים עם נתונים</p>
-    `;
+      fiber: a.fiber + (+r.fiber_g || 0),
+    }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
+    const n = rows.length;
+    const avgt = { calories: avg.cal / n, protein_g: avg.pro / n, carbs_g: avg.carb / n, fat_g: avg.fat / n, fiber_g: avg.fiber / n };
+    document.getElementById('monthly-macro').innerHTML = renderMacroProgressBars(avgt) + `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">ממוצע יומי ב-${n} ימים</p>`;
   } catch { }
 }
 
 // ════════════════════════════════════════════════════
-// Vertical SVG bar chart
+// SVG line chart with dots and date labels
 // ════════════════════════════════════════════════════
-function renderVerticalBarChart(rows, { getValue, getLabel, isToday, recommended }) {
-  const W = 320, H = 160, BOTTOM = 22, TOP = 16;
+function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
+  const W = 320, H = 160, BOTTOM = 24, TOP = 14, LEFT = 8, RIGHT = 8;
+  const chartW = W - LEFT - RIGHT;
   const chartH = H - BOTTOM - TOP;
   const n = rows.length;
-  const maxVal = Math.max(...rows.map(getValue), recommended || 0, 1);
-  const barW = Math.max(Math.floor((W - 20) / n) - 3, 4);
-  const gap = (W - 20 - barW * n) / Math.max(n - 1, 1);
+  const values = rows.map(getValue);
+  const maxVal = Math.max(...values, recommended || 0, 1);
+  const range = maxVal || 1;
 
-  let bars = '';
-  let labels = '';
-  rows.forEach((r, i) => {
-    const val = getValue(r);
-    const bh = Math.max(Math.round(val / maxVal * chartH), val > 0 ? 2 : 0);
-    const x = 10 + i * (barW + gap);
-    const y = TOP + chartH - bh;
-    const isT = isToday(r);
-    const fill = isT ? 'rgba(232,112,58,0.92)' : 'rgba(232,112,58,0.45)';
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${bh}" rx="2" fill="${fill}"/>`;
-    const lx = (x + barW / 2).toFixed(1);
-    labels += `<text x="${lx}" y="${H - 5}" text-anchor="middle" font-size="9" fill="${isT ? 'var(--accent)' : '#7a6e62'}" font-family="IBM Plex Mono,monospace">${getLabel(r)}</text>`;
+  const pts = rows.map((r, i) => {
+    const x = n === 1 ? W / 2 : LEFT + (i / (n - 1)) * chartW;
+    const y = TOP + chartH - (getValue(r) / range) * chartH;
+    return { x, y, r };
   });
 
-  // Recommended line
+  const polyline = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = n > 1
+    ? `M ${pts[0].x.toFixed(1)},${(TOP + chartH).toFixed(1)} ` +
+      pts.map(p => `L ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') +
+      ` L ${pts[n-1].x.toFixed(1)},${(TOP + chartH).toFixed(1)} Z`
+    : '';
+
+  // Only show label every Nth point to avoid crowding
+  const step = n <= 10 ? 1 : n <= 20 ? 2 : 5;
+
+  const dots = pts.map(p => {
+    const isT = isToday(p.r);
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${isT ? '#e8703a' : 'rgba(232,112,58,0.65)'}" stroke="#0d0b09" stroke-width="1.5"/>`;
+  }).join('');
+
+  const labels = pts.map((p, i) => {
+    if (i % step !== 0 && i !== n - 1) return '';
+    const isT = isToday(p.r);
+    return `<text x="${p.x.toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="8" fill="${isT ? '#e8703a' : '#7a6e62'}" font-family="IBM Plex Mono,monospace">${getLabel(p.r)}</text>`;
+  }).join('');
+
   let recLine = '';
-  if (recommended > 0 && recommended <= maxVal * 1.5) {
-    const ry = (TOP + chartH - Math.round(recommended / maxVal * chartH)).toFixed(1);
-    recLine = `<line x1="10" y1="${ry}" x2="${W - 10}" y2="${ry}" stroke="#e8703a" stroke-dasharray="4,3" opacity="0.6" stroke-width="1"/>
-      <text x="${W - 12}" y="${+ry - 2}" text-anchor="end" font-size="8" fill="#e8703a" opacity="0.8" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
+  if (recommended > 0) {
+    const ry = (TOP + chartH - (recommended / range) * chartH).toFixed(1);
+    recLine = `<line x1="${LEFT}" y1="${ry}" x2="${W - RIGHT}" y2="${ry}" stroke="#e8703a" stroke-dasharray="4,3" opacity="0.5" stroke-width="1"/>
+      <text x="${W - RIGHT - 2}" y="${+ry - 3}" text-anchor="end" font-size="7" fill="#e8703a" opacity="0.75" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-    ${bars}
+    <defs>
+      <linearGradient id="lgrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#e8703a" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#e8703a" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${areaPath ? `<path d="${areaPath}" fill="url(#lgrad)"/>` : ''}
+    <polyline points="${polyline}" fill="none" stroke="rgba(232,112,58,0.7)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
     ${recLine}
+    ${dots}
     ${labels}
   </svg>`;
+}
+
+async function loadYearlyStats() {
+  document.getElementById('stats-year-label').textContent = statsYear;
+  try {
+    const rows = await apiFetch(`/api/stats/yearly?year=${statsYear}`);
+    const rec = calcRecommendedCal();
+    const monthNames = ['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ'];
+
+    // Avg box
+    const avgBoxEl = document.getElementById('yearly-avg-box');
+    if (rows.length) {
+      const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
+      const avgCal = Math.round(totalCal / rows.length);
+      let diffHtml = '';
+      if (rec > 0) {
+        const diff = avgCal - rec;
+        const cls = diff <= 0 ? 'under' : 'over';
+        const sign = diff > 0 ? '+' : '';
+        diffHtml = `<div class="avg-diff ${cls}">${sign}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
+      }
+      avgBoxEl.innerHTML = `<div class="avg-box">
+        <div class="avg-box-left">
+          <div class="avg-val">${avgCal}</div>
+          <div class="avg-label">ממוצע קל' חודשי</div>
+        </div>
+        <div class="avg-box-right">${diffHtml}</div>
+      </div>`;
+    } else {
+      avgBoxEl.innerHTML = '';
+    }
+
+    const chartEl = document.getElementById('yearly-chart');
+    if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
+
+    const currentMonth = todayStr().slice(0, 7);
+    chartEl.innerHTML = renderLineChart(rows, {
+      getValue: r => +r.calories || 0,
+      getLabel: r => monthNames[+(r.month.slice(5, 7)) - 1],
+      isToday: r => r.month === currentMonth,
+      recommended: rec,
+    });
+
+    // Macro avgs
+    const avg = rows.reduce((a, r) => ({
+      cal: a.cal + (+r.calories || 0),
+      pro: a.pro + (+r.protein_g || 0),
+      carb: a.carb + (+r.carbs_g || 0),
+      fat: a.fat + (+r.fat_g || 0),
+      fiber: a.fiber + (+r.fiber_g || 0),
+    }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
+    const n = rows.length;
+    const avgt = { calories: avg.cal / n, protein_g: avg.pro / n, carbs_g: avg.carb / n, fat_g: avg.fat / n, fiber_g: avg.fiber / n };
+    document.getElementById('yearly-macro').innerHTML = renderMacroProgressBars(avgt) + `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">ממוצע חודשי ב-${n} חודשים</p>`;
+  } catch { }
 }
 
 // ════════════════════════════════════════════════════

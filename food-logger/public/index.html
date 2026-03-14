@@ -1411,7 +1411,6 @@ let token = localStorage.getItem('fl_token');
 let username = localStorage.getItem('fl_username');
 let currentScreen = 'auth';
 let diaryDate = todayStr();
-let statsDate = todayStr();
 let statsMonth = todayStr().slice(0, 7);
 let selectedMeal = 'lunch';
 let capturedImageBase64 = null;
@@ -1589,15 +1588,12 @@ async function doRegister() {
     document.getElementById('auth-step1').style.display = 'none';
     document.getElementById('auth-step2').style.display = '';
     // Reset reg profile state
-    regGender = 'male';
-    regActivity = 'light';
-    regGoalKg = 0;
+    regGender = 'male'; regActivity = 'light'; regGoalKg = 0;
     document.getElementById('reg-male-btn').classList.add('selected');
     document.getElementById('reg-female-btn').classList.remove('selected');
     document.querySelectorAll('#reg-activity-list .activity-opt').forEach(b => {
       b.classList.toggle('selected', b.dataset.val === 'light');
     });
-    regGoalKg = 0;
     const regGoalSel = document.getElementById('reg-goal-select');
     if (regGoalSel) regGoalSel.value = '0';
   } catch (e) { document.getElementById('auth-error2').textContent = e.message; }
@@ -1829,13 +1825,13 @@ const MEAL_BADGE = { breakfast: 'badge-breakfast', lunch: 'badge-lunch', dinner:
 
 const FOOD_EMOJI_MAP = [
   [['עוף','chicken','שניצל','קציצ'], '🍗'],
-  [['בשר','המבורגר','burger','סטייק','steak','כבד'], '🥩'],
+  [['בשר','סטייק','steak','כבד'], '🥩'],
   [['דג','fish','סלמון','salmon','טונה','tuna','בס','דניס','פילה דג'], '🐟'],
   [['סלט','salad'], '🥗'],
   [['פסטה','pasta','ספגטי','spaghetti','פנה','לזניה'], '🍝'],
   [['פיצה','pizza'], '🍕'],
   [['סושי','sushi','מאקי'], '🍱'],
-  [['בורגר','burger'], '🍔'],
+  [['בורגר','המבורגר','burger','hamburger'], '🍔'],
   [['אורז','rice'], '🍚'],
   [['לחם','toast','טוסט','כריך','sandwich','פיתה','לאפה','בגט'], '🥪'],
   [['קרואסון','croissant'], '🥐'],
@@ -2069,38 +2065,38 @@ async function loadStats() {
   if (currentStatsTab === 'yearly') await loadYearlyStats();
 }
 
+// ── Shared stat helpers ──────────────────────────────────────────────────────
+function renderStatAvgBox(elId, rows, rec, label) {
+  const el = document.getElementById(elId);
+  if (!rows.length) { el.innerHTML = ''; return; }
+  const avgCal = Math.round(rows.reduce((s, r) => s + (+r.calories || 0), 0) / rows.length);
+  let diffHtml = '';
+  if (rec > 0) {
+    const diff = avgCal - rec;
+    const cls = diff <= 0 ? 'under' : 'over';
+    diffHtml = `<div class="avg-diff ${cls}">${diff > 0 ? '+' : ''}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
+  }
+  el.innerHTML = `<div class="avg-box"><div class="avg-box-left"><div class="avg-val">${avgCal}</div><div class="avg-label">${label}</div></div><div class="avg-box-right">${diffHtml}</div></div>`;
+}
+
+function renderStatMacros(elId, rows, footnote) {
+  const n = rows.length;
+  const sum = rows.reduce((a, r) => ({
+    pro: a.pro + (+r.protein_g || 0), carb: a.carb + (+r.carbs_g || 0),
+    fat: a.fat + (+r.fat_g || 0), fiber: a.fiber + (+r.fiber_g || 0),
+  }), { pro: 0, carb: 0, fat: 0, fiber: 0 });
+  const avgt = { protein_g: sum.pro / n, carbs_g: sum.carb / n, fat_g: sum.fat / n, fiber_g: sum.fiber / n };
+  document.getElementById(elId).innerHTML = renderMacroProgressBars(avgt) +
+    `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">${footnote}</p>`;
+}
+
 async function loadWeeklyStats() {
   try {
     const rows = await apiFetch('/api/stats/weekly');
     const rec = calcRecommendedCal();
-
-    // Avg box
-    const avgBoxEl = document.getElementById('weekly-avg-box');
-    if (rows.length) {
-      const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
-      const avgCal = Math.round(totalCal / rows.length);
-      let diffHtml = '';
-      if (rec > 0) {
-        const diff = avgCal - rec;
-        const cls = diff <= 0 ? 'under' : 'over';
-        const sign = diff > 0 ? '+' : '';
-        diffHtml = `<div class="avg-diff ${cls}">${sign}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
-      }
-      avgBoxEl.innerHTML = `<div class="avg-box">
-        <div class="avg-box-left">
-          <div class="avg-val">${avgCal}</div>
-          <div class="avg-label">ממוצע קל' יומי</div>
-        </div>
-        <div class="avg-box-right">${diffHtml}</div>
-      </div>`;
-    } else {
-      avgBoxEl.innerHTML = '';
-    }
-
-    // Line chart
+    renderStatAvgBox('weekly-avg-box', rows, rec, "ממוצע קל' יומי");
     const chartEl = document.getElementById('weekly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
-
     const todayS = todayStr();
     chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
@@ -2108,18 +2104,7 @@ async function loadWeeklyStats() {
       isToday: r => r.day.slice(0, 10) === todayS,
       recommended: rec,
     });
-
-    // Macro avgs
-    const avg = rows.reduce((a, r) => ({
-      cal: a.cal + (+r.calories || 0),
-      pro: a.pro + (+r.protein_g || 0),
-      carb: a.carb + (+r.carbs_g || 0),
-      fat: a.fat + (+r.fat_g || 0),
-      fiber: a.fiber + (+r.fiber_g || 0),
-    }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
-    const n = rows.length;
-    const avgt = { calories: avg.cal / n, protein_g: avg.pro / n, carbs_g: avg.carb / n, fat_g: avg.fat / n, fiber_g: avg.fiber / n };
-    document.getElementById('weekly-macro').innerHTML = renderMacroProgressBars(avgt) + `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">ממוצע יומי ב-${n} ימים</p>`;
+    renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
 }
 
@@ -2128,34 +2113,9 @@ async function loadMonthlyStats() {
   try {
     const rows = await apiFetch(`/api/stats/monthly?month=${statsMonth}`);
     const rec = calcRecommendedCal();
-
-    // Avg box
-    const avgBoxEl = document.getElementById('monthly-avg-box');
-    if (rows.length) {
-      const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
-      const avgCal = Math.round(totalCal / rows.length);
-      let diffHtml = '';
-      if (rec > 0) {
-        const diff = avgCal - rec;
-        const cls = diff <= 0 ? 'under' : 'over';
-        const sign = diff > 0 ? '+' : '';
-        diffHtml = `<div class="avg-diff ${cls}">${sign}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
-      }
-      avgBoxEl.innerHTML = `<div class="avg-box">
-        <div class="avg-box-left">
-          <div class="avg-val">${avgCal}</div>
-          <div class="avg-label">ממוצע קל' יומי</div>
-        </div>
-        <div class="avg-box-right">${diffHtml}</div>
-      </div>`;
-    } else {
-      avgBoxEl.innerHTML = '';
-    }
-
-    // Line chart
+    renderStatAvgBox('monthly-avg-box', rows, rec, "ממוצע קל' יומי");
     const chartEl = document.getElementById('monthly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
-
     const todayS = todayStr();
     chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
@@ -2163,18 +2123,7 @@ async function loadMonthlyStats() {
       isToday: r => r.day.slice(0, 10) === todayS,
       recommended: rec,
     });
-
-    // Macro avgs
-    const avg = rows.reduce((a, r) => ({
-      cal: a.cal + (+r.calories || 0),
-      pro: a.pro + (+r.protein_g || 0),
-      carb: a.carb + (+r.carbs_g || 0),
-      fat: a.fat + (+r.fat_g || 0),
-      fiber: a.fiber + (+r.fiber_g || 0),
-    }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
-    const n = rows.length;
-    const avgt = { calories: avg.cal / n, protein_g: avg.pro / n, carbs_g: avg.carb / n, fat_g: avg.fat / n, fiber_g: avg.fiber / n };
-    document.getElementById('monthly-macro').innerHTML = renderMacroProgressBars(avgt) + `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">ממוצע יומי ב-${n} ימים</p>`;
+    renderStatMacros('monthly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
 }
 
@@ -2245,33 +2194,9 @@ async function loadYearlyStats() {
     const rows = await apiFetch(`/api/stats/yearly?year=${statsYear}`);
     const rec = calcRecommendedCal();
     const monthNames = ['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ'];
-
-    // Avg box
-    const avgBoxEl = document.getElementById('yearly-avg-box');
-    if (rows.length) {
-      const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
-      const avgCal = Math.round(totalCal / rows.length);
-      let diffHtml = '';
-      if (rec > 0) {
-        const diff = avgCal - rec;
-        const cls = diff <= 0 ? 'under' : 'over';
-        const sign = diff > 0 ? '+' : '';
-        diffHtml = `<div class="avg-diff ${cls}">${sign}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
-      }
-      avgBoxEl.innerHTML = `<div class="avg-box">
-        <div class="avg-box-left">
-          <div class="avg-val">${avgCal}</div>
-          <div class="avg-label">ממוצע קל' חודשי</div>
-        </div>
-        <div class="avg-box-right">${diffHtml}</div>
-      </div>`;
-    } else {
-      avgBoxEl.innerHTML = '';
-    }
-
+    renderStatAvgBox('yearly-avg-box', rows, rec, "ממוצע קל' חודשי");
     const chartEl = document.getElementById('yearly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
-
     const currentMonth = todayStr().slice(0, 7);
     chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
@@ -2279,18 +2204,7 @@ async function loadYearlyStats() {
       isToday: r => r.month === currentMonth,
       recommended: rec,
     });
-
-    // Macro avgs
-    const avg = rows.reduce((a, r) => ({
-      cal: a.cal + (+r.calories || 0),
-      pro: a.pro + (+r.protein_g || 0),
-      carb: a.carb + (+r.carbs_g || 0),
-      fat: a.fat + (+r.fat_g || 0),
-      fiber: a.fiber + (+r.fiber_g || 0),
-    }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
-    const n = rows.length;
-    const avgt = { calories: avg.cal / n, protein_g: avg.pro / n, carbs_g: avg.carb / n, fat_g: avg.fat / n, fiber_g: avg.fiber / n };
-    document.getElementById('yearly-macro').innerHTML = renderMacroProgressBars(avgt) + `<p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">ממוצע חודשי ב-${n} חודשים</p>`;
+    renderStatMacros('yearly-macro', rows, `ממוצע חודשי ב-${rows.length} חודשים`);
   } catch { }
 }
 
@@ -2444,28 +2358,6 @@ function renderDonut(svgId, legendId, totals) {
       <span><b>${s.label}</b> ${s.grams} גרמ' (${Math.round(s.pct * 100)}%)</span>
     </div>
   `).join('');
-}
-
-function renderDonutHTML(totals) {
-  const pro_cal = (totals.protein_g || 0) * 4;
-  const carb_cal = (totals.carbs_g || 0) * 4;
-  const fat_cal = (totals.fat_g || 0) * 9;
-  const total = pro_cal + carb_cal + fat_cal || 1;
-  const segments = [
-    { pct: pro_cal / total, color: '#5eead4', label: 'חלבון', grams: Math.round(totals.protein_g || 0) },
-    { pct: carb_cal / total, color: '#93c5fd', label: 'פחמימות', grams: Math.round(totals.carbs_g || 0) },
-    { pct: fat_cal / total, color: '#fca5a5', label: 'שומן', grams: Math.round(totals.fat_g || 0) },
-  ];
-  const legend = segments.map(s => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${s.color}"></div>
-      <span><b>${s.label}</b> ${s.grams} גרמ' (${Math.round(s.pct * 100)}%)</span>
-    </div>
-  `).join('');
-  return `<div class="donut-wrap">
-    <svg width="90" height="90" viewBox="0 0 90 90">${donutSVGPaths(segments, 45, 18)}</svg>
-    <div class="donut-legend">${legend}</div>
-  </div>`;
 }
 
 function donutSVGPaths(segments, cx, r) {

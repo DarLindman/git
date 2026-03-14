@@ -5,7 +5,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const Anthropic = require('@anthropic-ai/sdk');
-const multer = require('multer');
 const path = require('path');
 
 const app = express();
@@ -16,9 +15,6 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process
 
 // Anthropic
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Multer (memory storage — images not persisted, only analysis results saved)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -124,20 +120,12 @@ app.post('/auth/change-password', auth, async (req, res) => {
 });
 
 // ─── Analyze food image ───────────────────────────────────────────────────────
-app.post('/api/analyze', auth, upload.single('image'), async (req, res) => {
+app.post('/api/analyze', auth, async (req, res) => {
+  const { imageBase64: raw, mimeType: mime } = req.body;
+  if (!raw) return res.status(400).json({ error: 'No image provided' });
+  const imageBase64 = raw.replace(/^data:[^;]+;base64,/, '');
+  const mimeType = mime || 'image/jpeg';
   try {
-    let imageBase64, mimeType;
-    if (req.file) {
-      imageBase64 = req.file.buffer.toString('base64');
-      mimeType = req.file.mimetype;
-    } else if (req.body.imageBase64) {
-      // Accept base64 from JSON body too
-      imageBase64 = req.body.imageBase64.replace(/^data:[^;]+;base64,/, '');
-      mimeType = req.body.mimeType || 'image/jpeg';
-    } else {
-      return res.status(400).json({ error: 'No image provided' });
-    }
-
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
@@ -224,40 +212,6 @@ app.delete('/api/food/:id', auth, async (req, res) => {
 });
 
 // ─── Statistics ───────────────────────────────────────────────────────────────
-// Daily summary
-app.get('/api/stats/daily', auth, async (req, res) => {
-  const { date } = req.query; // YYYY-MM-DD, defaults to today
-  try {
-    const { rows } = await pool.query(`
-      SELECT
-        meal_type,
-        COUNT(*) AS items,
-        SUM(calories) AS calories,
-        SUM(protein_g) AS protein_g,
-        SUM(carbs_g) AS carbs_g,
-        SUM(fat_g) AS fat_g,
-        SUM(fiber_g) AS fiber_g
-      FROM food_logs
-      WHERE user_id=$1 AND logged_at::date = COALESCE($2::date, CURRENT_DATE)
-      GROUP BY meal_type
-      ORDER BY meal_type
-    `, [req.user.id, date || null]);
-
-    const totals = rows.reduce((acc, r) => ({
-      calories: acc.calories + (+r.calories || 0),
-      protein_g: acc.protein_g + (+r.protein_g || 0),
-      carbs_g: acc.carbs_g + (+r.carbs_g || 0),
-      fat_g: acc.fat_g + (+r.fat_g || 0),
-      fiber_g: acc.fiber_g + (+r.fiber_g || 0),
-    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-
-    res.json({ byMeal: rows, totals });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'שגיאת שרת' });
-  }
-});
-
 // Weekly summary — returns 7 days of daily totals
 app.get('/api/stats/weekly', auth, async (req, res) => {
   const { start } = req.query; // YYYY-MM-DD (start of week), defaults to 7 days ago

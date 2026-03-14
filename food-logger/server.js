@@ -150,7 +150,7 @@ app.post('/api/analyze', auth, upload.single('image'), async (req, res) => {
           },
           {
             type: 'text',
-            text: `Identify the food in the image. Reply with ONLY a single-line JSON object, no markdown, no code blocks, no explanation:\n{"foodName":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"notes":"קצר"}\nEstimate for the portion shown. Numbers only for numeric fields.`
+            text: `Identify the food in the image. Reply with ONLY a single-line JSON object, no markdown, no code blocks, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nEstimate for the portion shown. All values except foodName must be numbers.`
           }
         ]
       }]

@@ -1030,28 +1030,7 @@ input::placeholder { color: var(--muted); }
 
 .toast.show { opacity: 1; }
 
-/* Goal buttons */
-.goal-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
-.goal-btn {
-  flex: 1;
-  min-width: 40px;
-  padding: 8px 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text2);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: 'IBM Plex Mono', monospace;
-  transition: all .15s;
-  text-align: center;
-}
-.goal-btn.selected {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-  color: var(--accent);
-}
+
 </style>
 </head>
 <body>
@@ -1093,22 +1072,24 @@ input::placeholder { color: var(--muted); }
           <button class="toggle-btn" id="reg-female-btn" onclick="setRegGender('female')">👩 אישה</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-          <div class="form-group" style="margin-bottom:0"><label>שנת לידה</label><select id="reg-birthyear"></select></div>
+        <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="reg-birthdate" style="font-size:14px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="reg-height"></select></div>
           <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="reg-weight"></select></div>
         </div>
-        <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
-        <div class="goal-row" id="reg-goal-list">
-          <button class="goal-btn" data-val="-1" onclick="setRegGoal(-1)">-1</button>
-          <button class="goal-btn" data-val="-0.75" onclick="setRegGoal(-0.75)">-¾</button>
-          <button class="goal-btn" data-val="-0.5" onclick="setRegGoal(-0.5)">-½</button>
-          <button class="goal-btn" data-val="-0.25" onclick="setRegGoal(-0.25)">-¼</button>
-          <button class="goal-btn selected" data-val="0" onclick="setRegGoal(0)">0</button>
-          <button class="goal-btn" data-val="0.25" onclick="setRegGoal(0.25)">+¼</button>
-          <button class="goal-btn" data-val="0.5" onclick="setRegGoal(0.5)">+½</button>
-          <button class="goal-btn" data-val="0.75" onclick="setRegGoal(0.75)">+¾</button>
-          <button class="goal-btn" data-val="1" onclick="setRegGoal(1)">+1</button>
+        <div class="form-group" style="margin-bottom:16px">
+          <label>יעד שינוי שבועי (ק"ג)</label>
+          <select id="reg-goal-select" onchange="setRegGoal(+this.value)">
+            <option value="-1">-1 ק"ג (הרזיה מהירה)</option>
+            <option value="-0.75">-¾ ק"ג</option>
+            <option value="-0.5">-½ ק"ג</option>
+            <option value="-0.25">-¼ ק"ג</option>
+            <option value="0" selected>0 (שמירה על משקל)</option>
+            <option value="0.25">+¼ ק"ג</option>
+            <option value="0.5">+½ ק"ג</option>
+            <option value="0.75">+¾ ק"ג</option>
+            <option value="1">+1 ק"ג (עלייה במשקל)</option>
+          </select>
         </div>
 
         <label style="margin-bottom:8px">רמת פעילות</label>
@@ -1384,22 +1365,24 @@ input::placeholder { color: var(--muted); }
       <button class="toggle-btn" id="mp-female-btn" onclick="setMpGender('female')">👩 אישה</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-      <div class="form-group" style="margin-bottom:0"><label>שנת לידה</label><select id="mp-birthyear" onchange="updateMpPreview()"></select></div>
+    <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="mp-birthdate" onchange="updateMpPreview()" style="font-size:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="mp-height" onchange="updateMpPreview()"></select></div>
       <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="mp-weight" onchange="updateMpPreview()"></select></div>
     </div>
-    <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
-    <div class="goal-row" id="mp-goal-list">
-      <button class="goal-btn" data-val="-1" onclick="setMpGoal(-1)">-1</button>
-      <button class="goal-btn" data-val="-0.75" onclick="setMpGoal(-0.75)">-¾</button>
-      <button class="goal-btn" data-val="-0.5" onclick="setMpGoal(-0.5)">-½</button>
-      <button class="goal-btn" data-val="-0.25" onclick="setMpGoal(-0.25)">-¼</button>
-      <button class="goal-btn selected" data-val="0" onclick="setMpGoal(0)">0</button>
-      <button class="goal-btn" data-val="0.25" onclick="setMpGoal(0.25)">+¼</button>
-      <button class="goal-btn" data-val="0.5" onclick="setMpGoal(0.5)">+½</button>
-      <button class="goal-btn" data-val="0.75" onclick="setMpGoal(0.75)">+¾</button>
-      <button class="goal-btn" data-val="1" onclick="setMpGoal(1)">+1</button>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>יעד שינוי שבועי (ק"ג)</label>
+      <select id="mp-goal-select" onchange="setMpGoal(+this.value)">
+        <option value="-1">-1 ק"ג (הרזיה מהירה)</option>
+        <option value="-0.75">-¾ ק"ג</option>
+        <option value="-0.5">-½ ק"ג</option>
+        <option value="-0.25">-¼ ק"ג</option>
+        <option value="0">0 (שמירה על משקל)</option>
+        <option value="0.25">+¼ ק"ג</option>
+        <option value="0.5">+½ ק"ג</option>
+        <option value="0.75">+¾ ק"ג</option>
+        <option value="1">+1 ק"ג (עלייה במשקל)</option>
+      </select>
     </div>
 
     <label style="margin-bottom:8px">רמת פעילות</label>
@@ -1497,8 +1480,15 @@ function loadProfile() {
 function profileAge(p) {
   const pr = p || userProfile;
   if (!pr) return 0;
-  if (pr.birthYear) return new Date().getFullYear() - +pr.birthYear;
-  return +pr.age || 0; // backwards compat
+  if (pr.birthDate) {
+    const [by, bm, bd] = pr.birthDate.split('-').map(Number);
+    const t = new Date();
+    let age = t.getFullYear() - by;
+    if (t.getMonth() + 1 < bm || (t.getMonth() + 1 === bm && t.getDate() < bd)) age--;
+    return age;
+  }
+  if (pr.birthYear) return new Date().getFullYear() - +pr.birthYear; // backwards compat
+  return +pr.age || 0;
 }
 
 function calcRecommendedCal(profile) {
@@ -1518,15 +1508,13 @@ function calcRecommendedCal(profile) {
 
 // Populate dropdown selects for profile fields
 function populateProfileSelects() {
-  const curYear = new Date().getFullYear();
-  // Birth year: 1940–(curYear-10)
-  ['reg-birthyear', 'mp-birthyear'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    sel.innerHTML = '<option value="">שנת לידה</option>';
-    for (let y = curYear - 10; y >= 1940; y--) {
-      sel.innerHTML += `<option value="${y}">${y}</option>`;
-    }
+  // Birthdate: max = 10 years ago, min = 100 years ago
+  const today = new Date();
+  const maxBD = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  const minBD = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  ['reg-birthdate', 'mp-birthdate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.max = maxBD; el.min = minBD; }
   });
   // Height: 100–220 cm
   ['reg-height', 'mp-height'].forEach(id => {
@@ -1609,9 +1597,9 @@ async function doRegister() {
     document.querySelectorAll('#reg-activity-list .activity-opt').forEach(b => {
       b.classList.toggle('selected', b.dataset.val === 'light');
     });
-    document.querySelectorAll('#reg-goal-list .goal-btn').forEach(b => {
-      b.classList.toggle('selected', +b.dataset.val === 0);
-    });
+    regGoalKg = 0;
+    const regGoalSel = document.getElementById('reg-goal-select');
+    if (regGoalSel) regGoalSel.value = '0';
   } catch (e) { document.getElementById('auth-error2').textContent = e.message; }
 }
 
@@ -1630,16 +1618,15 @@ function setRegActivity(a) {
 
 function setRegGoal(v) {
   regGoalKg = v;
-  document.querySelectorAll('#reg-goal-list .goal-btn').forEach(b => {
-    b.classList.toggle('selected', +b.dataset.val === v);
-  });
+  const sel = document.getElementById('reg-goal-select');
+  if (sel) sel.value = String(v);
 }
 
 async function saveRegProfile() {
-  const birthYear = +document.getElementById('reg-birthyear').value || 0;
+  const birthDate = document.getElementById('reg-birthdate').value || '';
   const height = +document.getElementById('reg-height').value || 0;
   const weight = +document.getElementById('reg-weight').value || 0;
-  const profile = { gender: regGender, birthYear, height, weight, activity: regActivity, goalKg: regGoalKg };
+  const profile = { gender: regGender, birthDate, height, weight, activity: regActivity, goalKg: regGoalKg };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
   // Save to server using pendingToken
   if (pendingToken) {
@@ -1720,17 +1707,18 @@ function openProfileModal() {
     mpGender = userProfile.gender || 'male';
     mpActivity = userProfile.activity || 'light';
     mpGoalKg = userProfile.goalKg || 0;
-    const by = userProfile.birthYear || (userProfile.age ? new Date().getFullYear() - userProfile.age : '');
-    document.getElementById('mp-birthyear').value = by;
+    const bd = userProfile.birthDate || (userProfile.birthYear ? `${userProfile.birthYear}-01-01` : '');
+    document.getElementById('mp-birthdate').value = bd;
     document.getElementById('mp-height').value = userProfile.height || '';
     // Use latest weight log if available, else profile weight
-    const lastWeight = weightLogs.length ? (+weightLogs[weightLogs.length - 1].weight_kg).toFixed(1) : (userProfile.weight || '');
+    const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+    const lastWeight = sorted.length ? (+sorted[0].weight_kg).toFixed(1) : (userProfile.weight ? (+userProfile.weight).toFixed(1) : '');
     document.getElementById('mp-weight').value = lastWeight;
   } else {
     mpGender = 'male';
     mpActivity = 'light';
     mpGoalKg = 0;
-    document.getElementById('mp-birthyear').value = '';
+    document.getElementById('mp-birthdate').value = '';
     document.getElementById('mp-height').value = '';
     document.getElementById('mp-weight').value = '';
   }
@@ -1743,9 +1731,8 @@ function openProfileModal() {
   const goalOpts = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1];
   const closest = goalOpts.reduce((a, b) => Math.abs(b - mpGoalKg) < Math.abs(a - mpGoalKg) ? b : a);
   mpGoalKg = closest;
-  document.querySelectorAll('#mp-goal-list .goal-btn').forEach(b => {
-    b.classList.toggle('selected', +b.dataset.val === mpGoalKg);
-  });
+  const goalSel = document.getElementById('mp-goal-select');
+  if (goalSel) goalSel.value = String(mpGoalKg);
   updateMpPreview();
   openModal('modal-profile');
 }
@@ -1767,16 +1754,15 @@ function setMpActivity(a) {
 
 function setMpGoal(v) {
   mpGoalKg = v;
-  document.querySelectorAll('#mp-goal-list .goal-btn').forEach(b => {
-    b.classList.toggle('selected', +b.dataset.val === v);
-  });
+  const sel = document.getElementById('mp-goal-select');
+  if (sel) sel.value = String(v);
   updateMpPreview();
 }
 
 function updateMpPreview() {
   const profile = {
     gender: mpGender,
-    birthYear: +document.getElementById('mp-birthyear').value || 0,
+    birthDate: document.getElementById('mp-birthdate').value || '',
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,
@@ -1789,7 +1775,7 @@ function updateMpPreview() {
 async function saveMpProfile() {
   const profile = {
     gender: mpGender,
-    birthYear: +document.getElementById('mp-birthyear').value || 0,
+    birthDate: document.getElementById('mp-birthdate').value || '',
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,

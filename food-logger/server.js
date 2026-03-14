@@ -274,7 +274,7 @@ app.get('/api/streak', auth, async (req, res) => {
       `SELECT DISTINCT logged_at::date AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
       [req.user.id]
     );
-    const days = rows.map(r => r.day.toISOString().slice(0, 10));
+    const days = rows.map(r => String(r.day).slice(0, 10));
     if (!days.length) return res.json({ streak: 0 });
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);

@@ -1519,8 +1519,8 @@ input::placeholder { color: var(--muted); }
       </div>
     </div>
 
-    <button class="btn-primary dash-cta" onclick="navigate('camera')">＋ הוסף ארוחה</button>
-    <button class="btn-ghost dash-cta-ghost" onclick="navigate('home')">📋 יומן היום</button>
+    <button class="btn btn-primary dash-cta" onclick="navigate('camera')">＋ הוסף ארוחה</button>
+    <button class="btn btn-ghost dash-cta-ghost" onclick="navigate('home')">📋 יומן היום</button>
   </div>
 </div>
 
@@ -1529,7 +1529,6 @@ input::placeholder { color: var(--muted); }
   <div class="topbar">
     <div>
       <div class="topbar-title">יומן</div>
-      <div class="topbar-sub" id="home-username"></div>
     </div>
     <div class="topbar-brand">
       <div class="topbar-brand-title">Your Personal Food Logger</div>
@@ -2102,7 +2101,6 @@ async function setLoggedIn(t, u) {
   token = t; username = u;
   localStorage.setItem('fl_token', t);
   localStorage.setItem('fl_username', u);
-  document.getElementById('home-username').textContent = `שלום, ${u}`;
   document.getElementById('settings-user').textContent = `מחובר כ: ${u}`;
   document.getElementById('bottom-nav').style.display = 'flex';
   // Load profile from server; fall back to localStorage

@@ -1534,7 +1534,9 @@ function populateProfileSelects() {
       sel.innerHTML += `<option value="${v}">${v} ק"ג</option>`;
     }
   });
-  // Default registration selects to average values
+  // Default registration selects/inputs to average values
+  const defaultBD = new Date(today.getFullYear() - 30, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  document.getElementById('reg-birthdate').value = defaultBD;
   document.getElementById('reg-height').value = '175';
   document.getElementById('reg-weight').value = '70.0';
 }

@@ -115,7 +115,7 @@ body::after {
   margin-bottom: 8px;
 }
 .welcome-title {
-  animation: titleReveal 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+  animation: titleReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 .welcome-title em {
   color: var(--accent);
@@ -124,8 +124,9 @@ body::after {
   animation: dotBounce 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.65s both;
 }
 @keyframes titleReveal {
-  from { opacity: 0; transform: translateY(20px) scale(0.94); filter: blur(8px); letter-spacing: 0.12em; }
-  to   { opacity: 1; transform: translateY(0)   scale(1);    filter: blur(0);   letter-spacing: -0.03em; }
+  0%   { opacity: 0; transform: translateY(32px) scale(0.88); filter: blur(12px); }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 @keyframes dotBounce {
   0%   { opacity: 0; transform: scale(0) rotate(-15deg); }

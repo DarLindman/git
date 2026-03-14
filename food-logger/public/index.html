@@ -325,6 +325,12 @@ input::placeholder { color: var(--muted); }
   margin-top: 1px;
 }
 
+.topbar-brand { text-align: left; }
+.topbar-brand-title { font-size: 10px; font-weight: 600; color: var(--text2); white-space: nowrap; line-height: 1.2; }
+.topbar-brand-sub { font-size: 9px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.topbar-brand-ig { color: #E1306C; text-decoration: none; display: inline-flex; align-items: center; gap: 2px; }
+.topbar-brand-ig:hover { opacity: 0.8; }
+
 /* ════════════════════════════════════════
    BOTTOM NAV — floating pill
 ════════════════════════════════════════ */
@@ -1116,7 +1122,10 @@ input::placeholder { color: var(--muted); }
       <div class="topbar-title">יומן</div>
       <div class="topbar-sub" id="home-username"></div>
     </div>
-    <div id="home-date-display" class="topbar-sub"></div>
+    <div class="topbar-brand">
+      <div class="topbar-brand-title">Your Personal Food Logger</div>
+      <div class="topbar-brand-sub">By Dar &middot; <a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a></div>
+    </div>
   </div>
   <div class="page">
     <div class="date-nav">
@@ -1176,7 +1185,10 @@ input::placeholder { color: var(--muted); }
 <!-- ════════════════ ANALYSIS ════════════════ -->
 <div id="screen-analysis" class="screen">
   <div class="topbar">
-    <div class="topbar-title">ניתוח תזונה</div>
+    <div>
+      <div class="topbar-title">ניתוח תזונה</div>
+      <div class="topbar-brand-sub" style="margin-top:2px">By Dar &middot; <a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a></div>
+    </div>
     <button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 13px;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit" onclick="navigate('camera')">✕</button>
   </div>
   <div class="page">
@@ -1209,7 +1221,7 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ STATS ════════════════ -->
 <div id="screen-stats" class="screen">
-  <div class="topbar"><div class="topbar-title">סטטיסטיקות</div></div>
+  <div class="topbar"><div class="topbar-title">סטטיסטיקות</div><div class="topbar-brand"><div class="topbar-brand-title">Your Personal Food Logger</div><div class="topbar-brand-sub">By Dar &middot; <a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a></div></div></div>
   <div class="page">
     <div class="stats-tabs">
       <button class="stats-tab active" onclick="switchStats('weekly')">שבועי</button>
@@ -1267,7 +1279,7 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ WEIGHT ════════════════ -->
 <div id="screen-weight" class="screen">
-  <div class="topbar"><div class="topbar-title">מעקב משקל</div></div>
+  <div class="topbar"><div class="topbar-title">מעקב משקל</div><div class="topbar-brand"><div class="topbar-brand-title">Your Personal Food Logger</div><div class="topbar-brand-sub">By Dar &middot; <a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a></div></div></div>
   <div class="page">
     <div class="card">
       <div class="card-title">הוסף מדידה</div>
@@ -1293,7 +1305,7 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ SETTINGS ════════════════ -->
 <div id="screen-settings" class="screen">
-  <div class="topbar"><div class="topbar-title">הגדרות</div></div>
+  <div class="topbar"><div class="topbar-title">הגדרות</div><div class="topbar-brand"><div class="topbar-brand-title">Your Personal Food Logger</div><div class="topbar-brand-sub">By Dar &middot; <a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a></div></div></div>
   <div class="page">
     <div class="card">
       <div class="settings-item" onclick="openProfileModal()">
@@ -1366,10 +1378,7 @@ input::placeholder { color: var(--muted); }
     </div>
 
     <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="mp-birthdate" onchange="updateMpPreview()" style="font-size:14px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="mp-height" onchange="updateMpPreview()"></select></div>
-      <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="mp-weight" onchange="updateMpPreview()"></select></div>
-    </div>
+    <div class="form-group" style="margin-bottom:16px"><label>גובה (ס"מ)</label><select id="mp-height" onchange="updateMpPreview()"></select></div>
     <div class="form-group" style="margin-bottom:16px">
       <label>יעד שינוי שבועי (ק"ג)</label>
       <select id="mp-goal-select" onchange="setMpGoal(+this.value)">
@@ -1507,13 +1516,13 @@ function calcRecommendedCal(profile) {
 
 // Populate dropdown selects for profile fields
 function populateProfileSelects() {
-  // Birthdate: max = 10 years ago, min = 100 years ago
   const today = new Date();
-  const maxBD = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
-  const minBD = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
+  const pad = n => String(n).padStart(2, '0');
+  const todayISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const minBD = `${today.getFullYear() - 100}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   ['reg-birthdate', 'mp-birthdate'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.max = maxBD; el.min = minBD; }
+    if (el) { el.max = todayISO; el.min = minBD; }
   });
   // Height: 100–220 cm
   ['reg-height', 'mp-height'].forEach(id => {
@@ -1525,7 +1534,7 @@ function populateProfileSelects() {
     }
   });
   // Weight: 30–250 kg in 0.5 steps
-  ['reg-weight', 'mp-weight'].forEach(id => {
+  ['reg-weight'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     sel.innerHTML = '<option value="">משקל</option>';
@@ -1535,8 +1544,7 @@ function populateProfileSelects() {
     }
   });
   // Default registration selects/inputs to average values
-  const defaultBD = new Date(today.getFullYear() - 30, today.getMonth(), today.getDate()).toISOString().slice(0, 10);
-  document.getElementById('reg-birthdate').value = defaultBD;
+  document.getElementById('reg-birthdate').value = todayISO;
   document.getElementById('reg-height').value = '175';
   document.getElementById('reg-weight').value = '70.0';
 }
@@ -1711,17 +1719,12 @@ function openProfileModal() {
     const bd = userProfile.birthDate || (userProfile.birthYear ? `${userProfile.birthYear}-01-01` : '');
     document.getElementById('mp-birthdate').value = bd;
     document.getElementById('mp-height').value = userProfile.height || '';
-    // Use latest weight log if available, else profile weight
-    const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-    const lastWeight = sorted.length ? (+sorted[0].weight_kg).toFixed(1) : (userProfile.weight ? (+userProfile.weight).toFixed(1) : '');
-    document.getElementById('mp-weight').value = lastWeight;
   } else {
     mpGender = 'male';
     mpActivity = 'light';
     mpGoalKg = 0;
     document.getElementById('mp-birthdate').value = '';
     document.getElementById('mp-height').value = '';
-    document.getElementById('mp-weight').value = '';
   }
   document.getElementById('mp-male-btn').classList.toggle('selected', mpGender === 'male');
   document.getElementById('mp-female-btn').classList.toggle('selected', mpGender === 'female');
@@ -1761,11 +1764,13 @@ function setMpGoal(v) {
 }
 
 function updateMpPreview() {
+  const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+  const currentWeight = sorted.length ? +sorted[0].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
   const profile = {
     gender: mpGender,
     birthDate: document.getElementById('mp-birthdate').value || '',
     height: +document.getElementById('mp-height').value || 0,
-    weight: +document.getElementById('mp-weight').value || 0,
+    weight: currentWeight,
     activity: mpActivity,
     goalKg: mpGoalKg,
   };
@@ -1774,11 +1779,13 @@ function updateMpPreview() {
 }
 
 async function saveMpProfile() {
+  const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+  const currentWeight = sorted.length ? +sorted[0].weight_kg : (userProfile ? +userProfile.weight || 0 : 0);
   const profile = {
     gender: mpGender,
     birthDate: document.getElementById('mp-birthdate').value || '',
     height: +document.getElementById('mp-height').value || 0,
-    weight: +document.getElementById('mp-weight').value || 0,
+    weight: currentWeight,
     activity: mpActivity,
     goalKg: mpGoalKg,
   };
@@ -2071,10 +2078,10 @@ async function loadStats() {
 }
 
 // ── Shared stat helpers ──────────────────────────────────────────────────────
-function renderStatAvgBox(elId, rows, rec, label) {
+function renderStatAvgBox(elId, rows, rec, label, customAvg) {
   const el = document.getElementById(elId);
   if (!rows.length) { el.innerHTML = ''; return; }
-  const avgCal = Math.round(rows.reduce((s, r) => s + (+r.calories || 0), 0) / rows.length);
+  const avgCal = customAvg !== undefined ? customAvg : Math.round(rows.reduce((s, r) => s + (+r.calories || 0), 0) / rows.length);
   let diffHtml = '';
   if (rec > 0) {
     const diff = avgCal - rec;
@@ -2199,7 +2206,13 @@ async function loadYearlyStats() {
     const rows = await apiFetch(`/api/stats/yearly?year=${statsYear}`);
     const rec = calcRecommendedCal();
     const monthNames = ['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ'];
-    renderStatAvgBox('yearly-avg-box', rows, rec, "ממוצע קל' חודשי");
+    const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
+    const totalDays = rows.reduce((s, r) => {
+      const [y, m] = r.month.split('-').map(Number);
+      return s + new Date(y, m, 0).getDate();
+    }, 0);
+    const yearlyDailyAvg = totalDays > 0 ? Math.round(totalCal / totalDays) : 0;
+    renderStatAvgBox('yearly-avg-box', rows, rec, "ממוצע קל' יומי", yearlyDailyAvg);
     const chartEl = document.getElementById('yearly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
     const currentMonth = todayStr().slice(0, 7);
@@ -2209,7 +2222,7 @@ async function loadYearlyStats() {
       isToday: r => r.month === currentMonth,
       recommended: rec,
     });
-    renderStatMacros('yearly-macro', rows, `ממוצע חודשי ב-${rows.length} חודשים`);
+    renderStatMacros('yearly-macro', rows, `ממוצע יומי על בסיס ${rows.length} חודשים`);
   } catch { }
 }
 

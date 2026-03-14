@@ -1534,6 +1534,9 @@ function populateProfileSelects() {
       sel.innerHTML += `<option value="${v}">${v} ק"ג</option>`;
     }
   });
+  // Default registration selects to average values
+  document.getElementById('reg-height').value = '175';
+  document.getElementById('reg-weight').value = '70.0';
 }
 
 function updateSettingsProfileSub() {

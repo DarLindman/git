@@ -435,12 +435,12 @@ input::placeholder { color: var(--muted); }
 }
 
 .topbar-title {
-  font-family: 'Fraunces', serif;
-  font-style: italic;
-  font-weight: 300;
-  font-size: 21px;
+  font-family: 'DM Sans', sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 18px;
   color: var(--text);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
 }
 
 .topbar-sub {
@@ -1167,8 +1167,9 @@ input::placeholder { color: var(--muted); }
    DESKTOP (min-width: 768px)
 ════════════════════════════════════════ */
 @media (min-width: 768px) {
-  .topbar-title { font-size: 28px; }
+  .topbar-title { font-size: 20px; }
   .topbar-sub { font-size: 14px; }
+  .chart-wrap svg { max-width: 480px; }
   .topbar-brand-title { font-size: 13px; }
   .topbar-brand-sub { font-size: 11px; }
   .topbar-brand-ig svg { width: 13px !important; height: 13px !important; }
@@ -2307,19 +2308,11 @@ async function loadWeeklyStats() {
   try {
     const rows = await apiFetch('/api/stats/weekly');
     const rec = calcRecommendedCal();
-    // Build full 7-day array (oldest→today), filling zeros for days without data
-    const today = new Date();
-    const allDays = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today); d.setDate(today.getDate() - i);
-      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const found = rows.find(r => r.day.slice(0,10) === ds);
-      allDays.push(found || { day: ds, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    }
     renderStatAvgBox('weekly-avg-box', rows, rec, "ממוצע קל' יומי");
     const chartEl = document.getElementById('weekly-chart');
+    if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
     const todayS = todayStr();
-    chartEl.innerHTML = renderLineChart(allDays, {
+    chartEl.innerHTML = renderLineChart(rows, {
       getValue: r => +r.calories || 0,
       getLabel: r => formatDateShort(r.day.slice(0, 10)),
       isToday: r => r.day.slice(0, 10) === todayS,

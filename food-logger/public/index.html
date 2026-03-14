@@ -504,6 +504,9 @@ input::placeholder { color: var(--muted); }
 .nav-item.nav-camera {
   background: var(--accent);
   border-radius: 50%;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
   width: 46px;
   height: 46px;
   min-width: 46px;
@@ -739,7 +742,7 @@ input::placeholder { color: var(--muted); }
 /* ════════════════════════════════════════
    CAMERA SCREEN
 ════════════════════════════════════════ */
-#screen-camera { background: #000; padding-bottom: 0; }
+#screen-camera { background: #000; padding-bottom: var(--nav-h); }
 
 .camera-area {
   flex: 1;
@@ -1572,7 +1575,7 @@ input::placeholder { color: var(--muted); }
   <button class="nav-item" id="nav-stats" onclick="navigate('stats')">
     <span class="nav-icon">📊</span><span>סטטיסטיקות</span>
   </button>
-  <button class="nav-item nav-camera" id="nav-camera" onclick="navigate('camera')">📷</button>
+  <button class="nav-item nav-camera" id="nav-camera" onclick="navigate('camera')">＋</button>
   <button class="nav-item" id="nav-weight" onclick="navigate('weight')">
     <span class="nav-icon">⚖️</span><span>משקל</span>
   </button>

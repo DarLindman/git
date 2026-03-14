@@ -2352,7 +2352,7 @@ async function loadMonthlyStats() {
 // SVG line chart with dots and date labels
 // ════════════════════════════════════════════════════
 function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
-  const W = 320, H = 160, BOTTOM = 24, TOP = 14, LEFT = 8, RIGHT = 8;
+  const W = 320, H = 160, BOTTOM = 26, TOP = 20, LEFT = 8, RIGHT = 14;
   const chartW = W - LEFT - RIGHT;
   const chartH = H - BOTTOM - TOP;
   const n = rows.length;
@@ -2396,7 +2396,7 @@ function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
       <text x="${W - RIGHT - 2}" y="${labelY.toFixed(1)}" text-anchor="end" font-size="8" fill="#e8703a" opacity="0.9" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
   }
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg viewBox="0 0 ${W} ${H}" overflow="visible" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="lgrad" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#e8703a" stop-opacity="0.18"/>
@@ -2530,7 +2530,7 @@ function renderWeightChart() {
     ${firstDate !== lastDate ? `<text x="${W - RIGHT}" y="${H - 4}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${lastDate}</text>` : ''}
   ` : '';
 
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" overflow="visible" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#5eead4" stop-opacity="0.25"/>

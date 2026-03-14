@@ -573,6 +573,7 @@ input::placeholder { color: var(--muted); }
 .mp-pro .mp-val { color: var(--protein); }
 .mp-carb .mp-val { color: var(--carb); }
 .mp-fat .mp-val { color: var(--fat); }
+.mp-fiber .mp-val { color: var(--fiber); }
 
 /* ════════════════════════════════════════
    CALORIE GOAL PROGRESS BAR
@@ -1263,7 +1264,7 @@ input::placeholder { color: var(--muted); }
           <button class="toggle-btn" id="reg-female-btn" onclick="setRegGender('female')">👩 אישה</button>
         </div>
 
-        <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="reg-birthdate" style="font-size:14px"></div>
+        <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="reg-birthdate" lang="he" style="font-size:14px"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
           <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="reg-height"></select></div>
           <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="reg-weight"></select></div>
@@ -1326,6 +1327,7 @@ input::placeholder { color: var(--muted); }
         <div class="macro-pill mp-pro"><div class="mp-val" id="sum-pro">0</div><div class="mp-label">חלבון</div></div>
         <div class="macro-pill mp-carb"><div class="mp-val" id="sum-carb">0</div><div class="mp-label">פחמימות</div></div>
         <div class="macro-pill mp-fat"><div class="mp-val" id="sum-fat">0</div><div class="mp-label">שומן</div></div>
+        <div class="macro-pill mp-fiber"><div class="mp-val" id="sum-fiber">0</div><div class="mp-label">סיבים</div></div>
       </div>
       <!-- Calorie goal progress bar (shown if profile set) -->
       <div id="cal-goal-section" style="display:none">
@@ -1562,7 +1564,7 @@ input::placeholder { color: var(--muted); }
       <button class="toggle-btn" id="mp-female-btn" onclick="setMpGender('female')">👩 אישה</button>
     </div>
 
-    <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="mp-birthdate" onchange="updateMpPreview()" style="font-size:14px"></div>
+    <div class="form-group" style="margin-bottom:10px"><label>תאריך לידה</label><input type="date" id="mp-birthdate" lang="he" onchange="updateMpPreview()" style="font-size:14px"></div>
     <div class="form-group" style="margin-bottom:16px"><label>גובה (ס"מ)</label><select id="mp-height" onchange="updateMpPreview()"></select></div>
     <div class="form-group" style="margin-bottom:16px">
       <label>יעד שינוי שבועי (ק"ג)</label>
@@ -2112,12 +2114,14 @@ function renderDailySummary(entries) {
     pro: a.pro + (+e.protein_g || 0),
     carb: a.carb + (+e.carbs_g || 0),
     fat: a.fat + (+e.fat_g || 0),
-  }), { cal: 0, pro: 0, carb: 0, fat: 0 });
+    fiber: a.fiber + (+e.fiber_g || 0),
+  }), { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 });
 
   document.getElementById('sum-cal').textContent = Math.round(totals.cal);
   document.getElementById('sum-pro').textContent = Math.round(totals.pro);
   document.getElementById('sum-carb').textContent = Math.round(totals.carb);
   document.getElementById('sum-fat').textContent = Math.round(totals.fat);
+  document.getElementById('sum-fiber').textContent = Math.round(totals.fiber);
 
   // Calorie goal bar
   const rec = calcRecommendedCal();
@@ -2303,11 +2307,19 @@ async function loadWeeklyStats() {
   try {
     const rows = await apiFetch('/api/stats/weekly');
     const rec = calcRecommendedCal();
+    // Build full 7-day array (oldest→today), filling zeros for days without data
+    const today = new Date();
+    const allDays = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const found = rows.find(r => r.day.slice(0,10) === ds);
+      allDays.push(found || { day: ds, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
+    }
     renderStatAvgBox('weekly-avg-box', rows, rec, "ממוצע קל' יומי");
     const chartEl = document.getElementById('weekly-chart');
-    if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
     const todayS = todayStr();
-    chartEl.innerHTML = renderLineChart(rows, {
+    chartEl.innerHTML = renderLineChart(allDays, {
       getValue: r => +r.calories || 0,
       getLabel: r => formatDateShort(r.day.slice(0, 10)),
       isToday: r => r.day.slice(0, 10) === todayS,
@@ -2377,9 +2389,11 @@ function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
 
   let recLine = '';
   if (recommended > 0) {
-    const ry = (TOP + chartH - (recommended / range) * chartH).toFixed(1);
-    recLine = `<line x1="${LEFT}" y1="${ry}" x2="${W - RIGHT}" y2="${ry}" stroke="#e8703a" stroke-dasharray="4,3" opacity="0.5" stroke-width="1"/>
-      <text x="${W - RIGHT - 2}" y="${+ry - 3}" text-anchor="end" font-size="7" fill="#e8703a" opacity="0.75" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
+    const ry = TOP + chartH - (recommended / range) * chartH;
+    // Place label below the line when near top, above otherwise
+    const labelY = ry < TOP + 12 ? ry + 10 : ry - 3;
+    recLine = `<line x1="${LEFT}" y1="${ry.toFixed(1)}" x2="${W - RIGHT}" y2="${ry.toFixed(1)}" stroke="#e8703a" stroke-dasharray="4,3" opacity="0.5" stroke-width="1"/>
+      <text x="${W - RIGHT - 2}" y="${labelY.toFixed(1)}" text-anchor="end" font-size="8" fill="#e8703a" opacity="0.9" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">

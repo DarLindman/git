@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.polarsteps.com)",
+      "Bash(python3 -c \":*)",
+      "Bash(node -e \":*)",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -File:*)",
+      "Bash(powershell -Command \"& { $d = Get-Content ''c:/Users/Dar/Documents/Git/trip.json'' -Raw | ConvertFrom-Json; $keys = $d | Get-Member -MemberType NoteProperty | ForEach-Object { $_Name }; Write-Host \\($keys -join '', ''\\) }\")"
+    ]
+  }
+}

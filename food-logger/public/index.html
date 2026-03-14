@@ -829,6 +829,46 @@ input::placeholder { color: var(--muted); }
 .cam-btn:disabled { opacity: 0.3; }
 #file-input { display: none; }
 
+.text-analyze-section {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 20px;
+  padding: 0 4px;
+}
+.text-analyze-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #444;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.text-analyze-divider::before,
+.text-analyze-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #2a2620;
+}
+#food-text-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 12px 14px;
+  resize: none;
+  height: 72px;
+  margin-bottom: 10px;
+  direction: rtl;
+}
+#food-text-input::placeholder { color: var(--muted); }
+#food-text-input:focus { outline: none; border-color: var(--accent); }
+
 /* ════════════════════════════════════════
    ANALYSIS
 ════════════════════════════════════════ */
@@ -1364,9 +1404,14 @@ input::placeholder { color: var(--muted); }
     </div>
     <div class="cam-actions">
       <button class="cam-btn cam-btn-shoot" onclick="document.getElementById('file-input').click()">📸 צלם / בחר</button>
-      <button class="cam-btn cam-btn-analyze" id="analyze-btn" onclick="analyzeFood()" disabled>✨ נתח</button>
+      <button class="cam-btn cam-btn-analyze" id="analyze-btn" onclick="analyzeFood()" disabled>✨ נתח תמונה</button>
     </div>
     <input type="file" id="file-input" accept="image/*" onchange="onImageSelected(event)">
+    <div class="text-analyze-section">
+      <div class="text-analyze-divider"><span>או הקלד תיאור אוכל</span></div>
+      <textarea id="food-text-input" placeholder="לדוגמה: 100 גרם חזה עוף עם כוס אורז וסלט ירקות"></textarea>
+      <button class="cam-btn cam-btn-analyze" id="text-analyze-btn" onclick="analyzeText()">✍️ נתח טקסט</button>
+    </div>
   </div>
 </div>
 
@@ -2187,6 +2232,33 @@ function onImageSelected(e) {
   reader.readAsDataURL(file);
 }
 
+async function analyzeText() {
+  const text = document.getElementById('food-text-input').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('text-analyze-btn');
+  btn.disabled = true;
+  navigate('analysis');
+  document.getElementById('analysis-img').style.display = 'none';
+  document.getElementById('analysis-loading').style.display = 'block';
+  document.getElementById('analysis-result').style.display = 'none';
+  document.getElementById('analysis-error').textContent = '';
+  try {
+    const data = await apiFetch('/api/analyze-text', { method: 'POST', body: JSON.stringify({ text }) });
+    document.getElementById('res-name').value = data.foodName || '';
+    document.getElementById('res-cal').value = data.calories || 0;
+    document.getElementById('res-pro').value = data.protein_g || 0;
+    document.getElementById('res-carb').value = data.carbs_g || 0;
+    document.getElementById('res-fat').value = data.fat_g || 0;
+    document.getElementById('res-fiber').value = data.fiber_g || 0;
+    document.getElementById('analysis-loading').style.display = 'none';
+    document.getElementById('analysis-result').style.display = 'block';
+  } catch (e) {
+    document.getElementById('analysis-loading').style.display = 'none';
+    document.getElementById('analysis-error').textContent = e.message;
+  }
+  btn.disabled = false;
+}
+
 async function analyzeFood() {
   if (!capturedImageBase64) return;
   navigate('analysis');
@@ -2246,6 +2318,7 @@ async function saveEntry() {
     document.querySelector('.cam-placeholder').style.display = '';
     document.getElementById('analyze-btn').disabled = true;
     document.getElementById('file-input').value = '';
+    document.getElementById('food-text-input').value = '';
   } catch (e) {
     showToast('שגיאה בשמירה: ' + e.message);
     saveBtn.disabled = false;

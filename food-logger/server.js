@@ -161,6 +161,32 @@ app.post('/api/analyze', auth, async (req, res) => {
   }
 });
 
+// ─── Analyze food text ────────────────────────────────────────────────────────
+app.post('/api/analyze-text', auth, async (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) return res.status(400).json({ error: 'No text provided' });
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\n\nהטקסט: ${text.trim()}`
+      }]
+    });
+    const raw = message.content[0].text.trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    let data;
+    try { data = JSON.parse(match[0]); }
+    catch { return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' }); }
+    res.json(data);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'שגיאה בניתוח הטקסט' });
+  }
+});
+
 // ─── Food log CRUD ────────────────────────────────────────────────────────────
 app.post('/api/food', auth, async (req, res) => {
   const { meal_type, food_name, calories, protein_g, carbs_g, fat_g, fiber_g, notes, logged_at } = req.body;

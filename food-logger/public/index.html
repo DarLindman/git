@@ -114,7 +114,8 @@ body::after {
   text-align: center;
   margin-bottom: 8px;
 }
-.welcome-title {
+.title-word {
+  display: inline-block;
   animation: titleReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
 }
 .welcome-title em {
@@ -1255,7 +1256,7 @@ input::placeholder { color: var(--muted); }
 <div id="screen-welcome" class="screen">
   <div class="welcome-wrap">
     <div class="welcome-icon fu fu-1">🥗</div>
-    <div class="welcome-title">יומן<em>.</em></div>
+    <div class="welcome-title"><span class="title-word">יומן</span><em>.</em></div>
     <div class="welcome-subtitle fu fu-3">יומן האוכל האישי שלך</div>
     <div class="welcome-features">
       <div class="welcome-feature fu fu-4">

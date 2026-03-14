@@ -1502,15 +1502,19 @@ function profileAge(p) {
 function calcRecommendedCal(profile) {
   const p = profile || userProfile;
   if (!p) return 0;
-  const { gender, height, weight, activity, goalKg } = p;
+  const { gender, height, activity, goalKg } = p;
+  // Always use latest weight log for current user; fall back to stored profile weight
+  let weight = +p.weight || 0;
+  if (!profile && weightLogs.length) {
+    const latestLog = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at))[0];
+    if (+latestLog.weight_kg > 0) weight = +latestLog.weight_kg;
+  }
   const age = profileAge(p);
   if (!age || !height || !weight) return 0;
-  let bmr = 10 * (+weight) + 6.25 * (+height) - 5 * age;
+  let bmr = 10 * weight + 6.25 * (+height) - 5 * age;
   bmr += gender === 'male' ? 5 : -161;
   const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, vactive: 1.9 };
   const tdee = bmr * (mult[activity] || 1.2);
-  // goalKg is per week; 1 kg ≈ 7700 kcal → daily adjustment = goalKg * 7700 / 7
-  // positive goalKg (gain) → add calories; negative goalKg (lose) → subtract
   const adj = (+goalKg || 0) * 7700 / 7;
   return Math.max(Math.round(tdee + adj), 1000);
 }
@@ -1685,6 +1689,8 @@ async function setLoggedIn(t, u) {
       localStorage.setItem('fl_profile', JSON.stringify(serverProfile));
     }
   } catch {}
+  // Load weight logs at startup so calcRecommendedCal always has current weight
+  try { weightLogs = await apiFetch('/api/weight'); } catch {}
   updateSettingsProfileSub();
   navigate('home');
 }
@@ -2256,17 +2262,9 @@ async function addWeightLog() {
     weightLogs = await apiFetch('/api/weight');
     renderWeightChart();
     renderWeightList();
-    // Update profile weight so recommended calories reflects new weight
-    if (userProfile) {
-      const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-      if (sorted.length) {
-        userProfile.weight = +sorted[0].weight_kg;
-        localStorage.setItem('fl_profile', JSON.stringify(userProfile));
-        try { await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(userProfile) }); } catch {}
-        updateSettingsProfileSub();
-        if (currentScreen === 'home') loadDiary();
-      }
-    }
+    // weightLogs refreshed — calcRecommendedCal now auto-reads latest weight
+    updateSettingsProfileSub();
+    if (currentScreen === 'home') loadDiary();
     showToast('המשקל נשמר');
   } catch (e) { document.getElementById('weight-add-error').textContent = e.message; }
 }

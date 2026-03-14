@@ -52,6 +52,10 @@ async function initDB() {
       logged_at DATE NOT NULL DEFAULT CURRENT_DATE,
       weight_kg NUMERIC(5,1) NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      profile_json TEXT NOT NULL DEFAULT '{}'
+    );
   `);
   console.log('DB ready');
 }
@@ -303,6 +307,26 @@ app.get('/api/stats/monthly', auth, async (req, res) => {
     console.error(e);
     res.status(500).json({ error: 'שגיאת שרת' });
   }
+});
+
+// ─── Profile endpoints ────────────────────────────────────────────────────────
+app.get('/api/profile', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id=$1', [req.user.id]);
+    res.json(rows[0] ? JSON.parse(rows[0].profile_json) : {});
+  } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
+});
+
+app.put('/api/profile', auth, async (req, res) => {
+  try {
+    const json = JSON.stringify(req.body);
+    await pool.query(
+      `INSERT INTO user_profiles (user_id, profile_json) VALUES ($1,$2)
+       ON CONFLICT (user_id) DO UPDATE SET profile_json=$2`,
+      [req.user.id, json]
+    );
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
 });
 
 // ─── Weight log endpoints ─────────────────────────────────────────────────────

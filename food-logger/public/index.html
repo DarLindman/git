@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0b09">
-<title>יומן אכילה</title>
+<title>יומן האוכל האישי שלך</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -1060,7 +1060,7 @@ input::placeholder { color: var(--muted); }
 <div id="screen-auth" class="screen active">
   <div class="auth-wrap">
     <div class="auth-wordmark">יומן<em>.</em></div>
-    <div class="auth-sub">מעקב תזונה חכם</div>
+    <div class="auth-sub">יומן האוכל האישי שלך</div>
     <div class="auth-card">
       <!-- Step 1: login/register tabs -->
       <div id="auth-step1">
@@ -1094,9 +1094,9 @@ input::placeholder { color: var(--muted); }
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-          <div class="form-group" style="margin-bottom:0"><label>גיל</label><input id="reg-age" type="number" min="10" max="120" placeholder="25"></div>
-          <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><input id="reg-height" type="number" min="100" max="250" placeholder="170"></div>
-          <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><input id="reg-weight" type="number" min="30" max="300" step="0.5" placeholder="70"></div>
+          <div class="form-group" style="margin-bottom:0"><label>שנת לידה</label><select id="reg-birthyear"></select></div>
+          <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="reg-height"></select></div>
+          <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="reg-weight"></select></div>
         </div>
         <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
         <div class="goal-row" id="reg-goal-list">
@@ -1211,7 +1211,6 @@ input::placeholder { color: var(--muted); }
           <div class="nut-field"><label>פחמימות (גרמ')</label><input id="res-carb" type="number" step="0.1"></div>
           <div class="nut-field"><label>שומן (גרמ')</label><input id="res-fat" type="number" step="0.1"></div>
           <div class="nut-field"><label>סיבים (גרמ')</label><input id="res-fiber" type="number" step="0.1"></div>
-          <div class="nut-field"><label>הערות</label><input id="res-notes" type="text"></div>
         </div>
         <div class="card-title" style="margin-top:14px">סוג ארוחה</div>
         <div class="meal-select">
@@ -1334,7 +1333,7 @@ input::placeholder { color: var(--muted); }
     </div>
     <div class="card" style="margin-top:4px">
       <div class="card-title">אודות</div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.75">יומן אכילה — מנוע זיהוי האוכל מאחורי האפליקציה הוא Claude AI של Anthropic. הערכות תזונתיות הן קירוב בלבד ואינן תחליף לייעוץ דיאטטי.</p>
+      <p style="font-size:12px;color:var(--muted);line-height:1.75">יומן האוכל האישי שלך — מנוע זיהוי האוכל מאחורי האפליקציה הוא Claude AI של Anthropic. הערכות תזונתיות הן קירוב בלבד ואינן תחליף לייעוץ דיאטטי.</p>
     </div>
   </div>
 </div>
@@ -1386,9 +1385,9 @@ input::placeholder { color: var(--muted); }
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-      <div class="form-group" style="margin-bottom:0"><label>גיל</label><input id="mp-age" type="number" min="10" max="120" placeholder="25" oninput="updateMpPreview()"></div>
-      <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><input id="mp-height" type="number" min="100" max="250" placeholder="170" oninput="updateMpPreview()"></div>
-      <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><input id="mp-weight" type="number" min="30" max="300" step="0.5" placeholder="70" oninput="updateMpPreview()"></div>
+      <div class="form-group" style="margin-bottom:0"><label>שנת לידה</label><select id="mp-birthyear" onchange="updateMpPreview()"></select></div>
+      <div class="form-group" style="margin-bottom:0"><label>גובה (ס"מ)</label><select id="mp-height" onchange="updateMpPreview()"></select></div>
+      <div class="form-group" style="margin-bottom:0"><label>משקל (ק"ג)</label><select id="mp-weight" onchange="updateMpPreview()"></select></div>
     </div>
     <label style="margin-bottom:8px">יעד שינוי שבועי (ק"ג)</label>
     <div class="goal-row" id="mp-goal-list">
@@ -1495,18 +1494,59 @@ function loadProfile() {
   try { userProfile = JSON.parse(localStorage.getItem('fl_profile')); } catch {}
 }
 
+function profileAge(p) {
+  const pr = p || userProfile;
+  if (!pr) return 0;
+  if (pr.birthYear) return new Date().getFullYear() - +pr.birthYear;
+  return +pr.age || 0; // backwards compat
+}
+
 function calcRecommendedCal(profile) {
   const p = profile || userProfile;
   if (!p) return 0;
-  const { gender, age, height, weight, activity, goalKg } = p;
+  const { gender, height, weight, activity, goalKg } = p;
+  const age = profileAge(p);
   if (!age || !height || !weight) return 0;
-  let bmr = 10 * (+weight) + 6.25 * (+height) - 5 * (+age);
+  let bmr = 10 * (+weight) + 6.25 * (+height) - 5 * age;
   bmr += gender === 'male' ? 5 : -161;
   const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, vactive: 1.9 };
   const tdee = bmr * (mult[activity] || 1.2);
   // goalKg is per week; 1 kg ≈ 7700 kcal → daily adjustment = goalKg * 7700 / 7
   const adj = (+goalKg || 0) * 7700 / 7;
   return Math.max(Math.round(tdee - adj), 1000);
+}
+
+// Populate dropdown selects for profile fields
+function populateProfileSelects() {
+  const curYear = new Date().getFullYear();
+  // Birth year: 1940–(curYear-10)
+  ['reg-birthyear', 'mp-birthyear'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">שנת לידה</option>';
+    for (let y = curYear - 10; y >= 1940; y--) {
+      sel.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+  });
+  // Height: 100–220 cm
+  ['reg-height', 'mp-height'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">גובה</option>';
+    for (let h = 220; h >= 100; h--) {
+      sel.innerHTML += `<option value="${h}">${h} ס"מ</option>`;
+    }
+  });
+  // Weight: 30–250 kg in 0.5 steps
+  ['reg-weight', 'mp-weight'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">משקל</option>';
+    for (let w = 250; w >= 30; w -= 0.5) {
+      const v = w.toFixed(1);
+      sel.innerHTML += `<option value="${v}">${v} ק"ג</option>`;
+    }
+  });
 }
 
 function updateSettingsProfileSub() {
@@ -1596,18 +1636,24 @@ function setRegGoal(v) {
 }
 
 async function saveRegProfile() {
-  const age = +document.getElementById('reg-age').value || 0;
+  const birthYear = +document.getElementById('reg-birthyear').value || 0;
   const height = +document.getElementById('reg-height').value || 0;
   const weight = +document.getElementById('reg-weight').value || 0;
-  const profile = { gender: regGender, age, height, weight, activity: regActivity, goalKg: regGoalKg };
+  const profile = { gender: regGender, birthYear, height, weight, activity: regActivity, goalKg: regGoalKg };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
-  // Auto-log registration weight
-  if (weight > 0 && pendingToken) {
+  // Save to server using pendingToken
+  if (pendingToken) {
     const savedToken = token;
     token = pendingToken;
     try {
-      await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }) });
+      await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile) });
     } catch(e) { /* non-critical */ }
+    // Auto-log registration weight
+    if (weight > 0) {
+      try {
+        await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }) });
+      } catch(e) { /* non-critical */ }
+    }
     token = savedToken;
   }
   finishLogin();
@@ -1627,13 +1673,21 @@ function finishLogin() {
   document.getElementById('auth-step2').style.display = 'none';
 }
 
-function setLoggedIn(t, u) {
+async function setLoggedIn(t, u) {
   token = t; username = u;
   localStorage.setItem('fl_token', t);
   localStorage.setItem('fl_username', u);
   document.getElementById('home-username').textContent = `שלום, ${u}`;
   document.getElementById('settings-user').textContent = `מחובר כ: ${u}`;
   document.getElementById('bottom-nav').style.display = 'flex';
+  // Load profile from server; fall back to localStorage
+  try {
+    const serverProfile = await apiFetch('/api/profile');
+    if (serverProfile && Object.keys(serverProfile).length) {
+      userProfile = serverProfile;
+      localStorage.setItem('fl_profile', JSON.stringify(serverProfile));
+    }
+  } catch {}
   updateSettingsProfileSub();
   navigate('home');
 }
@@ -1666,14 +1720,17 @@ function openProfileModal() {
     mpGender = userProfile.gender || 'male';
     mpActivity = userProfile.activity || 'light';
     mpGoalKg = userProfile.goalKg || 0;
-    document.getElementById('mp-age').value = userProfile.age || '';
+    const by = userProfile.birthYear || (userProfile.age ? new Date().getFullYear() - userProfile.age : '');
+    document.getElementById('mp-birthyear').value = by;
     document.getElementById('mp-height').value = userProfile.height || '';
-    document.getElementById('mp-weight').value = userProfile.weight || '';
+    // Use latest weight log if available, else profile weight
+    const lastWeight = weightLogs.length ? (+weightLogs[weightLogs.length - 1].weight_kg).toFixed(1) : (userProfile.weight || '');
+    document.getElementById('mp-weight').value = lastWeight;
   } else {
     mpGender = 'male';
     mpActivity = 'light';
     mpGoalKg = 0;
-    document.getElementById('mp-age').value = '';
+    document.getElementById('mp-birthyear').value = '';
     document.getElementById('mp-height').value = '';
     document.getElementById('mp-weight').value = '';
   }
@@ -1719,7 +1776,7 @@ function setMpGoal(v) {
 function updateMpPreview() {
   const profile = {
     gender: mpGender,
-    age: +document.getElementById('mp-age').value || 0,
+    birthYear: +document.getElementById('mp-birthyear').value || 0,
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,
@@ -1729,10 +1786,10 @@ function updateMpPreview() {
   document.getElementById('mp-cal-preview').textContent = rec > 0 ? `${rec} קל'` : '—';
 }
 
-function saveMpProfile() {
+async function saveMpProfile() {
   const profile = {
     gender: mpGender,
-    age: +document.getElementById('mp-age').value || 0,
+    birthYear: +document.getElementById('mp-birthyear').value || 0,
     height: +document.getElementById('mp-height').value || 0,
     weight: +document.getElementById('mp-weight').value || 0,
     activity: mpActivity,
@@ -1740,6 +1797,7 @@ function saveMpProfile() {
   };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
   userProfile = profile;
+  try { await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }); } catch {}
   updateSettingsProfileSub();
   closeModal('modal-profile');
   showToast('הפרופיל נשמר');
@@ -1763,7 +1821,12 @@ function navigate(screen) {
 // ════════════════════════════════════════════════════
 // Diary
 // ════════════════════════════════════════════════════
-function changeDay(n) { diaryDate = addDays(diaryDate, n); loadDiary(); }
+function changeDay(n) {
+  const next = addDays(diaryDate, n);
+  if (next > todayStr()) return; // no future
+  diaryDate = next;
+  loadDiary();
+}
 
 async function loadDiary() {
   document.getElementById('diary-date-label').textContent = formatDate(diaryDate);
@@ -1777,9 +1840,59 @@ async function loadDiary() {
 
 const MEAL_LABELS = { breakfast: '☀️ בוקר', lunch: '🌤️ צהריים', dinner: '🌙 ערב', snack: '🍎 חטיף' };
 const MEAL_BADGE = { breakfast: 'badge-breakfast', lunch: 'badge-lunch', dinner: 'badge-dinner', snack: 'badge-snack' };
-const FOOD_ICONS = ['🍗','🥩','🐟','🥗','🍜','🍛','🥙','🥪','🍕','🍝','🧆','🥚','🧀','🥑','🍎','🥐','🍚','🥣'];
 
-function foodIcon() { return FOOD_ICONS[Math.floor(Math.random() * FOOD_ICONS.length)]; }
+const FOOD_EMOJI_MAP = [
+  [['עוף','chicken','שניצל','קציצ'], '🍗'],
+  [['בשר','המבורגר','burger','סטייק','steak','כבד'], '🥩'],
+  [['דג','fish','סלמון','salmon','טונה','tuna','בס','דניס','פילה דג'], '🐟'],
+  [['סלט','salad'], '🥗'],
+  [['פסטה','pasta','ספגטי','spaghetti','פנה','לזניה'], '🍝'],
+  [['פיצה','pizza'], '🍕'],
+  [['סושי','sushi','מאקי'], '🍱'],
+  [['בורגר','burger'], '🍔'],
+  [['אורז','rice'], '🍚'],
+  [['לחם','toast','טוסט','כריך','sandwich','פיתה','לאפה','בגט'], '🥪'],
+  [['קרואסון','croissant'], '🥐'],
+  [['ביצה','egg','חביתה','שקשוקה'], '🍳'],
+  [['גבינה','cheese'], '🧀'],
+  [['אבוקדו','avocado'], '🥑'],
+  [['חומוס','hummus'], '🫘'],
+  [['פלאפל','falafel'], '🧆'],
+  [['מרק','soup'], '🍲'],
+  [['יוגורט','yogurt','גביע'], '🥛'],
+  [['שייק חלבון','protein shake','אבקת חלבון'], '💪'],
+  [['שייק','smoothie','shake'], '🥤'],
+  [['קפה','coffee','לאטה','קפוצ'], '☕'],
+  [['תה','tea'], '🍵'],
+  [['מיץ','juice'], '🧃'],
+  [['שוקולד','chocolate'], '🍫'],
+  [['עוגה','cake','קינוח','brownie'], '🎂'],
+  [['גלידה','ice cream','ארטיק'], '🍦'],
+  [['חטיף','chips','צ\'יפס','בייגל'], '🍿'],
+  [['שקדים','almonds','אגוז','nuts','קשיו','פיסטוק'], '🥜'],
+  [['בננה','banana'], '🍌'],
+  [['תפוח','apple'], '🍎'],
+  [['תות','strawberry'], '🍓'],
+  [['ענב','grape'], '🍇'],
+  [['מנגו','mango'], '🥭'],
+  [['תפוז','orange','מיץ תפוזים'], '🍊'],
+  [['אננס','pineapple'], '🍍'],
+  [['אבטיח','watermelon'], '🍉'],
+  [['ירקות','vegetable','ברוקולי','כרוב','גזר'], '🥦'],
+  [['תירס','corn'], '🌽'],
+  [['בטטה','sweet potato'], '🍠'],
+  [['תפוח אדמה','potato'], '🥔'],
+  [['וופל','waffle'], '🧇'],
+  [['פנקייק','pancake'], '🥞'],
+];
+
+function getFoodEmoji(name) {
+  const n = (name || '').toLowerCase();
+  for (const [keywords, emoji] of FOOD_EMOJI_MAP) {
+    if (keywords.some(k => n.includes(k))) return emoji;
+  }
+  return '🍽️';
+}
 
 function renderMealList(entries) {
   const el = document.getElementById('meal-list');
@@ -1789,7 +1902,7 @@ function renderMealList(entries) {
   }
   el.innerHTML = entries.map(e => `
     <div class="food-item" id="entry-${e.id}">
-      <div class="food-emoji">${foodIcon()}</div>
+      <div class="food-emoji">${getFoodEmoji(e.food_name)}</div>
       <div class="food-info">
         <div class="food-name">${e.food_name}</div>
         <div class="food-meta">
@@ -1899,7 +2012,6 @@ async function analyzeFood() {
     document.getElementById('res-carb').value = data.carbs_g || 0;
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
-    document.getElementById('res-notes').value = data.notes || '';
     document.getElementById('analysis-loading').style.display = 'none';
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
@@ -1923,7 +2035,6 @@ async function saveEntry() {
     carbs_g: +document.getElementById('res-carb').value || 0,
     fat_g: +document.getElementById('res-fat').value || 0,
     fiber_g: +document.getElementById('res-fiber').value || 0,
-    notes: document.getElementById('res-notes').value.trim(),
   };
   try {
     await apiFetch('/api/food', { method: 'POST', body: JSON.stringify(body) });
@@ -1953,8 +2064,18 @@ function switchStats(tab) {
   loadStats();
 }
 
-function statsChangeMonth(n) { statsMonth = addMonths(statsMonth, n); loadStats(); }
-function statsChangeYear(n) { statsYear = String(+statsYear + n); loadStats(); }
+function statsChangeMonth(n) {
+  const next = addMonths(statsMonth, n);
+  if (next > todayStr().slice(0, 7)) return; // no future month
+  statsMonth = next;
+  loadStats();
+}
+function statsChangeYear(n) {
+  const next = +statsYear + n;
+  if (next > new Date().getFullYear()) return; // no future year
+  statsYear = String(next);
+  loadStats();
+}
 
 async function loadStats() {
   if (currentStatsTab === 'weekly') await loadWeeklyStats();
@@ -2191,8 +2312,10 @@ async function loadYearlyStats() {
 // Weight screen
 // ════════════════════════════════════════════════════
 async function loadWeightScreen() {
-  // Set date input default to today
-  document.getElementById('weight-date').value = todayStr();
+  // Set date input default to today, block future
+  const dateEl = document.getElementById('weight-date');
+  dateEl.value = todayStr();
+  dateEl.max = todayStr();
   try {
     weightLogs = await apiFetch('/api/weight');
     renderWeightChart();
@@ -2206,6 +2329,10 @@ async function addWeightLog() {
   document.getElementById('weight-add-error').textContent = '';
   if (!val || isNaN(+val) || +val <= 0) {
     document.getElementById('weight-add-error').textContent = 'הכנס משקל תקין';
+    return;
+  }
+  if (date && date > todayStr()) {
+    document.getElementById('weight-add-error').textContent = 'לא ניתן לרשום משקל לתאריך עתידי';
     return;
   }
   try {
@@ -2292,8 +2419,14 @@ function renderWeightList() {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚖️</div><p>אין מדידות עדיין</p></div>`;
     return;
   }
-  // Show most recent first
+  // Update profile weight from latest log
   const sorted = [...weightLogs].sort((a, b) => b.logged_at.localeCompare(a.logged_at));
+  const latestWeight = +sorted[0].weight_kg;
+  if (userProfile && latestWeight) {
+    userProfile.weight = latestWeight;
+    localStorage.setItem('fl_profile', JSON.stringify(userProfile));
+    apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(userProfile) }).catch(() => {});
+  }
   el.innerHTML = sorted.map(w => `
     <div class="weight-entry">
       <button class="delete-btn" onclick="deleteWeightLog(${w.id})">🗑️</button>
@@ -2399,6 +2532,7 @@ function showToast(msg) {
 // ════════════════════════════════════════════════════
 // Init
 // ════════════════════════════════════════════════════
+populateProfileSelects();
 loadProfile();
 
 if (token) {

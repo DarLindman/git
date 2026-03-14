@@ -146,9 +146,9 @@ app.post('/api/analyze', auth, upload.single('image'), async (req, res) => {
           },
           {
             type: 'text',
-            text: `זהה את האוכל בתמונה והחזר JSON בלבד, ללא טקסט נוסף:
-{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"notes":"הערה קצרה"}
-הערכות בגרמים, קלוריות בkcal, עבור המנה שנראית בתמונה. אם אינך בטוח, הערך בסבירות גבוהה.`
+            text: `זהה את האוכל בתמונה והחזר JSON בלבד ללא שום טקסט נוסף, ללא גרשיים בתוך ערכי המחרוזות:
+{"foodName":"שם קצר בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"notes":"2-3 מילים"}
+הערכות בגרמים, קלוריות בkcal. אל תוסיף הסברים, רק JSON.`
           }
         ]
       }]
@@ -158,7 +158,20 @@ app.post('/api/analyze', auth, upload.single('image'), async (req, res) => {
     // Extract JSON even if wrapped in markdown code blocks
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
-    const data = JSON.parse(jsonMatch[0]);
+    // Sanitize: escape control characters that are illegal inside JSON strings
+    const jsonStr = jsonMatch[0].replace(/[\x00-\x1F\x7F]/g, ch => {
+      if (ch === '\n') return '\\n';
+      if (ch === '\r') return '\\r';
+      if (ch === '\t') return '\\t';
+      return '';
+    });
+    let data;
+    try {
+      data = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error('JSON parse error:', parseErr.message, '\nClaude raw output:', text);
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
     res.json(data);
   } catch (e) {
     console.error(e);

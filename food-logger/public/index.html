@@ -2022,6 +2022,12 @@ input::placeholder { color: var(--muted); }
 
     <hr class="receipt-hr">
 
+    <div class="receipt-row receipt-entry">
+      <label class="receipt-lbl">שעה</label>
+      <input id="res-time" type="time" class="receipt-val" style="direction:ltr;text-align:left">
+      <span class="receipt-unit"></span>
+    </div>
+
     <div class="receipt-row">
       <span class="receipt-lbl">אמינות</span>
       <span id="res-confidence" class="receipt-confidence"></span>
@@ -2969,6 +2975,8 @@ async function analyzeText() {
     const hhmm = now.toTimeString().slice(0, 5);
     const rtEl = document.getElementById('receipt-time');
     if (rtEl) rtEl.textContent = hhmm;
+    const timeInput = document.getElementById('res-time');
+    if (timeInput) timeInput.value = hhmm;
     // Re-trigger stagger animation by forcing reflow
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
@@ -3007,6 +3015,8 @@ async function analyzeFood() {
     const hhmm = now.toTimeString().slice(0, 5);
     const rtEl = document.getElementById('receipt-time');
     if (rtEl) rtEl.textContent = hhmm;
+    const timeInput = document.getElementById('res-time');
+    if (timeInput) timeInput.value = hhmm;
     // Re-trigger stagger animation by forcing reflow
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
@@ -3036,7 +3046,7 @@ async function saveEntry() {
     carbs_g: +document.getElementById('res-carb').value || 0,
     fat_g: +document.getElementById('res-fat').value || 0,
     fiber_g: +document.getElementById('res-fiber').value || 0,
-    logged_at: todayStr() + 'T12:00:00', // use local date to avoid UTC timezone mismatch
+    logged_at: todayStr() + 'T' + (document.getElementById('res-time')?.value || new Date().toTimeString().slice(0, 5)) + ':00',
   };
   try {
     await apiFetch('/api/food', { method: 'POST', body: JSON.stringify(body) });

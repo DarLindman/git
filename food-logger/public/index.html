@@ -249,7 +249,7 @@ body::after {
 
 .dash-greeting-text {
   font-family: 'Fraunces', serif;
-  font-style: italic;
+  font-style: normal;
   font-weight: 300;
   font-size: 22px;
   color: var(--text2);
@@ -280,7 +280,7 @@ body::after {
 }
 .dash-cal-num {
   font-family: 'Fraunces', serif;
-  font-style: italic;
+  font-style: normal;
   font-weight: 300;
   font-size: clamp(48px, 14vw, 64px);
   color: var(--text);
@@ -293,17 +293,17 @@ body::after {
 }
 .dash-cal-sep {
   font-family: 'Fraunces', serif;
-  font-style: italic;
+  font-style: normal;
   font-size: clamp(30px, 8vw, 38px);
   color: var(--border);
   line-height: 1;
 }
 .dash-cal-pct {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
+  font-size: 18px;
   color: var(--accent);
-  letter-spacing: 1px;
-  margin-top: 2px;
+  letter-spacing: 2px;
+  margin-top: 4px;
 }
 
 .dash-cal-label-main {
@@ -321,17 +321,6 @@ body::after {
   color: var(--text2);
 }
 
-/* Calorie ring */
-.dash-ring-wrap {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.dash-ring-wrap svg {
-  transform: rotate(-90deg);
-}
 
 /* Macro plate */
 .dash-plate-tooltip {
@@ -404,7 +393,7 @@ body::after {
 }
 .dash-fire-canvas {
   position: absolute;
-  bottom: 0;
+  bottom: 55px;
   left: 50%;
   transform: translateX(-50%);
   width: 200px;
@@ -1977,8 +1966,6 @@ input::placeholder { color: var(--muted); }
       </div>
       <div class="dash-cal-label-main">קלוריות היום</div>
       <div class="dash-cal-pct" id="dash-cal-pct" style="display:none"></div>
-      <!-- Calorie ring SVG — rendered by JS -->
-      <div class="dash-ring-wrap" id="dash-ring-wrap"></div>
     </div>
 
     <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
@@ -2137,7 +2124,7 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ STATS ════════════════ -->
 <div id="screen-stats" class="screen">
-  <div class="topbar"><div class="topbar-title">סטטיסטיקות</div><div class="topbar-brand"><div class="topbar-brand-title">Your Personal Food Logger</div><div class="topbar-brand-sub"><a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a> &middot; By Dar</div></div></div>
+  <div class="topbar"><div class="topbar-title">נתונים</div><div class="topbar-brand"><div class="topbar-brand-title">Your Personal Food Logger</div><div class="topbar-brand-sub"><a class="topbar-brand-ig" href="https://www.instagram.com/darlindman/" target="_blank" rel="noopener"><svg width="9" height="9" viewBox="0 0 24 24" fill="#E1306C"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>Instagram</a> &middot; By Dar</div></div></div>
   <div class="page">
     <div class="stats-tabs">
       <button class="stats-tab active" onclick="switchStats('weekly')">שבועי</button>
@@ -2258,13 +2245,10 @@ input::placeholder { color: var(--muted); }
   <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
 </svg></span><span>יומן</span>
   </button>
+  <button class="nav-item nav-camera" id="nav-camera" onclick="navigate('camera')"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
   <button class="nav-item" id="nav-stats" onclick="navigate('stats')">
-    <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span>סטטס</span>
+    <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span>נתונים</span>
   </button>
-  <button class="nav-item nav-camera" id="nav-camera" onclick="navigate('camera')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-  <circle cx="12" cy="13" r="4"/>
-</svg></button>
   <button class="nav-item" id="nav-weight" onclick="navigate('weight')">
     <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></span><span>משקל</span>
   </button>
@@ -2778,37 +2762,6 @@ function navigate(screen) {
 // ════════════════════════════════════════════════════
 // Dashboard helpers
 // ════════════════════════════════════════════════════
-function renderCalRing(eaten, goal) {
-  const el = document.getElementById('dash-ring-wrap');
-  if (!el) return;
-  const R = 48, CX = 56, CY = 56, SW = 6;
-  const circ = 2 * Math.PI * R;
-  const pct = goal > 0 ? Math.min(eaten / goal, 1) : 0;
-  const over = goal > 0 && eaten > goal;
-  const fillColor = over ? '#e85d5d' : 'var(--accent)';
-  el.innerHTML = `
-    <svg width="112" height="112" viewBox="0 0 112 112" style="transform:rotate(-90deg)">
-      <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="${SW}"/>
-      <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${fillColor}" stroke-width="${SW}"
-        stroke-linecap="round"
-        stroke-dasharray="${circ}"
-        stroke-dashoffset="${circ}"
-        id="cal-ring-fill"
-        style="transition: stroke-dashoffset 0.7s var(--ease-out, cubic-bezier(0.22,1,0.36,1))"/>
-    </svg>`;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const ring = document.getElementById('cal-ring-fill');
-    if (ring) ring.style.strokeDashoffset = circ * (1 - pct);
-  } else {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const ring = document.getElementById('cal-ring-fill');
-        if (ring) ring.style.strokeDashoffset = circ * (1 - pct);
-      });
-    });
-  }
-}
-
 function renderDashLogPreview(entries) {
   const el = document.getElementById('dash-log-preview');
   if (!el) return;
@@ -2963,7 +2916,6 @@ async function loadDashboard() {
       sepEl.style.display  = 'none';
       pctEl.style.display  = 'none';
     }
-    renderCalRing(cal, goal);
   } catch {}
 
   try {
@@ -3065,7 +3017,7 @@ function renderMealList(entries) {
   </div>
   <div class="mir-body">
     <div class="mir-name">${escapeHtml(e.food_name || '')}</div>
-    <div class="mir-macros">ח ${Math.round(e.protein_g||0)} · פ ${Math.round(e.carbs_g||0)} · ש ${Math.round(e.fat_g||0)} · ס ${Math.round(e.fiber_g||0)}</div>
+    <div class="mir-macros"><span style="color:var(--protein)">ח ${Math.round(e.protein_g||0)}</span> · <span style="color:var(--carb)">פ ${Math.round(e.carbs_g||0)}</span> · <span style="color:var(--fat)">ש ${Math.round(e.fat_g||0)}</span> · <span style="color:var(--fiber)">ס ${Math.round(e.fiber_g||0)}</span></div>
   </div>
   <div class="mir-right">
     <div class="mir-kcal">${Math.round(e.calories || 0)}</div>

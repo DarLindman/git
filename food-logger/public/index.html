@@ -2772,7 +2772,7 @@ async function loadDiary() {
   } catch (e) { showToast('שגיאה בטעינת היומן'); }
 }
 
-const MEAL_LABELS = { breakfast: '☀️ בוקר', lunch: '🌤️ צהריים', dinner: '🌙 ערב', snack: '🍎 חטיף' };
+const MEAL_LABELS = { breakfast: 'בוקר', lunch: 'צהריים', dinner: 'ערב', snack: 'חטיף' };
 const MEAL_BADGE = { breakfast: 'badge-breakfast', lunch: 'badge-lunch', dinner: 'badge-dinner', snack: 'badge-snack' };
 
 const FOOD_EMOJI_MAP = [
@@ -3388,7 +3388,9 @@ function renderWeightList() {
   // Display newest first
   el.innerHTML = [...weightLogs].reverse().map(w => `
     <div class="weight-entry">
-      <button class="delete-btn" onclick="deleteWeightLog(${w.id})">🗑️</button>
+      <button class="delete-btn" onclick="deleteWeightLog(${w.id})" aria-label="מחק">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
       <div class="weight-entry-info">
         <div class="weight-val-big">${(+w.weight_kg).toFixed(1)} ק"ג</div>
         <div class="weight-entry-date">${formatDate(w.logged_at)}</div>

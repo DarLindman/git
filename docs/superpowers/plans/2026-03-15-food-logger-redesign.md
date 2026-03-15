@@ -589,7 +589,7 @@ function renderDashLogPreview(entries) {
 
 - [ ] **Step 4: Verify in browser**
 
-Expected: Ring animates from 0 to correct fill on Dashboard load. If over goal, ring is red. Streak line shows three stats separated by `·`. Log preview shows last 3 meals in asymmetric rows.
+Expected: Ring animates from 0 to correct fill on Dashboard load. If over goal, ring is red. Streak line shows a single text line (e.g. "12 ימים ברצף"). Log preview shows last 3 meals in asymmetric rows.
 
 - [ ] **Step 5: Commit**
 

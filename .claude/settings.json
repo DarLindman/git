@@ -5,8 +5,6 @@
     ]
   },
   "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true,
-    "writing-linkedin-posts@mamad-skills": true,
-    "presentation-builder@mamad-skills": true
+    "frontend-design@claude-plugins-official": true
   }
 }

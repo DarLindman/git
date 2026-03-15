@@ -99,9 +99,7 @@ app.use(express.json({ limit: '15mb' }));
 
 const loginLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
 const analyzeLimiter = rateLimit({ windowMs: 3_600_000, max: 20, standardHeaders: true, legacyHeaders: false });
-app.get('/apple-touch-icon.png', serveIcon);
-app.get('/apple-touch-icon-precomposed.png', serveIcon);
-app.get('/icon-180.png', serveIcon);
+app.get('/favicon.ico', serveIcon);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── DB Init ─────────────────────────────────────────────────────────────────

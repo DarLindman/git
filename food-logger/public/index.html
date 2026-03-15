@@ -3124,8 +3124,8 @@ function renderStatAvgBox(elId, rows, rec, label, customAvg) {
   el.innerHTML = `<div class="avg-box"><div class="avg-box-left"><div class="avg-val">${avgCal}</div><div class="avg-label">${label}</div></div><div class="avg-box-right">${diffHtml}</div></div>`;
 }
 
-function renderStatMacros(elId, rows, footnote) {
-  const n = rows.length;
+function renderStatMacros(elId, rows, footnote, divisor) {
+  const n = divisor || rows.length;
   const sum = rows.reduce((a, r) => ({
     pro: a.pro + (+r.protein_g || 0), carb: a.carb + (+r.carbs_g || 0),
     fat: a.fat + (+r.fat_g || 0), fiber: a.fiber + (+r.fiber_g || 0),
@@ -3305,7 +3305,7 @@ async function loadYearlyStats() {
       isToday: r => r.month === currentMonth,
       recommended: rec,
     });
-    renderStatMacros('yearly-macro', rows, `ממוצע יומי על בסיס ${rows.length} חודשים`);
+    renderStatMacros('yearly-macro', rows, `ממוצע יומי על בסיס ${totalDays} ימים`, totalDays);
   } catch { }
 }
 

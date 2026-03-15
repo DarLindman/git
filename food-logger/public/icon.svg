@@ -1,5 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Orange rounded background -->
   <rect width="180" height="180" rx="38" fill="#E8703A"/>
-  <text x="90" y="125" text-anchor="middle" font-size="96"
-        font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">🥗</text>
+  <!-- Bowl rim -->
+  <ellipse cx="90" cy="108" rx="62" ry="18" fill="#FFFFFF"/>
+  <!-- Bowl body -->
+  <path d="M 28,108 A 62,62 0 0,0 152,108 Z" fill="#FFFFFF"/>
+  <!-- Salad greens -->
+  <circle cx="90" cy="78" r="19" fill="#388E3C"/>
+  <circle cx="68" cy="86" r="18" fill="#4CAF50"/>
+  <circle cx="114" cy="86" r="18" fill="#4CAF50"/>
+  <circle cx="52" cy="100" r="13" fill="#66BB6A"/>
+  <circle cx="128" cy="100" r="13" fill="#66BB6A"/>
+  <circle cx="100" cy="92" r="13" fill="#81C784"/>
+  <circle cx="80" cy="94" r="11" fill="#A5D6A7"/>
+  <!-- Tomato -->
+  <circle cx="78" cy="100" r="11" fill="#EF5350"/>
+  <!-- Corn -->
+  <circle cx="106" cy="102" r="7" fill="#FFD54F"/>
 </svg>

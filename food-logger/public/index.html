@@ -269,6 +269,19 @@ body::after {
   align-items: center;
   gap: 4px;
   padding: 8px 0;
+  position: relative;
+}
+
+.dash-ambient-steam {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 400px;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .dash-cal-remaining {
@@ -282,6 +295,8 @@ body::after {
   transform-origin: center;
   font-variant-numeric: tabular-nums;
   letter-spacing: -4px;
+  position: relative;
+  z-index: 1;
 }
 
 .dash-cal-label-row {
@@ -289,6 +304,8 @@ body::after {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  position: relative;
+  z-index: 1;
 }
 
 .dash-cal-label-main {
@@ -1841,6 +1858,10 @@ input::placeholder { color: var(--muted); }
 
     <!-- Hero calorie number -->
     <div class="dash-hero-cal">
+      <video class="dash-ambient-steam"
+        src="/ambient-steam.mp4"
+        autoplay muted loop playsinline
+        aria-hidden="true"></video>
       <div class="dash-cal-remaining" id="dash-cal-remaining">—</div>
       <div class="dash-cal-label-row">
         <span class="dash-cal-label-main">קלוריות נשארו</span>

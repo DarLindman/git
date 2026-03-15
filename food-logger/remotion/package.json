@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "render": "npx remotion render SaladLogo --output ../public/salad-logo.mp4",
+    "render:steam": "npx remotion render AmbientSteam --output ../public/ambient-steam.mp4",
     "studio": "npx remotion studio"
   },
   "dependencies": {

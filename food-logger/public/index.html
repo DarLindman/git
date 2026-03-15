@@ -3036,10 +3036,20 @@ async function loadWeeklyStats() {
       isToday: r => r.day.slice(0, 10) === todayDs,
       recommended: rec,
       dayLetters: chartDays.map(r => {
-        const d = new Date(r.day);
+        const parts = r.day.slice(0, 10).split('-');
+        const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
         return hebrewDays[d.getDay()];
       }),
     });
+    // Trigger draw-on animation for the polyline
+    const polylineEl = chartEl.querySelector('polyline[id^="lc-"]');
+    if (polylineEl) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          polylineEl.style.strokeDashoffset = '0';
+        });
+      });
+    }
     renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
 }
@@ -3138,15 +3148,6 @@ function renderLineChart(rows, { getValue, getLabel, isToday, recommended, dayLe
       style="transition: stroke-dashoffset 0.6s var(--ease-out, cubic-bezier(0.22,1,0.36,1))"/>` : ''}
     ${dots}
     ${labels}
-    <script>
-      (function(){
-        var el = document.getElementById('${polylineId}');
-        if (!el) return;
-        requestAnimationFrame(function(){ requestAnimationFrame(function(){
-          el.style.strokeDashoffset = '0';
-        }); });
-      })();
-    </script>
   </svg>`;
 }
 

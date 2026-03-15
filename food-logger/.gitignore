@@ -1,3 +1,4 @@
 node_modules/
 .env
 *.db
+remotion/node_modules/

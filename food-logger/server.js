@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
@@ -84,13 +85,20 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // DB
+// NOTE: rejectUnauthorized:false skips cert validation on the Postgres TLS connection.
+// This is required for Railway/Render managed databases that use self-signed certs.
+// Risk: no MITM protection on the DB connection. To harden, obtain the CA cert from
+// your provider and pass it as ssl:{ ca: fs.readFileSync('ca.crt') } instead.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false });
 
 // Anthropic
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-app.use(cors());
+app.use(cors({ origin: process.env.ORIGIN || 'http://localhost:3000' }));
 app.use(express.json({ limit: '15mb' }));
+
+const loginLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
+const analyzeLimiter = rateLimit({ windowMs: 3_600_000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.get('/apple-touch-icon.png', serveIcon);
 app.get('/apple-touch-icon-precomposed.png', serveIcon);
 app.get('/icon-180.png', serveIcon);
@@ -147,9 +155,9 @@ function auth(req, res, next) {
 }
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
-const DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstuvuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu.'; // for timing parity
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing-parity', 10); // for timing parity
 function createToken(user) {
-  return jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
 // ─── Auth routes ─────────────────────────────────────────────────────────────
@@ -171,10 +179,11 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
+  const lowerUser = (username || '').toLowerCase();
   try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username.toLowerCase()]);
+    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [lowerUser]);
     const user = rows[0];
     // Always run bcrypt to prevent timing-based username enumeration
     const valid = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
@@ -204,11 +213,12 @@ app.post('/auth/change-password', auth, async (req, res) => {
 });
 
 // ─── Analyze food image ───────────────────────────────────────────────────────
-app.post('/api/analyze', auth, async (req, res) => {
+app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
   const { imageBase64: raw, mimeType: mime } = req.body;
   if (!raw) return res.status(400).json({ error: 'No image provided' });
+  const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  const mimeType = ALLOWED_MIME.includes(mime) ? mime : 'image/jpeg';
   const imageBase64 = raw.replace(/^data:[^;]+;base64,/, '');
-  const mimeType = mime || 'image/jpeg';
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -246,9 +256,10 @@ app.post('/api/analyze', auth, async (req, res) => {
 });
 
 // ─── Analyze food text ────────────────────────────────────────────────────────
-app.post('/api/analyze-text', auth, async (req, res) => {
+app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
   const { text } = req.body;
   if (!text || !text.trim()) return res.status(400).json({ error: 'No text provided' });
+  if (text.length > 500) return res.status(400).json({ error: 'תיאור ארוך מדי (מקסימום 500 תווים)' });
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -296,7 +307,7 @@ app.get('/api/food', auth, async (req, res) => {
       query = `SELECT * FROM food_logs WHERE user_id=$1 AND logged_at::date = $2::date ORDER BY logged_at ASC`;
       params = [req.user.id, date];
     } else {
-      query = `SELECT * FROM food_logs WHERE user_id=$1 ORDER BY logged_at DESC LIMIT 100`;
+      query = `SELECT * FROM food_logs WHERE user_id=$1 ORDER BY logged_at DESC LIMIT 500`;
       params = [req.user.id];
     }
     const { rows } = await pool.query(query, params);
@@ -408,13 +419,23 @@ app.get('/api/stats/monthly', auth, async (req, res) => {
 app.get('/api/profile', auth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id=$1', [req.user.id]);
-    res.json(rows[0] ? JSON.parse(rows[0].profile_json) : {});
+    if (!rows[0]) return res.json({});
+    try {
+      res.json(JSON.parse(rows[0].profile_json));
+    } catch {
+      console.error('Corrupt profile_json for user', req.user.id);
+      res.json({});
+    }
   } catch (e) { console.error(e); res.status(500).json({ error: 'שגיאת שרת' }); }
 });
 
+const PROFILE_ALLOWED_KEYS = new Set(['gender', 'birthDate', 'height', 'weight', 'activity', 'goalKg']);
 app.put('/api/profile', auth, async (req, res) => {
   try {
-    const json = JSON.stringify(req.body);
+    const sanitized = Object.fromEntries(
+      Object.entries(req.body).filter(([k]) => PROFILE_ALLOWED_KEYS.has(k))
+    );
+    const json = JSON.stringify(sanitized);
     await pool.query(
       `INSERT INTO user_profiles (user_id, profile_json) VALUES ($1,$2)
        ON CONFLICT (user_id) DO UPDATE SET profile_json=$2`,
@@ -440,7 +461,7 @@ app.post('/api/weight', auth, async (req, res) => {
 app.get('/api/weight', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, logged_at::text, weight_kg FROM weight_logs WHERE user_id=$1 ORDER BY logged_at ASC LIMIT 90`,
+      `SELECT id, logged_at::text, weight_kg FROM weight_logs WHERE user_id=$1 ORDER BY logged_at ASC LIMIT 1095`,
       [req.user.id]
     );
     res.json(rows);

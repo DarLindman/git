@@ -1995,6 +1995,18 @@ function updateSettingsProfileSub() {
 }
 
 // ════════════════════════════════════════════════════
+// Security helpers
+// ════════════════════════════════════════════════════
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ════════════════════════════════════════════════════
 // API helpers
 // ════════════════════════════════════════════════════
 async function apiFetch(path, opts = {}) {
@@ -2080,20 +2092,18 @@ async function saveRegProfile() {
   const weight = +document.getElementById('reg-weight').value || 0;
   const profile = { gender: regGender, birthDate, height, weight, activity: regActivity, goalKg: regGoalKg };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
-  // Save to server using pendingToken
+  // Save to server using pendingToken (passed explicitly to avoid mutating the global)
   if (pendingToken) {
-    const savedToken = token;
-    token = pendingToken;
+    const authHeader = { Authorization: `Bearer ${pendingToken}` };
     try {
-      await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile) });
+      await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile), headers: authHeader });
     } catch(e) { /* non-critical */ }
     // Auto-log registration weight
     if (weight > 0) {
       try {
-        await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }) });
+        await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }), headers: authHeader });
       } catch(e) { /* non-critical */ }
     }
-    token = savedToken;
   }
   finishLogin();
 }
@@ -2135,7 +2145,8 @@ async function setLoggedIn(t, u) {
 function doLogout() {
   localStorage.removeItem('fl_token');
   localStorage.removeItem('fl_username');
-  token = null; username = null;
+  localStorage.removeItem('fl_profile');
+  token = null; username = null; userProfile = null;
   document.getElementById('bottom-nav').style.display = 'none';
   navigate('auth');
 }
@@ -2389,9 +2400,9 @@ function renderMealList(entries) {
     <div class="food-item" id="entry-${e.id}">
       <div class="food-emoji">${getFoodEmoji(e.food_name)}</div>
       <div class="food-info">
-        <div class="food-name">${e.food_name}</div>
+        <div class="food-name">${escapeHtml(e.food_name)}</div>
         <div class="food-meta">
-          <span class="meal-badge ${MEAL_BADGE[e.meal_type] || ''}">${MEAL_LABELS[e.meal_type] || e.meal_type}</span>
+          <span class="meal-badge ${MEAL_BADGE[e.meal_type] || ''}">${MEAL_LABELS[e.meal_type] || escapeHtml(e.meal_type)}</span>
           חל'${Math.round(e.protein_g || 0)}·פח'${Math.round(e.carbs_g || 0)}·שו'${Math.round(e.fat_g || 0)}
         </div>
       </div>

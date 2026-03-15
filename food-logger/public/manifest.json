@@ -1,6 +1,8 @@
 {
   "name": "יומן האוכל האישי שלך",
   "short_name": "יומן",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d0b09",
   "theme_color": "#0d0b09",

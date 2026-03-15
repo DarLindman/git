@@ -393,7 +393,7 @@ app.get('/api/streak', auth, async (req, res) => {
   try {
     // ::text forces pg to return 'YYYY-MM-DD' string, not a Date object
     const { rows } = await pool.query(
-      `SELECT DISTINCT logged_at::date::text AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
+      `SELECT DISTINCT (logged_at AT TIME ZONE 'UTC')::date::text AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
       [req.user.id]
     );
     const days = rows.map(r => r.day); // already 'YYYY-MM-DD' strings

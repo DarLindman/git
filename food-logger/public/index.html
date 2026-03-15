@@ -922,10 +922,6 @@ input::placeholder { color: var(--muted); }
    DONUT CHART (dynamically injected)
 ════════════════════════════════════════ */
 .donut-wrap { display: flex; align-items: center; gap: 16px; }
-#macro-donut-wrap {
-  flex-direction: column;
-  align-items: center;
-}
 .donut-legend { flex: 1; }
 
 .legend-item {
@@ -1968,11 +1964,6 @@ input::placeholder { color: var(--muted); }
           <div class="cal-goal-track"><div class="cal-goal-fill" id="cal-goal-fill" style="width:0%"></div></div>
         </div>
       </div>
-      <div id="macro-donut-wrap" class="donut-wrap">
-        <svg id="macro-donut" width="200" height="200" viewBox="0 0 200 200"></svg>
-        <div id="macro-plate-tooltip" class="dash-plate-tooltip" style="display:none;margin-top:4px"></div>
-        <div class="donut-legend" id="macro-legend"></div>
-      </div>
     </div>
 
     <div class="card">
@@ -2926,7 +2917,6 @@ function renderDailySummary(entries) {
     goalSection.style.display = 'none';
   }
 
-  renderPlate('macro-donut', 'macro-legend', 'macro-plate-tooltip', totals);
 }
 
 async function deleteEntry(id) {
@@ -3296,7 +3286,16 @@ async function loadYearlyStats() {
     const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
     const totalDays = rows.reduce((s, r) => s + (parseInt(r.day_count, 10) || 0), 0);
     const yearlyDailyAvg = totalDays > 0 ? Math.round(totalCal / totalDays) : (rows.length > 0 ? Math.round(totalCal / (rows.length * 30)) : 0);
-    renderStatAvgBox('yearly-avg-box', rows, rec, "ממוצע קל' יומי", yearlyDailyAvg);
+    const yearlyAvgEl = document.getElementById('yearly-avg-box');
+    if (yearlyAvgEl && rows.length) {
+      let diffHtml = '';
+      if (rec > 0) {
+        const diff = yearlyDailyAvg - rec;
+        const cls = diff <= 0 ? 'under' : 'over';
+        diffHtml = `<div class="avg-diff ${cls}">${diff > 0 ? '+' : ''}${diff} קל'</div><div style="font-size:11px;color:var(--muted)">מהמומלץ</div>`;
+      }
+      yearlyAvgEl.innerHTML = `<div class="avg-box"><div class="avg-box-left"><div class="avg-val">${yearlyDailyAvg}</div><div class="avg-label">ממוצע קל' יומי</div></div><div class="avg-box-right">${diffHtml}</div></div>`;
+    }
     const chartEl = document.getElementById('yearly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
     const currentMonth = todayStr().slice(0, 7);

@@ -2733,7 +2733,7 @@ function navigate(screen) {
   const navEl = document.getElementById(`nav-${screen}`);
   if (navEl) navEl.classList.add('active');
   currentScreen = screen;
-  if (screen === 'dashboard') loadDashboard();
+  if (screen === 'dashboard') { loadDashboard(); animateDashStagger(); }
   if (screen === 'home') loadDiary();
   if (screen === 'stats') loadStats();
   if (screen === 'weight') loadWeightScreen();
@@ -2794,6 +2794,32 @@ function renderDashLogPreview(entries) {
 }
 
 // ════════════════════════════════════════════════════
+function animateCountUp(el, target, duration) {
+  duration = duration || 800;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.textContent = target.toLocaleString('he-IL');
+    return;
+  }
+  var start = performance.now();
+  function tick(now) {
+    var t = Math.min((now - start) / duration, 1);
+    el.textContent = Math.round(t * target).toLocaleString('he-IL');
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function animateDashStagger() {
+  var els = document.querySelectorAll('.dash-stagger');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  els.forEach(function(el) { el.classList.remove('anim-visible'); });
+  var delays = [0, 150, 300, 450];
+  els.forEach(function(el, i) {
+    if (reduced) { el.classList.add('anim-visible'); return; }
+    setTimeout(function() { el.classList.add('anim-visible'); }, delays[i] || 0);
+  });
+}
+
 // Dashboard
 // ════════════════════════════════════════════════════
 async function loadDashboard() {
@@ -2814,8 +2840,22 @@ async function loadDashboard() {
       { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 }
     );
     const goal = calcRecommendedCal(userProfile);
-    document.getElementById('dash-cal-remaining').textContent = goal > 0 ? Math.max(0, goal - cal).toLocaleString('he-IL') : '—';
-    document.getElementById('dash-cal-goal-label').textContent = goal > 0 ? 'מתוך ' + goal.toLocaleString('he-IL') : '';
+    const calEl = document.getElementById('dash-cal-remaining');
+    const goalRow = document.getElementById('dash-cal-goal-row');
+    const goalLbl = document.getElementById('dash-cal-goal-label');
+    if (cal === 0 && goal === 0) {
+      calEl.textContent = '—';
+    } else if (cal === 0) {
+      calEl.textContent = '0';
+    } else {
+      animateCountUp(calEl, cal);
+    }
+    if (goal > 0) {
+      goalLbl.textContent = goal.toLocaleString('he-IL');
+      goalRow.style.display = 'flex';
+    } else {
+      goalRow.style.display = 'none';
+    }
     renderCalRing(cal, goal);
   } catch {}
 
@@ -2823,6 +2863,8 @@ async function loadDashboard() {
     const { streak } = await apiFetch('/api/streak');
     const numEl = document.getElementById('dash-streak-num');
     if (numEl) numEl.textContent = streak ?? '—';
+    const fireVid = document.getElementById('dash-fire-vid');
+    if (fireVid) fireVid.style.display = (streak >= 1) ? '' : 'none';
   } catch {}
 }
 

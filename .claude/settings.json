@@ -3,8 +3,5 @@
     "allow": [
       "Bash(powershell -ExecutionPolicy Bypass -File \"c:/Users/Dar/Documents/Git/parse_trip.ps1\")"
     ]
-  },
-  "enabledPlugins": {
-    "frontend-design@claude-plugins-official": false
   }
 }

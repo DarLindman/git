@@ -223,6 +223,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
+      system: 'You are a food nutrition analyzer. You MUST always write food names in Hebrew script only (כתב עברי). Never use Latin, English, or any non-Hebrew characters in the foodName field. Examples: use "עוף בתנור" not "Grilled Chicken", use "פסטה ברוטב עגבניות" not "Pasta with tomato sauce".',
       messages: [{
         role: 'user',
         content: [
@@ -264,6 +265,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
+      temperature: 0,
       messages: [{
         role: 'user',
         content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\nשם האוכל חייב להיות בעברית בלבד, ללא תווים לטיניים. לדוגמה: "עוף בתנור" ולא "Grilled Chicken".\n\nהטקסט: ${text.trim()}`

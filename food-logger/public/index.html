@@ -1047,19 +1047,6 @@ input::placeholder { color: var(--muted); }
   border: 1px solid #1e1e1e;
 }
 
-/* Corner brackets */
-.cam-preview::before, .cam-preview::after {
-  content: '';
-  position: absolute;
-  width: 26px;
-  height: 26px;
-  border-color: var(--accent);
-  border-style: solid;
-  z-index: 2;
-  opacity: 0.7;
-}
-.cam-preview::before { top: 16px; right: 16px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
-.cam-preview::after  { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
 
 .cam-corners {
   position: absolute;
@@ -2448,14 +2435,16 @@ async function saveMpProfile() {
 // ════════════════════════════════════════════════════
 // Navigation
 // ════════════════════════════════════════════════════
+let _placeholderIv = null;
 function animatePlaceholder() {
   const ta = document.getElementById('food-text-input');
   if (!ta) return;
+  clearInterval(_placeholderIv);
   const full = ta.getAttribute('data-placeholder') || '';
   ta.placeholder = '';
   let i = 0;
-  const iv = setInterval(() => {
-    if (i >= full.length) { clearInterval(iv); return; }
+  _placeholderIv = setInterval(() => {
+    if (i >= full.length) { clearInterval(_placeholderIv); return; }
     ta.placeholder = full.slice(0, ++i);
   }, 15);
 }

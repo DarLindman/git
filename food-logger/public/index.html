@@ -238,122 +238,201 @@ body::after {
   padding: 40px 20px 120px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
-.dash-hero {
+
+.dash-greeting-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
 }
+
+.dash-greeting-text {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 22px;
+  color: var(--muted);
+}
+
 .dash-logo-vid {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-sharp);
   display: block;
 }
-.dash-greeting {
-  font-family: 'Fraunces', serif;
-  font-weight: 300;
-  font-size: 34px;
-  color: var(--text);
-  line-height: 1.1;
-}
-.dash-username {
-  font-size: 13px;
-  color: var(--text2);
-  margin-top: 4px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-.dash-cal-top {
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.dash-cal-sep, .dash-cal-unit {
-  font-size: 16px;
-  color: var(--text2);
-  font-weight: 400;
-}
-.dash-cal-track {
-  height: 8px;
-  background: var(--surface2);
-  border-radius: 4px;
-  margin: 12px 0 8px;
-  overflow: hidden;
-}
-.dash-cal-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 4px;
-  width: 0%;
-  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.dash-cal-fill.over { background: #e85d5d; }
-.dash-cal-sub {
-  font-size: 12px;
-  color: var(--text2);
-}
-.dash-row {
-  display: flex;
-  gap: 12px;
-}
-.dash-streak-card {
-  flex: 1;
-  text-align: center;
+
+/* Hero calorie number */
+.dash-hero-cal {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  padding: 8px 0;
 }
-.dash-streak-num {
-  font-size: 44px;
-  font-weight: 700;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
+
+.dash-cal-remaining {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(72px, 22vw, 96px);
+  color: var(--text);
   line-height: 1;
+  transform: rotate(-1.5deg);
+  transform-origin: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -4px;
 }
-.dash-streak-label {
+
+.dash-cal-label-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dash-cal-label-main {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash-cal-label-sub {
+  font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
   color: var(--text2);
-  margin-top: 6px;
 }
-.dash-macro-card {
-  flex: 2;
-  display: flex;
-  align-items: center;
-}
-.dash-macro-row {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
+
+/* Calorie ring */
+.dash-ring-wrap {
   width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
 }
-.dash-macro-val {
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: center;
+
+.dash-ring-wrap svg {
+  transform: rotate(-90deg);
 }
-.dash-macro-lbl {
-  font-size: 11px;
+
+/* Macro plate */
+.dash-plate-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-plate-tooltip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
   color: var(--text2);
   text-align: center;
-  margin-top: 3px;
+  min-height: 18px;
 }
-.dash-cta {
+
+.dash-plate-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 20px;
   width: 100%;
-  margin-top: 4px;
-  font-size: 17px;
-  padding: 16px;
+  max-width: 240px;
 }
-.dash-cta-ghost {
-  width: 100%;
+
+.plate-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.plate-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Streak line */
+.dash-streak-line {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* Log preview rows */
+.dash-log-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dash-log-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+
+.dash-log-row:last-child { border-bottom: none; }
+
+.dash-log-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  grid-row: 1;
+  grid-column: 1;
+  padding-top: 2px;
+}
+
+.dash-log-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.dash-log-kcal {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 20px;
+  color: var(--text);
+  grid-row: 1;
+  grid-column: 3;
+  line-height: 1;
+}
+
+.dash-log-macros {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  grid-row: 2;
+  grid-column: 2 / 4;
   margin-top: 2px;
 }
+
+.dash-username {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.dash-cta { margin-top: 4px; border-radius: var(--radius-pill); }
+.dash-cta-ghost { width: 100%; margin-top: 2px; border-radius: var(--radius-pill); }
 
 /* ════════════════════════════════════════
    AUTH
@@ -1546,38 +1625,54 @@ input::placeholder { color: var(--muted); }
 <!-- ════════════════ DASHBOARD ════════════════ -->
 <div id="screen-dashboard" class="screen">
   <div class="dash-wrap">
-    <div class="dash-hero">
-      <div>
-        <div class="dash-greeting" id="dash-greeting">בוקר טוב ☀️</div>
-        <div class="dash-username" id="dash-username"></div>
-      </div>
-      <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.mp4" muted playsinline></video>
+
+    <!-- Greeting -->
+    <div class="dash-greeting-line">
+      <span class="dash-greeting-text" id="dash-greeting">בוקר טוב</span>
+      <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.mp4" muted playsinline autoplay loop></video>
     </div>
 
-    <div class="card">
-      <div class="dash-cal-top">
-        <span id="dash-cal-eaten">0</span><span class="dash-cal-sep"> / </span><span id="dash-cal-goal">—</span><span class="dash-cal-unit"> קל'</span>
+    <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,4 Q25,1 50,4 Q75,7 100,4"/>
+    </svg>
+
+    <!-- Hero calorie number -->
+    <div class="dash-hero-cal">
+      <div class="dash-cal-remaining" id="dash-cal-remaining">—</div>
+      <div class="dash-cal-label-row">
+        <span class="dash-cal-label-main">קלוריות נשארו</span>
+        <span class="dash-cal-label-sub" id="dash-cal-goal-label">מתוך —</span>
       </div>
-      <div class="dash-cal-track"><div class="dash-cal-fill" id="dash-cal-fill"></div></div>
-      <div class="dash-cal-sub" id="dash-cal-sub">טוען...</div>
+      <!-- Calorie ring SVG — rendered by JS -->
+      <div class="dash-ring-wrap" id="dash-ring-wrap"></div>
     </div>
 
-    <div class="dash-row">
-      <div class="card dash-streak-card">
-        <div class="dash-streak-num" id="dash-streak">—</div>
-        <div class="dash-streak-label">ימים ברצף 🔥</div>
-      </div>
-      <div class="card dash-macro-card">
-        <div class="dash-macro-row">
-          <div><div class="dash-macro-val" id="dash-pro">—</div><div class="dash-macro-lbl">חלבון</div></div>
-          <div><div class="dash-macro-val" id="dash-carb">—</div><div class="dash-macro-lbl">פחמימות</div></div>
-          <div><div class="dash-macro-val" id="dash-fat">—</div><div class="dash-macro-lbl">שומן</div></div>
-        </div>
-      </div>
+    <!-- Macro plate -->
+    <div class="dash-plate-wrap">
+      <svg id="dash-plate-svg" width="200" height="200" viewBox="0 0 200 200"></svg>
+      <div class="dash-plate-tooltip" id="dash-plate-tooltip" style="display:none"></div>
+      <div class="dash-plate-legend" id="dash-plate-legend"></div>
     </div>
 
-    <button class="btn btn-primary dash-cta" onclick="navigate('camera')">＋ הוסף ארוחה</button>
-    <button class="btn btn-ghost dash-cta-ghost" onclick="navigate('home')">📋 יומן היום</button>
+    <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,4 Q25,1 50,4 Q75,7 100,4"/>
+    </svg>
+
+    <!-- Streak line -->
+    <div class="dash-streak-line" id="dash-streak-line">טוען...</div>
+
+    <!-- Log preview -->
+    <div class="dash-log-preview" id="dash-log-preview"></div>
+
+    <!-- CTAs -->
+    <div class="dash-username" id="dash-username"></div>
+    <button class="btn btn-primary dash-cta" onclick="navigate('camera')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" style="vertical-align:middle;margin-left:6px">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      הוסף ארוחה
+    </button>
+    <button class="btn btn-ghost dash-cta-ghost" onclick="navigate('home')">יומן היום</button>
   </div>
 </div>
 

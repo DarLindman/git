@@ -1011,6 +1011,71 @@ input::placeholder { color: var(--muted); }
 .delete-btn:active { background: var(--surface2); }
 
 /* ════════════════════════════════════════
+   MEAL ITEM ROW (asymmetric layout)
+════════════════════════════════════════ */
+.meal-item-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  column-gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.meal-item-row:last-child { border-bottom: none; }
+
+.mir-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  padding-top: 3px;
+}
+.mir-body {
+  min-width: 0;
+}
+.mir-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+.mir-macros {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 3px;
+}
+.mir-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.mir-kcal {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 20px;
+  color: var(--text);
+  line-height: 1;
+}
+.mir-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  transition: color var(--dur-fast);
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mir-delete:hover { color: #f87171; }
+
+/* ════════════════════════════════════════
    CAMERA SCREEN
 ════════════════════════════════════════ */
 #screen-camera { background: #000; padding-bottom: var(--nav-h); }
@@ -2748,20 +2813,21 @@ function renderMealList(entries) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">🍽️</div><p>אין ארוחות מתועדות<br>לחץ 📷 לצלם אוכל</p></div>`;
     return;
   }
-  el.innerHTML = entries.map(e => `
-    <div class="food-item" id="entry-${e.id}">
-      <div class="food-emoji">${getFoodEmoji(e.food_name)}</div>
-      <div class="food-info">
-        <div class="food-name">${escapeHtml(e.food_name)}</div>
-        <div class="food-meta">
-          <span class="meal-badge ${MEAL_BADGE[e.meal_type] || ''}">${MEAL_LABELS[e.meal_type] || escapeHtml(e.meal_type)}</span>
-          חל'${Math.round(e.protein_g || 0)}·פח'${Math.round(e.carbs_g || 0)}·שו'${Math.round(e.fat_g || 0)}
-        </div>
-      </div>
-      <div class="food-cal">${Math.round(e.calories || 0)}<small>קל׳</small></div>
-      <button class="delete-btn" onclick="deleteEntry(${e.id})">🗑️</button>
-    </div>
-  `).join('');
+  el.innerHTML = entries.map(e => `<div class="meal-item-row" id="entry-${e.id}">
+  <div class="mir-time">${e.logged_at ? e.logged_at.slice(11, 16) : ''}</div>
+  <div class="mir-body">
+    <div class="mir-name">${escapeHtml(e.food_name || '')}</div>
+    <div class="mir-macros">ח ${Math.round(e.protein_g||0)} · פ ${Math.round(e.carbs_g||0)} · ש ${Math.round(e.fat_g||0)} · ס ${Math.round(e.fiber_g||0)}</div>
+  </div>
+  <div class="mir-right">
+    <div class="mir-kcal">${Math.round(e.calories || 0)}</div>
+    <button class="mir-delete" onclick="deleteEntry(${e.id})" aria-label="מחק">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+    </button>
+  </div>
+</div>`).join('');
 }
 
 function renderDailySummary(entries) {

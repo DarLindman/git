@@ -400,6 +400,7 @@ app.get('/api/streak', auth, async (req, res) => {
     if (!days.length) return res.json({ streak: 0 });
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    console.log('[streak] days:', days, 'today:', today, 'yesterday:', yesterday);
     if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0 });
     let streak = 0;
     let expected = days[0];

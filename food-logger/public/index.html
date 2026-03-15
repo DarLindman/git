@@ -76,6 +76,9 @@ body::after {
 
 /* ── Screens ── */
 .screen { display: none; flex-direction: column; min-height: 100dvh; padding-bottom: var(--nav-h); }
+#screen-dashboard { overflow: hidden; max-height: 100dvh; }
+#screen-settings { overflow: hidden; max-height: 100dvh; }
+#screen-settings .page { overflow: hidden; }
 
 @keyframes screenEnter {
   from { opacity: 0; transform: translateY(12px); }
@@ -1989,7 +1992,6 @@ input::placeholder { color: var(--muted); }
       </svg>
       הוסף ארוחה
     </button>
-    <button class="btn btn-ghost dash-cta-ghost" onclick="navigate('home')">יומן היום</button>
   </div>
 </div>
 

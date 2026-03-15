@@ -1708,11 +1708,6 @@ input::placeholder { color: var(--muted); }
   text-align: left;
 }
 
-.receipt-confidence {
-  font-size: 12px;
-  color: var(--text2);
-}
-
 /* Stagger animation */
 @keyframes receiptRow {
   from { opacity: 0; transform: translateY(6px); }
@@ -2026,11 +2021,6 @@ input::placeholder { color: var(--muted); }
       <label class="receipt-lbl">שעה</label>
       <input id="res-time" type="time" class="receipt-val" style="direction:ltr;text-align:left">
       <span class="receipt-unit"></span>
-    </div>
-
-    <div class="receipt-row">
-      <span class="receipt-lbl">אמינות</span>
-      <span id="res-confidence" class="receipt-confidence"></span>
     </div>
 
   </div><!-- /receipt -->
@@ -2968,8 +2958,7 @@ async function analyzeText() {
     document.getElementById('res-carb').value = data.carbs_g || 0;
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
-    const confEl = document.getElementById('res-confidence');
-    if (confEl) confEl.textContent = data.confidence || '—';
+
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();
     const hhmm = now.toTimeString().slice(0, 5);
@@ -3008,8 +2997,7 @@ async function analyzeFood() {
     document.getElementById('res-carb').value = data.carbs_g || 0;
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
-    const confEl = document.getElementById('res-confidence');
-    if (confEl) confEl.textContent = data.confidence || '—';
+
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();
     const hhmm = now.toTimeString().slice(0, 5);

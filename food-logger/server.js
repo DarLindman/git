@@ -316,25 +316,25 @@ app.delete('/api/food/:id', auth, async (req, res) => {
 // ─── Streak ───────────────────────────────────────────────────────────────────
 app.get('/api/streak', auth, async (req, res) => {
   try {
+    // ::text forces pg to return 'YYYY-MM-DD' string, not a Date object
     const { rows } = await pool.query(
-      `SELECT DISTINCT logged_at::date AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
+      `SELECT DISTINCT logged_at::date::text AS day FROM food_logs WHERE user_id=$1 ORDER BY day DESC`,
       [req.user.id]
     );
-    const days = rows.map(r => String(r.day).slice(0, 10));
+    const days = rows.map(r => r.day); // already 'YYYY-MM-DD' strings
     if (!days.length) return res.json({ streak: 0 });
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    // streak counts from today or yesterday onwards
     if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0 });
     let streak = 0;
-    let cursor = days[0];
+    let expected = days[0];
     for (const day of days) {
-      if (day === cursor) {
-        streak++;
-        const d = new Date(cursor);
-        d.setDate(d.getDate() - 1);
-        cursor = d.toISOString().slice(0, 10);
-      } else break;
+      if (day !== expected) break;
+      streak++;
+      // advance expected to previous day using UTC arithmetic
+      const d = new Date(expected + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() - 1);
+      expected = d.toISOString().slice(0, 10);
     }
     res.json({ streak });
   } catch (e) {

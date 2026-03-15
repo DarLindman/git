@@ -1715,6 +1715,7 @@ input::placeholder { color: var(--muted); }
       </div>
       <div id="macro-donut-wrap" class="donut-wrap">
         <svg id="macro-donut" width="90" height="90" viewBox="0 0 90 90"></svg>
+        <div id="macro-plate-tooltip" class="dash-plate-tooltip" style="display:none;margin-top:4px"></div>
         <div class="donut-legend" id="macro-legend"></div>
       </div>
     </div>
@@ -2480,9 +2481,7 @@ async function loadDashboard() {
     document.getElementById('dash-cal-goal-label').textContent = goal > 0 ? 'מתוך ' + goal.toLocaleString('he-IL') : '';
     renderCalRing(cal, goal);
     renderDashLogPreview(entries);
-    if (typeof renderPlate === 'function') {
-      renderPlate('dash-plate-svg', 'dash-plate-legend', 'dash-plate-tooltip', { pro, carb, fat, fiber });
-    }
+    renderPlate('dash-plate-svg', 'dash-plate-legend', 'dash-plate-tooltip', { pro, carb, fat, fiber });
   } catch {}
 
   try {
@@ -2623,7 +2622,7 @@ function renderDailySummary(entries) {
     goalSection.style.display = 'none';
   }
 
-  renderDonut('macro-donut', 'macro-legend', totals);
+  renderPlate('macro-donut', 'macro-legend', 'macro-plate-tooltip', totals);
 }
 
 async function deleteEntry(id) {
@@ -3088,42 +3087,95 @@ function renderWeightList() {
 }
 
 // ════════════════════════════════════════════════════
-// Donut chart (pure SVG)
+// Plate chart (arc SVG with tap tooltips)
 // ════════════════════════════════════════════════════
-function renderDonut(svgId, legendId, totals) {
-  const pro_cal = (totals.pro || 0) * 4;
-  const carb_cal = (totals.carb || 0) * 4;
-  const fat_cal = (totals.fat || 0) * 9;
-  const total = pro_cal + carb_cal + fat_cal || 1;
-  const segments = [
-    { pct: pro_cal / total, color: '#5eead4', label: 'חלבון', grams: Math.round(totals.pro || 0) },
-    { pct: carb_cal / total, color: '#93c5fd', label: 'פחמימות', grams: Math.round(totals.carb || 0) },
-    { pct: fat_cal / total, color: '#fca5a5', label: 'שומן', grams: Math.round(totals.fat || 0) },
+function renderPlate(svgId, legendId, tooltipId, totals) {
+  const macros = [
+    { key: 'pro',   label: 'חלבון',   color: '#5eead4', grams: Math.round(totals.pro   || 0), target: (window.userProfile?.protein_g  || 0) },
+    { key: 'carb',  label: 'פחמימות', color: '#93c5fd', grams: Math.round(totals.carb  || 0), target: (window.userProfile?.carbs_g    || 0) },
+    { key: 'fat',   label: 'שומן',    color: '#fca5a5', grams: Math.round(totals.fat   || 0), target: (window.userProfile?.fat_g      || 0) },
+    { key: 'fiber', label: 'סיבים',   color: '#c4b5fd', grams: Math.round(totals.fiber || 0), target: 25 },
   ];
-  document.getElementById(svgId).innerHTML = donutSVGPaths(segments, 45, 18);
-  document.getElementById(legendId).innerHTML = segments.map(s => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${s.color}"></div>
-      <span><b>${s.label}</b> ${s.grams} גרם (${Math.round(s.pct * 100)}%)</span>
-    </div>
-  `).join('');
-}
 
-function donutSVGPaths(segments, cx, r) {
-  const R = cx;
-  let startAngle = -Math.PI / 2;
-  return segments.map(s => {
-    const angle = s.pct * 2 * Math.PI;
-    const endAngle = startAngle + angle;
-    const x1 = cx + R * Math.cos(startAngle);
-    const y1 = cx + R * Math.sin(startAngle);
-    const x2 = cx + R * Math.cos(endAngle);
-    const y2 = cx + R * Math.sin(endAngle);
-    const largeArc = angle > Math.PI ? 1 : 0;
-    const path = `M ${cx} ${cx} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-    startAngle = endAngle;
-    return `<path d="${path}" fill="${s.color}" opacity="0.9"/>`;
-  }).join('') + `<circle cx="${cx}" cy="${cx}" r="${r}" fill="#161310"/>`;
+  const totalGrams = macros.reduce((s, m) => s + m.grams, 0) || 1;
+  const CX = 100, CY = 100, R = 72, GAP_DEG = 3;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function degToRad(d) { return d * Math.PI / 180; }
+  function arcPath(startDeg, sweepDeg, cx, cy, r) {
+    if (sweepDeg <= 0) return null;
+    const s = degToRad(startDeg);
+    const e = degToRad(startDeg + sweepDeg);
+    const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+    const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
+    const large = sweepDeg > 180 ? 1 : 0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  }
+
+  const svgEl = document.getElementById(svgId);
+  if (!svgEl) return;
+  svgEl.innerHTML = '';
+
+  // Background ring
+  const bg = document.createElementNS(SVG_NS, 'circle');
+  bg.setAttribute('cx', CX); bg.setAttribute('cy', CY); bg.setAttribute('r', R);
+  bg.setAttribute('fill', 'none'); bg.setAttribute('stroke', 'var(--surface2)'); bg.setAttribute('stroke-width', '20');
+  svgEl.appendChild(bg);
+
+  let currentDeg = -90;
+  macros.forEach((m, i) => {
+    const pct = m.grams / totalGrams;
+    const sweepDeg = pct * 360 - GAP_DEG;
+    if (sweepDeg <= 0) { currentDeg += pct * 360; return; }
+
+    const d = arcPath(currentDeg, sweepDeg, CX, CY, R);
+    if (!d) { currentDeg += pct * 360; return; }
+
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', m.color);
+    path.setAttribute('stroke-width', '20');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('data-macro', i);
+    path.setAttribute('data-label', `${m.label}: ${m.grams}גר׳${m.target ? ' / ' + m.target + 'גר׳' : ''}`);
+    path.style.cursor = 'pointer';
+
+    // Tap/click handler — inline tooltip
+    path.addEventListener('click', (e) => {
+      const tip = document.getElementById(tooltipId);
+      if (!tip) return;
+      const active = path.getAttribute('data-active') === '1';
+      // Clear all
+      svgEl.querySelectorAll('[data-macro]').forEach(p => p.removeAttribute('data-active'));
+      if (active) { tip.style.display = 'none'; return; }
+      path.setAttribute('data-active', '1');
+      tip.textContent = path.getAttribute('data-label');
+      tip.style.display = 'block';
+    });
+
+    svgEl.appendChild(path);
+    currentDeg += pct * 360;
+  });
+
+  // Close click-outside
+  svgEl.addEventListener('click', (e) => {
+    if (!e.target.hasAttribute('data-macro')) {
+      const tip = document.getElementById(tooltipId);
+      if (tip) tip.style.display = 'none';
+      svgEl.querySelectorAll('[data-macro]').forEach(p => p.removeAttribute('data-active'));
+    }
+  });
+
+  // Legend
+  const legendEl = document.getElementById(legendId);
+  if (legendEl) {
+    legendEl.innerHTML = macros.map(m => `
+      <div class="plate-legend-item">
+        <div class="plate-legend-dot" style="background:${m.color}"></div>
+        <span>${m.label} ${m.grams}גר׳</span>
+      </div>`).join('');
+  }
 }
 
 function renderMacroProgressBars(t) {

@@ -10,37 +10,73 @@ const path = require('path');
 let ICON_PNG = null;
 function buildIcon() {
   try {
-    const { createCanvas } = require('canvas');
-    const size = 180, r = 38;
+    const { createCanvas } = require('@napi-rs/canvas');
+    const size = 180, cx = size / 2, cy = size / 2, cr = 40;
     const canvas = createCanvas(size, size);
     const ctx = canvas.getContext('2d');
+
     // Rounded orange background
     ctx.beginPath();
-    ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
-    ctx.arcTo(size, 0, size, r, r);
-    ctx.lineTo(size, size - r);
-    ctx.arcTo(size, size, size - r, size, r);
-    ctx.lineTo(r, size);
-    ctx.arcTo(0, size, 0, size - r, r);
-    ctx.lineTo(0, r);
-    ctx.arcTo(0, 0, r, 0, r);
+    ctx.moveTo(cr, 0); ctx.lineTo(size - cr, 0);
+    ctx.arcTo(size, 0, size, cr, cr);
+    ctx.lineTo(size, size - cr);
+    ctx.arcTo(size, size, size - cr, size, cr);
+    ctx.lineTo(cr, size);
+    ctx.arcTo(0, size, 0, size - cr, cr);
+    ctx.lineTo(0, cr);
+    ctx.arcTo(0, 0, cr, 0, cr);
     ctx.closePath();
     ctx.fillStyle = '#E8703A';
     ctx.fill();
-    // Emoji
-    ctx.font = '108px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🥗', size / 2, size / 2 + 4);
+
+    // Bowl rim
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 18, 62, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bowl body (bottom half)
+    ctx.beginPath();
+    ctx.arc(cx, cy + 18, 62, 0, Math.PI);
+    ctx.fill();
+
+    // Salad greens (layered circles)
+    for (const [lx, ly, lr, lc] of [
+      [cx,      cy - 12, 19, '#388E3C'],
+      [cx - 22, cy - 4,  18, '#4CAF50'],
+      [cx + 24, cy - 4,  18, '#4CAF50'],
+      [cx - 38, cy + 10, 13, '#66BB6A'],
+      [cx + 38, cy + 10, 13, '#66BB6A'],
+      [cx + 10, cy + 2,  13, '#81C784'],
+      [cx - 10, cy + 4,  11, '#A5D6A7'],
+    ]) {
+      ctx.fillStyle = lc;
+      ctx.beginPath();
+      ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Red tomato
+    ctx.fillStyle = '#EF5350';
+    ctx.beginPath();
+    ctx.arc(cx - 12, cy + 10, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Yellow corn dot
+    ctx.fillStyle = '#FFD54F';
+    ctx.beginPath();
+    ctx.arc(cx + 16, cy + 12, 7, 0, Math.PI * 2);
+    ctx.fill();
+
     ICON_PNG = canvas.toBuffer('image/png');
+    console.log('PWA icon generated');
   } catch (e) {
-    console.warn('canvas not available, using plain orange icon:', e.message);
+    console.warn('icon generation failed:', e.message);
   }
 }
 buildIcon();
-const serveIcon = (_,res) => {
+const serveIcon = (_, res) => {
   if (ICON_PNG) return res.type('png').send(ICON_PNG);
-  // fallback: redirect to SVG
   res.redirect('/icon.svg');
 };
 

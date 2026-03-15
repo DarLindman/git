@@ -1630,11 +1630,11 @@ input::placeholder { color: var(--muted); }
   opacity: 0;
   animation: receiptRow var(--dur-mid) var(--ease-out) both;
 }
-.receipt-entry:nth-child(1) { animation-delay: 80ms; }
-.receipt-entry:nth-child(2) { animation-delay: 140ms; }
-.receipt-entry:nth-child(3) { animation-delay: 200ms; }
-.receipt-entry:nth-child(4) { animation-delay: 260ms; }
-.receipt-entry:nth-child(5) { animation-delay: 320ms; }
+.receipt-entry:nth-child(4) { animation-delay: 80ms; }
+.receipt-entry:nth-child(5) { animation-delay: 140ms; }
+.receipt-entry:nth-child(6) { animation-delay: 200ms; }
+.receipt-entry:nth-child(7) { animation-delay: 260ms; }
+.receipt-entry:nth-child(8) { animation-delay: 320ms; }
 </style>
 </head>
 <body>
@@ -2860,6 +2860,8 @@ async function analyzeText() {
     document.getElementById('res-carb').value = data.carbs_g || 0;
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
+    const confEl = document.getElementById('res-confidence');
+    if (confEl) confEl.textContent = data.confidence || '—';
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();
     const hhmm = now.toTimeString().slice(0, 5);
@@ -2896,6 +2898,8 @@ async function analyzeFood() {
     document.getElementById('res-carb').value = data.carbs_g || 0;
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
+    const confEl = document.getElementById('res-confidence');
+    if (confEl) confEl.textContent = data.confidence || '—';
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();
     const hhmm = now.toTimeString().slice(0, 5);

@@ -1714,7 +1714,7 @@ input::placeholder { color: var(--muted); }
         </div>
       </div>
       <div id="macro-donut-wrap" class="donut-wrap">
-        <svg id="macro-donut" width="90" height="90" viewBox="0 0 90 90"></svg>
+        <svg id="macro-donut" width="200" height="200" viewBox="0 0 200 200"></svg>
         <div id="macro-plate-tooltip" class="dash-plate-tooltip" style="display:none;margin-top:4px"></div>
         <div class="donut-legend" id="macro-legend"></div>
       </div>
@@ -3158,14 +3158,18 @@ function renderPlate(svgId, legendId, tooltipId, totals) {
     currentDeg += pct * 360;
   });
 
-  // Close click-outside
-  svgEl.addEventListener('click', (e) => {
+  // Close click-outside — use a stored handler to avoid duplicates
+  if (svgEl._plateClickHandler) {
+    svgEl.removeEventListener('click', svgEl._plateClickHandler);
+  }
+  svgEl._plateClickHandler = (e) => {
     if (!e.target.hasAttribute('data-macro')) {
       const tip = document.getElementById(tooltipId);
       if (tip) tip.style.display = 'none';
       svgEl.querySelectorAll('[data-macro]').forEach(p => p.removeAttribute('data-active'));
     }
-  });
+  };
+  svgEl.addEventListener('click', svgEl._plateClickHandler);
 
   // Legend
   const legendEl = document.getElementById(legendId);

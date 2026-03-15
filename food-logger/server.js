@@ -210,6 +210,21 @@ app.post('/auth/change-password', auth, async (req, res) => {
   }
 });
 
+// ─── Hebrew name sanitizer ────────────────────────────────────────────────────
+async function ensureHebrewFoodName(name) {
+  if (!name || !/[a-zA-Z]/.test(name)) return name;
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 60,
+      temperature: 0,
+      messages: [{ role: 'user', content: `תרגם את שם האוכל הבא לעברית תקנית בלבד. השב בשם בלבד, ללא הסבר, ללא פיסוק נוסף:\n${name}` }]
+    });
+    const translated = msg.content[0].text.trim().replace(/^["']|["']$/g, '');
+    return translated || name;
+  } catch { return name; }
+}
+
 // ─── Analyze food image ───────────────────────────────────────────────────────
 app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
   const { imageBase64: raw, mimeType: mime } = req.body;
@@ -247,6 +262,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       console.error('JSON parse error:', parseErr.message, '\nClaude raw output:', text);
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
+    data.foodName = await ensureHebrewFoodName(data.foodName);
     res.json(data);
   } catch (e) {
     console.error(e);

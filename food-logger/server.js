@@ -398,9 +398,10 @@ app.get('/api/streak', auth, async (req, res) => {
     );
     const days = rows.map(r => r.day); // already 'YYYY-MM-DD' strings
     if (!days.length) return res.json({ streak: 0 });
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    console.log('[streak] days:', days, 'today:', today, 'yesterday:', yesterday);
+    // Use Israel timezone to match how the frontend stores logged_at (local time sent as-is)
+    const toIsraelDate = (d) => d.toLocaleString('sv', { timeZone: 'Asia/Jerusalem' }).slice(0, 10);
+    const today = toIsraelDate(new Date());
+    const yesterday = toIsraelDate(new Date(Date.now() - 86400000));
     if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0 });
     let streak = 0;
     let expected = days[0];

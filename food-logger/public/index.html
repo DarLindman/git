@@ -1530,6 +1530,111 @@ input::placeholder { color: var(--muted); }
   .welcome-feature-text h4 { font-size: 16px; }
   .welcome-feature-text p { font-size: 13px; }
 }
+
+.receipt {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sharp);
+  padding: 20px;
+  font-family: 'IBM Plex Mono', monospace;
+  overflow: hidden;
+}
+
+.receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.receipt-hr {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 10px 0;
+}
+
+.receipt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.receipt-name-row { margin-bottom: 4px; }
+
+.receipt-name-input {
+  font-family: 'Fraunces', serif !important;
+  font-weight: 500 !important;
+  font-size: 22px !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid transparent !important;
+  color: var(--text) !important;
+  padding: 0 !important;
+  width: 100%;
+}
+.receipt-name-input:focus {
+  border-bottom-color: var(--border) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.receipt-lbl {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.receipt-val {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 13px !important;
+  text-align: left;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid transparent !important;
+  width: 64px;
+  color: var(--text) !important;
+  padding: 2px 0 !important;
+}
+.receipt-val:focus {
+  border-bottom-color: var(--border) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.receipt-unit {
+  font-size: 11px;
+  color: var(--muted);
+  width: 28px;
+  text-align: left;
+}
+
+.receipt-confidence {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+/* Stagger animation */
+@keyframes receiptRow {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.receipt-entry {
+  opacity: 0;
+  animation: receiptRow var(--dur-mid) var(--ease-out) both;
+}
+.receipt-entry:nth-child(1) { animation-delay: 80ms; }
+.receipt-entry:nth-child(2) { animation-delay: 140ms; }
+.receipt-entry:nth-child(3) { animation-delay: 200ms; }
+.receipt-entry:nth-child(4) { animation-delay: 260ms; }
+.receipt-entry:nth-child(5) { animation-delay: 320ms; }
 </style>
 </head>
 <body>
@@ -1800,25 +1905,43 @@ input::placeholder { color: var(--muted); }
     <img id="analysis-img" class="analysis-img" alt="">
     <div id="analysis-loading" class="spinner">🔄</div>
     <div id="analysis-result" style="display:none">
-      <div class="card">
-        <div class="card-title">אוכל שזוהה</div>
-        <div class="form-group"><label>שם האוכל</label><input id="res-name" type="text"></div>
-        <div class="nutrition-grid">
-          <div class="nut-field"><label>קלוריות (kcal)</label><input id="res-cal" type="number"></div>
-          <div class="nut-field"><label>חלבון (גרם)</label><input id="res-pro" type="number" step="0.1"></div>
-          <div class="nut-field"><label>פחמימות (גרם)</label><input id="res-carb" type="number" step="0.1"></div>
-          <div class="nut-field"><label>שומן (גרם)</label><input id="res-fat" type="number" step="0.1"></div>
-          <div class="nut-field"><label>סיבים (גרם)</label><input id="res-fiber" type="number" step="0.1"></div>
-        </div>
-        <div class="card-title" style="margin-top:14px">סוג ארוחה</div>
-        <div class="meal-select">
-          <button class="meal-opt" data-meal="breakfast" onclick="selectMeal(this)">☀️ בוקר</button>
-          <button class="meal-opt selected" data-meal="lunch" onclick="selectMeal(this)">🌤️ צהריים</button>
-          <button class="meal-opt" data-meal="dinner" onclick="selectMeal(this)">🌙 ערב</button>
-          <button class="meal-opt" data-meal="snack" onclick="selectMeal(this)">🍎 חטיף</button>
-        </div>
-      </div>
-      <button class="btn btn-primary" id="save-entry-btn" onclick="saveEntry()" style="margin-top:4px">שמור ביומן</button>
+  <div class="receipt" id="receipt-body">
+
+    <div class="receipt-header">
+      <span class="receipt-title">── ניתוח ─</span>
+      <span class="receipt-time" id="receipt-time"></span>
+    </div>
+
+    <div class="receipt-row receipt-name-row">
+      <input id="res-name" type="text" class="receipt-name-input" placeholder="שם האוכל">
+    </div>
+
+    <hr class="receipt-hr">
+
+    <div class="receipt-row receipt-entry"><label class="receipt-lbl">קלוריות</label><input id="res-cal" type="number" class="receipt-val"><span class="receipt-unit">קק״ל</span></div>
+    <div class="receipt-row receipt-entry"><label class="receipt-lbl">חלבון</label><input id="res-pro" type="number" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+    <div class="receipt-row receipt-entry"><label class="receipt-lbl">פחמימות</label><input id="res-carb" type="number" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+    <div class="receipt-row receipt-entry"><label class="receipt-lbl">שומן</label><input id="res-fat" type="number" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+    <div class="receipt-row receipt-entry"><label class="receipt-lbl">סיבים</label><input id="res-fiber" type="number" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+
+    <hr class="receipt-hr">
+
+    <div class="receipt-row">
+      <span class="receipt-lbl">אמינות</span>
+      <span id="res-confidence" class="receipt-confidence"></span>
+    </div>
+
+  </div><!-- /receipt -->
+
+  <div class="card-title" style="margin-top:14px">סוג ארוחה</div>
+  <div class="meal-select">
+    <button class="meal-opt" data-meal="breakfast" onclick="selectMeal(this)">בוקר</button>
+    <button class="meal-opt selected" data-meal="lunch" onclick="selectMeal(this)">צהריים</button>
+    <button class="meal-opt" data-meal="dinner" onclick="selectMeal(this)">ערב</button>
+    <button class="meal-opt" data-meal="snack" onclick="selectMeal(this)">חטיף</button>
+  </div>
+
+  <button class="btn btn-primary" id="save-entry-btn" onclick="saveEntry()" style="margin-top:4px">שמור ביומן</button>
     </div>
     <div id="analysis-error" class="error-msg" style="margin-top:16px"></div>
   </div>
@@ -2738,6 +2861,13 @@ async function analyzeText() {
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
     document.getElementById('analysis-loading').style.display = 'none';
+    const now = new Date();
+    const hhmm = now.toTimeString().slice(0, 5);
+    const rtEl = document.getElementById('receipt-time');
+    if (rtEl) rtEl.textContent = hhmm;
+    // Re-trigger stagger animation by forcing reflow
+    const rb = document.getElementById('receipt-body');
+    if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
     document.getElementById('analysis-loading').style.display = 'none';
@@ -2767,6 +2897,13 @@ async function analyzeFood() {
     document.getElementById('res-fat').value = data.fat_g || 0;
     document.getElementById('res-fiber').value = data.fiber_g || 0;
     document.getElementById('analysis-loading').style.display = 'none';
+    const now = new Date();
+    const hhmm = now.toTimeString().slice(0, 5);
+    const rtEl = document.getElementById('receipt-time');
+    if (rtEl) rtEl.textContent = hhmm;
+    // Re-trigger stagger animation by forcing reflow
+    const rb = document.getElementById('receipt-body');
+    if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
     document.getElementById('analysis-loading').style.display = 'none';

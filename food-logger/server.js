@@ -264,24 +264,28 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
+      max_tokens: 600,
       temperature: 0,
       messages: [{
         role: 'user',
-        content: `המשתמש תיאר מאכלים בטקסט חופשי. חשב ערכים תזונתיים מדויקים.\n\nשלב 1: רשום כל פריט ברשימה עם הערכים התזונתיים שלו לפי הכמות שצוינה (ברירת מחדל: מנה סטנדרטית).\nשלב 2: סכם את כל הפריטים — הסכום חייב להיות גדול יותר מכל פריט בנפרד.\nשלב 3: פלוט JSON סופי עם הסכום.\n\nפורמט JSON סופי (שורה אחת, בסוף התשובה):\n{"foodName":"שמות המאכלים בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים. שם האוכל בעברית בלבד.\n\nהטקסט: ${text.trim()}`
+        content: `זהה כל מאכל בטקסט וחשב את ערכיו התזונתיים לפי הכמות שצוינה (ברירת מחדל: מנה סטנדרטית).\nהחזר ONLY a JSON array, no markdown, no explanation:\n[{"name":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nשם בעברית בלבד. כל הערכים מספרים.\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();
-    // Extract the last JSON object in the response (the final total after chain-of-thought)
-    const lastOpen = raw.lastIndexOf('{');
-    const lastClose = raw.lastIndexOf('}');
-    if (lastOpen === -1 || lastClose === -1 || lastClose < lastOpen) {
-      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
-    }
-    let data;
-    try { data = JSON.parse(raw.substring(lastOpen, lastClose + 1)); }
+    const arrMatch = raw.match(/\[[\s\S]*\]/);
+    if (!arrMatch) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    let items;
+    try { items = JSON.parse(arrMatch[0]); }
     catch { return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' }); }
-    res.json(data);
+    if (!Array.isArray(items) || items.length === 0) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    const totals = items.reduce((acc, item) => ({
+      calories: acc.calories + (Number(item.calories) || 0),
+      protein_g: acc.protein_g + (Number(item.protein_g) || 0),
+      carbs_g: acc.carbs_g + (Number(item.carbs_g) || 0),
+      fat_g: acc.fat_g + (Number(item.fat_g) || 0),
+      fiber_g: acc.fiber_g + (Number(item.fiber_g) || 0),
+    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
+    res.json({ foodName: items.map(i => i.name).join(', '), ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח הטקסט' });

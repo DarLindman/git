@@ -412,12 +412,24 @@ body::after {
 
 .dash-log-row:last-child { border-bottom: none; }
 
+.dash-log-time-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.dash-log-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .dash-log-time {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   color: var(--muted);
-  grid-row: 1;
-  grid-column: 1;
   padding-top: 2px;
 }
 
@@ -1052,6 +1064,18 @@ input::placeholder { color: var(--muted); }
   align-items: start;
 }
 .meal-item-row:last-child { border-bottom: none; }
+
+.mir-time-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mir-food-icon {
+  font-size: 18px;
+  line-height: 1;
+}
 
 .mir-time {
   font-family: 'IBM Plex Mono', monospace;
@@ -2724,7 +2748,10 @@ function renderDashLogPreview(entries) {
   el.innerHTML = last3.map(e => {
     const t = e.logged_at ? e.logged_at.slice(11, 16) : '';
     return `<div class="dash-log-row">
-      <div class="dash-log-time">${t}</div>
+      <div class="dash-log-time-col">
+        <div class="dash-log-icon">${getFoodEmoji(e.food_name)}</div>
+        <div class="dash-log-time">${t}</div>
+      </div>
       <div class="dash-log-name">${escapeHtml(e.food_name || '')}</div>
       <div class="dash-log-kcal">${Math.round(e.calories || 0)}</div>
       <div class="dash-log-macros">ח ${Math.round(e.protein_g||0)} · פ ${Math.round(e.carbs_g||0)} · ש ${Math.round(e.fat_g||0)}</div>
@@ -2850,7 +2877,10 @@ function renderMealList(entries) {
     return;
   }
   el.innerHTML = entries.map(e => `<div class="meal-item-row" id="entry-${e.id}">
-  <div class="mir-time">${e.logged_at ? e.logged_at.slice(11, 16) : ''}</div>
+  <div class="mir-time-col">
+    <div class="mir-food-icon">${getFoodEmoji(e.food_name)}</div>
+    <div class="mir-time">${e.logged_at ? e.logged_at.slice(11, 16) : ''}</div>
+  </div>
   <div class="mir-body">
     <div class="mir-name">${escapeHtml(e.food_name || '')}</div>
     <div class="mir-macros">ח ${Math.round(e.protein_g||0)} · פ ${Math.round(e.carbs_g||0)} · ש ${Math.round(e.fat_g||0)} · ס ${Math.round(e.fiber_g||0)}</div>

@@ -285,7 +285,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       fat_g: acc.fat_g + (Number(item.fat_g) || 0),
       fiber_g: acc.fiber_g + (Number(item.fiber_g) || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    res.json({ foodName: items.map(i => i.name).join(', '), ...totals });
+    res.json({ foodName: text.trim(), ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח הטקסט' });

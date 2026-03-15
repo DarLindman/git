@@ -232,7 +232,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `Identify the food in the image. Reply with ONLY a single-line JSON object, no markdown, no code blocks, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nEstimate for the portion shown. All values except foodName must be numbers.`
+            text: `Identify the food in the image. Reply with ONLY a single-line JSON object, no markdown, no code blocks, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nEstimate for the portion shown. All values except foodName must be numbers.\nCRITICAL: foodName must be in Hebrew script only — no English, no Latin characters. Example: "עוף בתנור" not "Grilled Chicken".`
           }
         ]
       }]
@@ -266,7 +266,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       max_tokens: 400,
       messages: [{
         role: 'user',
-        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\n\nהטקסט: ${text.trim()}`
+        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\nשם האוכל חייב להיות בעברית בלבד, ללא תווים לטיניים. לדוגמה: "עוף בתנור" ולא "Grilled Chicken".\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();

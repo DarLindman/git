@@ -46,11 +46,12 @@ npm run render    # renders to ../public/salad-logo.mp4
 npm run studio    # opens Remotion Studio for preview
 ```
 
-## Standalone HTML files
+## Standalone HTML files (`standalone/`)
 
 - **travel-presentation.html** — Slide-based travel presentation (East Asia/Ethiopia). Keyboard/click navigation, CSS transitions.
 - **savings-dashboard.html** — Personal savings portfolio dashboard with a newspaper/parchment aesthetic.
 - **recycling-game.html** — Drag-and-drop recycling sorting game with scoring.
+- **trip.json** — Raw Polarsteps export used as source data when building the travel presentation.
 
 No build step — edit and open directly in a browser. All CSS and JS are inline.
 

@@ -264,18 +264,22 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      max_tokens: 1000,
       temperature: 0,
       messages: [{
         role: 'user',
-        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nחשוב: אם מוזכרים מספר מאכלים, חשב כל אחד לפי מנה רגילה שלו וסכם את כל הערכים. לעולם אל תפחית ערך תזונתי כי מוזכר מאכל נוסף.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\nשם האוכל חייב להיות בעברית בלבד, ללא תווים לטיניים. לדוגמה: "עוף בתנור" ולא "Grilled Chicken".\n\nהטקסט: ${text.trim()}`
+        content: `המשתמש תיאר מאכלים בטקסט חופשי. חשב ערכים תזונתיים מדויקים.\n\nשלב 1: רשום כל פריט ברשימה עם הערכים התזונתיים שלו לפי הכמות שצוינה (ברירת מחדל: מנה סטנדרטית).\nשלב 2: סכם את כל הפריטים — הסכום חייב להיות גדול יותר מכל פריט בנפרד.\nשלב 3: פלוט JSON סופי עם הסכום.\n\nפורמט JSON סופי (שורה אחת, בסוף התשובה):\n{"foodName":"שמות המאכלים בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים. שם האוכל בעברית בלבד.\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    // Extract the last JSON object in the response (the final total after chain-of-thought)
+    const lastOpen = raw.lastIndexOf('{');
+    const lastClose = raw.lastIndexOf('}');
+    if (lastOpen === -1 || lastClose === -1 || lastClose < lastOpen) {
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
     let data;
-    try { data = JSON.parse(match[0]); }
+    try { data = JSON.parse(raw.substring(lastOpen, lastClose + 1)); }
     catch { return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' }); }
     res.json(data);
   } catch (e) {

@@ -902,6 +902,10 @@ input::placeholder { color: var(--muted); }
    DONUT CHART (dynamically injected)
 ════════════════════════════════════════ */
 .donut-wrap { display: flex; align-items: center; gap: 16px; }
+#macro-donut-wrap {
+  flex-direction: column;
+  align-items: center;
+}
 .donut-legend { flex: 1; }
 
 .legend-item {
@@ -1188,9 +1192,10 @@ input::placeholder { color: var(--muted); }
   background: var(--surface2) !important;
   border: 2px solid var(--accent) !important;
   box-shadow: 0 0 0 6px var(--surface), 0 0 0 7px transparent;
-  flex-shrink: 0;
+  flex: 0 0 64px;
+  overflow: hidden;
   transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast);
-  font-size: 24px;
+  font-size: 0;
 }
 .cam-btn-shoot::after {
   content: '';
@@ -1369,6 +1374,11 @@ input::placeholder { color: var(--muted); }
   font-size: 11px;
   color: var(--muted);
   margin-top: 3px;
+}
+.avg-box-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .avg-box-right {
   text-align: left;
@@ -1966,7 +1976,7 @@ input::placeholder { color: var(--muted); }
       <img id="preview-img" alt="תצוגה מקדימה">
     </div>
     <div class="cam-actions">
-      <button class="cam-btn cam-btn-shoot" onclick="document.getElementById('file-input').click()">📸 צלם / בחר</button>
+      <button class="cam-btn cam-btn-shoot" onclick="document.getElementById('file-input').click()" aria-label="צלם / בחר תמונה"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
       <button class="cam-btn cam-btn-analyze" id="analyze-btn" onclick="analyzeFood()" disabled>✨ נתח תמונה</button>
     </div>
     <input type="file" id="file-input" accept="image/*" onchange="onImageSelected(event)">
@@ -2693,12 +2703,17 @@ function renderCalRing(eaten, goal) {
         id="cal-ring-fill"
         style="transition: stroke-dashoffset 0.7s var(--ease-out, cubic-bezier(0.22,1,0.36,1))"/>
     </svg>`;
-  requestAnimationFrame(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const ring = document.getElementById('cal-ring-fill');
+    if (ring) ring.style.strokeDashoffset = circ * (1 - pct);
+  } else {
     requestAnimationFrame(() => {
-      const ring = document.getElementById('cal-ring-fill');
-      if (ring) ring.style.strokeDashoffset = circ * (1 - pct);
+      requestAnimationFrame(() => {
+        const ring = document.getElementById('cal-ring-fill');
+        if (ring) ring.style.strokeDashoffset = circ * (1 - pct);
+      });
     });
-  });
+  }
 }
 
 function renderDashLogPreview(entries) {
@@ -3131,11 +3146,15 @@ async function loadWeeklyStats() {
     // Trigger draw-on animation for the polyline
     const polylineEl = chartEl.querySelector('polyline[id^="lc-"]');
     if (polylineEl) {
-      requestAnimationFrame(() => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        polylineEl.style.strokeDashoffset = '0';
+      } else {
         requestAnimationFrame(() => {
-          polylineEl.style.strokeDashoffset = '0';
+          requestAnimationFrame(() => {
+            polylineEl.style.strokeDashoffset = '0';
+          });
         });
-      });
+      }
     }
     renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
@@ -3350,8 +3369,8 @@ function renderWeightChart() {
   `;
 
   // X labels: first and last date (only show last if different from first)
-  const firstDate = formatDateShort(weightLogs[0].logged_at);
-  const lastDate = formatDateShort(weightLogs[n-1].logged_at);
+  const firstDate = escapeHtml(formatDateShort(weightLogs[0].logged_at));
+  const lastDate = escapeHtml(formatDateShort(weightLogs[n-1].logged_at));
   const xLabels = n > 1 ? `
     <text x="${LEFT}" y="${H - 4}" text-anchor="start" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${firstDate}</text>
     ${firstDate !== lastDate ? `<text x="${W - RIGHT}" y="${H - 4}" text-anchor="end" font-size="8" fill="#7a6e62" font-family="IBM Plex Mono,monospace">${lastDate}</text>` : ''}
@@ -3393,7 +3412,7 @@ function renderWeightList() {
       </button>
       <div class="weight-entry-info">
         <div class="weight-val-big">${(+w.weight_kg).toFixed(1)} ק"ג</div>
-        <div class="weight-entry-date">${formatDate(w.logged_at)}</div>
+        <div class="weight-entry-date">${escapeHtml(formatDate(w.logged_at))}</div>
       </div>
     </div>
   `).join('');

@@ -3300,7 +3300,7 @@ async function loadYearlyStats() {
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }
     const currentMonth = todayStr().slice(0, 7);
     chartEl.innerHTML = renderLineChart(rows, {
-      getValue: r => +r.calories || 0,
+      getValue: r => r.day_count > 0 ? Math.round((+r.calories || 0) / r.day_count) : 0,
       getLabel: r => monthNames[+(r.month.slice(5, 7)) - 1],
       isToday: r => r.month === currentMonth,
       recommended: rec,

@@ -1128,7 +1128,6 @@ input::placeholder { color: var(--muted); }
   padding: 14px 18px;
   margin-bottom: 12px;
 }
-.avg-box-left {}
 .avg-val {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 26px;
@@ -1219,7 +1218,6 @@ input::placeholder { color: var(--muted); }
 }
 
 .modal-close {
-  float: left;
   background: var(--surface2);
   border: 1px solid var(--border);
   font-size: 16px;
@@ -1231,7 +1229,7 @@ input::placeholder { color: var(--muted); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 0;
+  margin-inline-start: auto;
 }
 
 /* Profile modal cal preview */
@@ -2270,10 +2268,15 @@ async function loadDashboard() {
 
   try {
     const entries = await apiFetch(`/api/food?date=${todayStr()}`);
-    const cal  = entries.reduce((s, e) => s + (+e.calories  || 0), 0);
-    const pro  = entries.reduce((s, e) => s + (+e.protein_g || 0), 0);
-    const carb = entries.reduce((s, e) => s + (+e.carbs_g   || 0), 0);
-    const fat  = entries.reduce((s, e) => s + (+e.fat_g     || 0), 0);
+    const { cal, pro, carb, fat } = entries.reduce(
+      (s, e) => ({
+        cal:  s.cal  + (+e.calories  || 0),
+        pro:  s.pro  + (+e.protein_g || 0),
+        carb: s.carb + (+e.carbs_g   || 0),
+        fat:  s.fat  + (+e.fat_g     || 0),
+      }),
+      { cal: 0, pro: 0, carb: 0, fat: 0 }
+    );
     document.getElementById('dash-cal-eaten').textContent = cal;
     document.getElementById('dash-pro').textContent  = Math.round(pro)  + 'g';
     document.getElementById('dash-carb').textContent = Math.round(carb) + 'g';

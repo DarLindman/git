@@ -128,6 +128,8 @@ async function initDB() {
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       profile_json TEXT NOT NULL DEFAULT '{}'
     );
+    CREATE INDEX IF NOT EXISTS idx_food_logs_user_date ON food_logs(user_id, logged_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_weight_logs_user ON weight_logs(user_id, logged_at ASC);
   `);
   console.log('DB ready');
 }
@@ -144,6 +146,12 @@ function auth(req, res, next) {
   }
 }
 
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+const DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstuvuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu.'; // for timing parity
+function createToken(user) {
+  return jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '30d' });
+}
+
 // ─── Auth routes ─────────────────────────────────────────────────────────────
 app.post('/auth/register', async (req, res) => {
   const { username, password } = req.body;
@@ -155,8 +163,7 @@ app.post('/auth/register', async (req, res) => {
       'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
       [username.toLowerCase(), hash]
     );
-    const token = jwt.sign({ id: rows[0].id, username: rows[0].username }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, username: rows[0].username });
+    res.json({ token: createToken(rows[0]), username: rows[0].username });
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'שם המשתמש כבר קיים' });
     console.error(e);
@@ -168,10 +175,11 @@ app.post('/auth/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username.toLowerCase()]);
-    if (!rows[0] || !(await bcrypt.compare(password, rows[0].password_hash)))
-      return res.status(401).json({ error: 'שם משתמש או סיסמא שגויים' });
-    const token = jwt.sign({ id: rows[0].id, username: rows[0].username }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, username: rows[0].username });
+    const user = rows[0];
+    // Always run bcrypt to prevent timing-based username enumeration
+    const valid = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
+    if (!valid || !user) return res.status(401).json({ error: 'שם משתמש או סיסמא שגויים' });
+    res.json({ token: createToken(user), username: user.username });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאת שרת' });
@@ -184,7 +192,7 @@ app.post('/auth/change-password', auth, async (req, res) => {
     return res.status(400).json({ error: 'סיסמא חדשה חייבת להכיל לפחות 6 תווים' });
   try {
     const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
-    if (!(await bcrypt.compare(currentPassword, rows[0].password_hash)))
+    if (!rows[0] || !(await bcrypt.compare(currentPassword, rows[0].password_hash)))
       return res.status(401).json({ error: 'סיסמא נוכחית שגויה' });
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
@@ -384,10 +392,11 @@ app.get('/api/stats/monthly', auth, async (req, res) => {
         SUM(fiber_g) AS fiber_g
       FROM food_logs
       WHERE user_id=$1
-        AND TO_CHAR(logged_at, 'YYYY-MM') = COALESCE($2, TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
+        AND logged_at::date >= DATE_TRUNC('month', COALESCE($2::date, CURRENT_DATE))::date
+        AND logged_at::date <  (DATE_TRUNC('month', COALESCE($2::date, CURRENT_DATE)) + INTERVAL '1 month')::date
       GROUP BY day
       ORDER BY day ASC
-    `, [req.user.id, month || null]);
+    `, [req.user.id, month ? month + '-01' : null]);
     res.json(rows);
   } catch (e) {
     console.error(e);
@@ -464,10 +473,11 @@ app.get('/api/stats/yearly', auth, async (req, res) => {
         COUNT(DISTINCT logged_at::date) AS day_count
       FROM food_logs
       WHERE user_id=$1
-        AND EXTRACT(YEAR FROM logged_at) = COALESCE($2::integer, EXTRACT(YEAR FROM CURRENT_DATE))
+        AND logged_at >= make_date(COALESCE($2::int, EXTRACT(YEAR FROM CURRENT_DATE)::int), 1, 1)
+        AND logged_at <  make_date(COALESCE($2::int, EXTRACT(YEAR FROM CURRENT_DATE)::int) + 1, 1, 1)
       GROUP BY month
       ORDER BY month ASC
-    `, [req.user.id, year || null]);
+    `, [req.user.id, year ? +year : null]);
     res.json(rows);
   } catch (e) {
     console.error(e);

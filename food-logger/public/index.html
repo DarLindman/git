@@ -3120,11 +3120,11 @@ async function analyzeText() {
   try {
     const data = await apiFetch('/api/analyze-text', { method: 'POST', body: JSON.stringify({ text }) });
     document.getElementById('res-name').value = data.foodName || '';
-    document.getElementById('res-cal').value = data.calories || 0;
-    document.getElementById('res-pro').value = data.protein_g || 0;
-    document.getElementById('res-carb').value = data.carbs_g || 0;
-    document.getElementById('res-fat').value = data.fat_g || 0;
-    document.getElementById('res-fiber').value = data.fiber_g || 0;
+    document.getElementById('res-cal').value = (+data.calories || 0).toFixed(1);
+    document.getElementById('res-pro').value = (+data.protein_g || 0).toFixed(1);
+    document.getElementById('res-carb').value = (+data.carbs_g || 0).toFixed(1);
+    document.getElementById('res-fat').value = (+data.fat_g || 0).toFixed(1);
+    document.getElementById('res-fiber').value = (+data.fiber_g || 0).toFixed(1);
 
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();
@@ -3159,11 +3159,11 @@ async function analyzeFood() {
       body: JSON.stringify({ imageBase64: capturedImageBase64, mimeType: capturedMime })
     });
     document.getElementById('res-name').value = data.foodName || '';
-    document.getElementById('res-cal').value = data.calories || 0;
-    document.getElementById('res-pro').value = data.protein_g || 0;
-    document.getElementById('res-carb').value = data.carbs_g || 0;
-    document.getElementById('res-fat').value = data.fat_g || 0;
-    document.getElementById('res-fiber').value = data.fiber_g || 0;
+    document.getElementById('res-cal').value = (+data.calories || 0).toFixed(1);
+    document.getElementById('res-pro').value = (+data.protein_g || 0).toFixed(1);
+    document.getElementById('res-carb').value = (+data.carbs_g || 0).toFixed(1);
+    document.getElementById('res-fat').value = (+data.fat_g || 0).toFixed(1);
+    document.getElementById('res-fiber').value = (+data.fiber_g || 0).toFixed(1);
 
     document.getElementById('analysis-loading').style.display = 'none';
     const now = new Date();

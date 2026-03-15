@@ -6,33 +6,43 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
-const zlib = require('zlib');
-
-// ─── PWA Icon (pure Node.js, no extra packages) ───────────────────────────────
-function crc32(buf) {
-  const t = Array.from({length:256},(_,i)=>{let c=i;for(let j=0;j<8;j++)c=c&1?0xEDB88320^(c>>>1):c>>>1;return c});
-  let crc=0xFFFFFFFF;
-  for(const b of buf) crc=t[(crc^b)&0xFF]^(crc>>>8);
-  return (crc^0xFFFFFFFF)>>>0;
+// ─── PWA Icon ─────────────────────────────────────────────────────────────────
+let ICON_PNG = null;
+function buildIcon() {
+  try {
+    const { createCanvas } = require('canvas');
+    const size = 180, r = 38;
+    const canvas = createCanvas(size, size);
+    const ctx = canvas.getContext('2d');
+    // Rounded orange background
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(size - r, 0);
+    ctx.arcTo(size, 0, size, r, r);
+    ctx.lineTo(size, size - r);
+    ctx.arcTo(size, size, size - r, size, r);
+    ctx.lineTo(r, size);
+    ctx.arcTo(0, size, 0, size - r, r);
+    ctx.lineTo(0, r);
+    ctx.arcTo(0, 0, r, 0, r);
+    ctx.closePath();
+    ctx.fillStyle = '#E8703A';
+    ctx.fill();
+    // Emoji
+    ctx.font = '108px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🥗', size / 2, size / 2 + 4);
+    ICON_PNG = canvas.toBuffer('image/png');
+  } catch (e) {
+    console.warn('canvas not available, using plain orange icon:', e.message);
+  }
 }
-function pngChunk(type,data){
-  const t=Buffer.from(type,'ascii');
-  const l=Buffer.alloc(4); l.writeUInt32BE(data.length);
-  const c=Buffer.alloc(4); c.writeUInt32BE(crc32(Buffer.concat([t,data])));
-  return Buffer.concat([l,t,data,c]);
-}
-function solidPNG(size,r,g,b){
-  const sig=Buffer.from([137,80,78,71,13,10,26,10]);
-  const ih=Buffer.alloc(13);
-  ih.writeUInt32BE(size,0); ih.writeUInt32BE(size,4);
-  ih[8]=8; ih[9]=2;
-  const row=Buffer.alloc(size*3+1);
-  for(let x=0;x<size;x++){row[1+x*3]=r;row[2+x*3]=g;row[3+x*3]=b;}
-  const raw=Buffer.concat(Array(size).fill(row));
-  return Buffer.concat([sig,pngChunk('IHDR',ih),pngChunk('IDAT',zlib.deflateSync(raw)),pngChunk('IEND',Buffer.alloc(0))]);
-}
-const ICON_PNG = solidPNG(180, 232, 112, 58); // #E8703A orange
-const serveIcon = (_,res) => res.type('png').send(ICON_PNG);
+buildIcon();
+const serveIcon = (_,res) => {
+  if (ICON_PNG) return res.type('png').send(ICON_PNG);
+  // fallback: redirect to SVG
+  res.redirect('/icon.svg');
+};
 
 const app = express();
 const port = process.env.PORT || 3000;

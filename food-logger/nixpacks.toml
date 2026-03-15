@@ -1,0 +1,2 @@
+[phases.setup]
+nixPkgs = ["cairo", "pango", "libjpeg", "giflib", "librsvg", "pkgconfig", "pixman", "fontconfig", "freetype", "noto-fonts-emoji"]

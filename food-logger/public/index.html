@@ -37,6 +37,12 @@
   --radius-sharp: 4px;
   --radius-pill:  99px;
   --radius-input: 8px;
+  /* Animation system */
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast:    150ms;
+  --dur-mid:     250ms;
+  --dur-slow:    400ms;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -46,6 +52,14 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Grain texture overlay */
@@ -61,7 +75,15 @@ body::after {
 
 /* ── Screens ── */
 .screen { display: none; flex-direction: column; min-height: 100dvh; padding-bottom: var(--nav-h); }
-.screen.active { display: flex; }
+
+@keyframes screenEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.screen.active {
+  display: flex;
+  animation: screenEnter var(--dur-mid) var(--ease-out) both;
+}
 
 /* ════════════════════════════════════════
    WELCOME

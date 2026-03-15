@@ -268,7 +268,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       temperature: 0,
       messages: [{
         role: 'user',
-        content: `זהה כל מאכל בטקסט וחשב את ערכיו התזונתיים לפי הכמות שצוינה.\nכשאין כמות: השתמש בכמות הקטנה הסבירה — חתיכה/יחידה אחת, לא פחית שלמה. דגים קטנים (סרדין, אנשובי, מקרל) = דג/חתיכה בודדת. טונה ללא כמות = פחית קטנה (85 גרם).\nהחזר ONLY a JSON array, no markdown, no explanation:\n[{"name":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nשם בעברית בלבד. כל הערכים מספרים.\n\nהטקסט: ${text.trim()}`
+        content: `זהה כל מאכל בטקסט וחשב ערכים תזונתיים לפי הכמות שצוינה.\nכשאין כמות, השתמש בגרמים הבאים: טונה/סלמון משומר=85g, סרדין שלם=12g, אנשובי (פילה בודד)=4g, ביצה=50g, שאר הדגים=100g, שאר המאכלים=מנה סטנדרטית.\nהחזר ONLY a JSON array, no markdown, no explanation:\n[{"name":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nשם בעברית בלבד. כל הערכים מספרים.\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();

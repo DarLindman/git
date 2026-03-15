@@ -264,7 +264,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      max_tokens: 1200,
       temperature: 0,
       system: `אתה מחשבון תזונה מדויק למשתמשים ישראלים.
 
@@ -297,11 +297,18 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       }]
     });
     const raw = message.content[0].text.trim();
+    console.log('[analyze-text] raw response:', raw);
     const arrMatch = raw.match(/\[[\s\S]*\]/);
-    if (!arrMatch) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    if (!arrMatch) {
+      console.error('[analyze-text] no JSON array found in response');
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
     let items;
     try { items = JSON.parse(arrMatch[0]); }
-    catch { return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' }); }
+    catch (parseErr) {
+      console.error('[analyze-text] JSON parse error:', parseErr.message, '\nmatched:', arrMatch[0]);
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
     if (!Array.isArray(items) || items.length === 0) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     const totals = items.reduce((acc, item) => ({
       calories: acc.calories + (Number(item.calories) || 0),

@@ -223,7 +223,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
-      system: 'You are a food nutrition analyzer. You MUST always write food names in Hebrew script only (כתב עברי). Never use Latin, English, or any non-Hebrew characters in the foodName field. Examples: use "עוף בתנור" not "Grilled Chicken", use "פסטה ברוטב עגבניות" not "Pasta with tomato sauce".',
+      system: 'אתה מנתח תזונה מדויק למשתמשים ישראלים. חוק מחמיר: שדה foodName חייב להיות כתוב בעברית תקנית בלבד — אותיות עבריות בלבד, ללא אנגלית, ללא לטינית, ללא תעתיק. אסור לערבב שפות. נכון: "עוף צלוי" — שגוי: "Grilled Chicken" או "עוף Grilled". השתמש בשמות אוכל עבריים טבעיים ותקניים כפי שישראלי ממוצע היה כותב אותם.',
       messages: [{
         role: 'user',
         content: [
@@ -233,7 +233,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `Identify the food in the image. Reply with ONLY a single-line JSON object, no markdown, no code blocks, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nEstimate for the portion shown. All values except foodName must be numbers.\nCRITICAL: foodName must be in Hebrew script only — no English, no Latin characters. Example: "עוף בתנור" not "Grilled Chicken".`
+            text: `זהה את האוכל בתמונה. השב עם JSON בשורה אחת בלבד, ללא markdown, ללא הסבר:\n{"foodName":"שם בעברית תקנית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nהערך לפי המנה הנראית בתמונה. כל הערכים פרט ל-foodName חייבים להיות מספרים.\nחובה: foodName בעברית תקנית בלבד — אפס אנגלית, אפס לטינית, אפס תעתיק.`
           }
         ]
       }]
@@ -266,9 +266,24 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
       temperature: 0,
+      system: `אתה מחשבון תזונה מדויק למשתמשים ישראלים. כללים מחייבים:
+
+1. שמות מאכלים בעברית תקנית בלבד — אפס אנגלית, אפס לטינית.
+
+2. כמות מפורשת — חשב בדיוק לפי הכמות שצוינה. אל תשנה אותה בשום אופן.
+   דוגמה: "100 גרם אורז" → חשב בדיוק ל-100 גרם, לא 200 גרם "מנה רגילה".
+
+3. כמות לא מצוינת — הנח כמות ממוצעת ריאלית של מנה בודדת כפי שאדם בישראל אוכל במציאות, תוך התחשבות ביתר המרכיבים שצוינו (לא מנה מקסימלית ממאגר תזונה).
+   דוגמה: "עוף ואורז ושעועית" → אורז ~100-120 גרם, עוף ~100 גרם, שעועית ~60 גרם — כמנה מאוזנת.
+
+4. פרשנות "מוכן לאכילה" — תמיד פרש כמויות כפי שהצרכן מבין אותן:
+   • "5 אגוזי מלך" = 5 חצאי גרעינים מוכנים לאכילה (~25 גרם), לא 5 אגוזים שלמים בקליפה.
+   • "כף שמן" = כף מטבח אחת (~13 מ"ל).
+   • "פרוסת לחם" = פרוסה בינונית (~25-30 גרם).
+   • ספור יחידות = יחידות שאדם רגיל אוכל, לא גרסת מסד נתונים.`,
       messages: [{
         role: 'user',
-        content: `זהה כל מאכל בטקסט וחשב ערכים תזונתיים.\nכשכמות צוינה במפורש — השתמש בה. כשלא צוינה — השתמש בכמות שאדם אחד שם בצלחת כחלק ממנה מעורבת (לא מנה מקסימלית לפי מסד נתונים תזונתי).\nהחזר ONLY a JSON array, no markdown, no explanation:\n[{"name":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nשם בעברית בלבד. כל הערכים מספרים.\n\nהטקסט: ${text.trim()}`
+        content: `זהה כל מאכל בטקסט וחשב ערכים תזונתיים מדויקים.\nהחזר JSON array בלבד, ללא markdown, ללא הסבר:\n[{"name":"שם בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nכל הערכים מספרים.\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();

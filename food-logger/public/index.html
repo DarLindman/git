@@ -2447,7 +2447,7 @@ function renderDashLogPreview(entries) {
     const t = e.logged_at ? e.logged_at.slice(11, 16) : '';
     return `<div class="dash-log-row">
       <div class="dash-log-time">${t}</div>
-      <div class="dash-log-name">${e.food_name || ''}</div>
+      <div class="dash-log-name">${escapeHtml(e.food_name || '')}</div>
       <div class="dash-log-kcal">${Math.round(e.calories || 0)}</div>
       <div class="dash-log-macros">ח ${Math.round(e.protein_g||0)} · פ ${Math.round(e.carbs_g||0)} · ש ${Math.round(e.fat_g||0)}</div>
     </div>`;

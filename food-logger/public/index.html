@@ -3262,8 +3262,8 @@ async function loadYearlyStats() {
     const rec = calcRecommendedCal();
     const monthNames = ['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ'];
     const totalCal = rows.reduce((s, r) => s + (+r.calories || 0), 0);
-    const totalDays = rows.reduce((s, r) => s + (+r.day_count || 0), 0);
-    const yearlyDailyAvg = totalDays > 0 ? Math.round(totalCal / totalDays) : 0;
+    const totalDays = rows.reduce((s, r) => s + (parseInt(r.day_count, 10) || 0), 0);
+    const yearlyDailyAvg = totalDays > 0 ? Math.round(totalCal / totalDays) : (rows.length > 0 ? Math.round(totalCal / (rows.length * 30)) : 0);
     renderStatAvgBox('yearly-avg-box', rows, rec, "ממוצע קל' יומי", yearlyDailyAvg);
     const chartEl = document.getElementById('yearly-chart');
     if (!rows.length) { chartEl.innerHTML = `<div class="empty-state"><p>אין נתונים</p></div>`; return; }

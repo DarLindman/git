@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "render": "npx remotion render SaladLogo --output ../public/salad-logo.mp4",
+    "render": "npx remotion render SaladLogo --output ../public/salad-logo.webm --codec vp9 --transparent",
     "render:steam": "npx remotion render AmbientSteam --output ../public/ambient-steam.mp4",
     "studio": "npx remotion studio"
   },

@@ -70,7 +70,7 @@ export const SaladLogo: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        background: "#0d0b09",
+        background: "transparent",
         alignItems: "center",
         justifyContent: "center",
       }}

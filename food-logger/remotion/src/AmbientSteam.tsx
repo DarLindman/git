@@ -47,6 +47,7 @@ export const AmbientSteam: React.FC = () => {
       width="400"
       height="300"
       viewBox="0 0 400 300"
+      overflow="visible"
       style={{ background: 'transparent' }}
     >
       {WISPS.map((w, i) => (

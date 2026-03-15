@@ -1371,7 +1371,18 @@ input::placeholder { color: var(--muted); }
 /* ════════════════════════════════════════
    ANALYSIS
 ════════════════════════════════════════ */
-#screen-analysis { background: var(--bg); }
+#screen-analysis {
+  background: #FAFAF8;
+  color: #1A1A1A;
+}
+#screen-analysis .topbar {
+  background: #FAFAF8;
+  border-bottom: 1px solid #E0DDD8;
+  color: #1A1A1A;
+}
+#screen-analysis .topbar button {
+  color: #1A1A1A;
+}
 
 .analysis-img {
   width: 100%;
@@ -1729,10 +1740,11 @@ input::placeholder { color: var(--muted); }
 }
 
 .receipt {
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sharp);
-  padding: 20px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  padding: 24px 20px;
   font-family: 'IBM Plex Mono', monospace;
   overflow: hidden;
 }
@@ -1749,9 +1761,45 @@ input::placeholder { color: var(--muted); }
 
 .receipt-hr {
   border: none;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed #CCCCCC;
   margin: 10px 0;
 }
+.receipt-store-header {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: #1A1A1A;
+  margin-bottom: 2px;
+}
+.receipt-store-sub {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: #999;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+.receipt-lbl { font-family: 'IBM Plex Mono', monospace !important; color: #555 !important; text-transform: uppercase; letter-spacing: 1px; }
+.receipt-val { font-family: 'IBM Plex Mono', monospace !important; color: #1A1A1A !important; background: transparent !important; }
+.receipt-unit { color: #888 !important; }
+.receipt-barcode {
+  display: flex; justify-content: center; gap: 2px;
+  margin: 12px 0 4px; height: 28px; align-items: flex-end;
+}
+.receipt-barcode span { background: #1A1A1A; display: inline-block; border-radius: 0; }
+.receipt-footer {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; color: #AAA; letter-spacing: 3px; margin-top: 4px;
+}
+#screen-analysis .meal-opt { border: 1px solid #DDD; background: #FFF; color: #333; }
+#screen-analysis .meal-opt.selected {
+  border-color: #E8703A; background: rgba(232,112,58,0.08); color: #E8703A;
+}
+#screen-analysis .btn-primary { background: #1A1A1A; color: #FFF; box-shadow: none; }
+#screen-analysis .receipt-hr { border-top-color: #CCCCCC; }
 
 .receipt-row {
   display: flex;
@@ -1763,13 +1811,13 @@ input::placeholder { color: var(--muted); }
 .receipt-name-row { margin-bottom: 4px; }
 
 .receipt-name-input {
-  font-family: 'Fraunces', serif !important;
-  font-weight: 500 !important;
-  font-size: 22px !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
   background: transparent !important;
   border: none !important;
   border-bottom: 1px solid transparent !important;
-  color: var(--text) !important;
+  color: #1A1A1A !important;
   padding: 0 !important;
   width: 100%;
 }
@@ -2095,10 +2143,9 @@ input::placeholder { color: var(--muted); }
     <div id="analysis-result" style="display:none">
   <div class="receipt" id="receipt-body">
 
-    <div class="receipt-header">
-      <span class="receipt-title">── ניתוח ─</span>
-      <span class="receipt-time" id="receipt-time"></span>
-    </div>
+    <div class="receipt-store-header">FOOD LOG</div>
+    <div class="receipt-store-sub" id="receipt-time"></div>
+    <hr class="receipt-hr">
 
     <div class="receipt-row receipt-name-row">
       <input id="res-name" type="text" class="receipt-name-input" placeholder="שם האוכל">
@@ -2119,6 +2166,10 @@ input::placeholder { color: var(--muted); }
       <input id="res-time" type="time" class="receipt-val" style="direction:ltr;text-align:left">
       <span class="receipt-unit"></span>
     </div>
+
+    <hr class="receipt-hr">
+    <div class="receipt-barcode" id="receipt-barcode"></div>
+    <div class="receipt-footer">תודה על הרישום ✓</div>
 
   </div><!-- /receipt -->
 
@@ -2778,6 +2829,15 @@ function navigate(screen) {
 // ════════════════════════════════════════════════════
 // Dashboard helpers
 // ════════════════════════════════════════════════════
+function renderBarcode(el) {
+  if (!el) return;
+  el.innerHTML = Array.from({ length: 42 }, function() {
+    var h = 12 + Math.random() * 16;
+    var w = Math.random() > 0.3 ? (Math.random() > 0.6 ? 3 : 2) : 1;
+    return '<span style="width:' + w + 'px;height:' + h + 'px"></span>';
+  }).join('');
+}
+
 function renderCalRing(eaten, goal) {
   const el = document.getElementById('dash-ring-wrap');
   if (!el) return;
@@ -3112,6 +3172,7 @@ async function analyzeText() {
     // Re-trigger stagger animation by forcing reflow
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
+    renderBarcode(document.getElementById('receipt-barcode'));
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
     document.getElementById('analysis-loading').style.display = 'none';
@@ -3151,6 +3212,7 @@ async function analyzeFood() {
     // Re-trigger stagger animation by forcing reflow
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
+    renderBarcode(document.getElementById('receipt-barcode'));
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
     document.getElementById('analysis-loading').style.display = 'none';

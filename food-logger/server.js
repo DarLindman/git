@@ -268,7 +268,7 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       temperature: 0,
       messages: [{
         role: 'user',
-        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\nשם האוכל חייב להיות בעברית בלבד, ללא תווים לטיניים. לדוגמה: "עוף בתנור" ולא "Grilled Chicken".\n\nהטקסט: ${text.trim()}`
+        content: `המשתמש תיאר אוכל בטקסט חופשי. זהה את האוכל, הערך את הכמות, וחשב ערכים תזונתיים מדויקים ככל האפשר.\nחשוב: אם מוזכרים מספר מאכלים, חשב כל אחד לפי מנה רגילה שלו וסכם את כל הערכים. לעולם אל תפחית ערך תזונתי כי מוזכר מאכל נוסף.\nהחזר ONLY a single-line JSON object, no markdown, no explanation:\n{"foodName":"שם האוכל בעברית","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}\nכל הערכים פרט ל-foodName חייבים להיות מספרים.\nשם האוכל חייב להיות בעברית בלבד, ללא תווים לטיניים. לדוגמה: "עוף בתנור" ולא "Grilled Chicken".\n\nהטקסט: ${text.trim()}`
       }]
     });
     const raw = message.content[0].text.trim();

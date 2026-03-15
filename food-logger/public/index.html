@@ -1048,8 +1048,7 @@ input::placeholder { color: var(--muted); }
 }
 
 /* Corner brackets */
-.cam-preview::before, .cam-preview::after,
-.cam-corners::before, .cam-corners::after {
+.cam-preview::before, .cam-preview::after {
   content: '';
   position: absolute;
   width: 26px;
@@ -1062,9 +1061,32 @@ input::placeholder { color: var(--muted); }
 .cam-preview::before { top: 16px; right: 16px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
 .cam-preview::after  { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
 
-.cam-corners { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
-.cam-corners::before { top: 16px; left: 16px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
-.cam-corners::after  { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+.cam-corners {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  z-index: 2;
+}
+.cam-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+.cam-corner path {
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  animation: cornerPulse 2s ease-in-out infinite;
+}
+.cam-corner:nth-child(1) { top: 0; right: 0; }
+.cam-corner:nth-child(2) { top: 0; left: 0; }
+.cam-corner:nth-child(3) { bottom: 0; right: 0; }
+.cam-corner:nth-child(4) { bottom: 0; left: 0; }
+@keyframes cornerPulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
 
 .cam-preview img { width: 100%; height: 100%; object-fit: cover; display: none; }
 .cam-placeholder { font-size: 44px; opacity: 0.2; }
@@ -1089,9 +1111,33 @@ input::placeholder { color: var(--muted); }
 }
 
 .cam-btn-shoot {
-  background: var(--surface2);
-  color: var(--text2);
-  border: 1px solid var(--border);
+  position: relative;
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  background: var(--surface2) !important;
+  border: 2px solid var(--accent) !important;
+  box-shadow: 0 0 0 6px var(--surface), 0 0 0 7px transparent;
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast);
+  font-size: 24px;
+}
+.cam-btn-shoot::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px dashed rgba(232,112,58,0.4);
+  animation: outerRingRotate 10s linear infinite;
+}
+.cam-btn-shoot:active {
+  transform: scale(0.92);
+  box-shadow: 0 0 0 6px var(--surface), 0 0 20px var(--accent-glow);
+}
+@keyframes outerRingRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .cam-btn-analyze {
@@ -1732,7 +1778,12 @@ input::placeholder { color: var(--muted); }
   <div class="camera-area">
     <div class="cam-tip">צלם את האוכל שלך</div>
     <div class="cam-preview" id="cam-preview">
-      <div class="cam-corners"></div>
+      <div class="cam-corners">
+  <svg class="cam-corner" viewBox="0 0 20 20"><path d="M18 2 H10 M18 2 V10"/></svg>
+  <svg class="cam-corner" viewBox="0 0 20 20"><path d="M2 2 H10 M2 2 V10"/></svg>
+  <svg class="cam-corner" viewBox="0 0 20 20"><path d="M18 18 H10 M18 18 V10"/></svg>
+  <svg class="cam-corner" viewBox="0 0 20 20"><path d="M2 18 H10 M2 18 V10"/></svg>
+</div>
       <span class="cam-placeholder">📷</span>
       <img id="preview-img" alt="תצוגה מקדימה">
     </div>
@@ -1743,7 +1794,7 @@ input::placeholder { color: var(--muted); }
     <input type="file" id="file-input" accept="image/*" onchange="onImageSelected(event)">
     <div class="text-analyze-section">
       <div class="text-analyze-divider"><span>או הקלד תיאור אוכל</span></div>
-      <textarea id="food-text-input" placeholder="לדוגמה: 100 גרם חזה עוף עם כוס אורז וסלט ירקות"></textarea>
+      <textarea id="food-text-input" placeholder="" data-placeholder="לדוגמה: 100 גרם חזה עוף עם כוס אורז וסלט ירקות"></textarea>
       <button class="cam-btn cam-btn-analyze" id="text-analyze-btn" onclick="analyzeText()">✍️ נתח טקסט</button>
     </div>
   </div>
@@ -2397,6 +2448,18 @@ async function saveMpProfile() {
 // ════════════════════════════════════════════════════
 // Navigation
 // ════════════════════════════════════════════════════
+function animatePlaceholder() {
+  const ta = document.getElementById('food-text-input');
+  if (!ta) return;
+  const full = ta.getAttribute('data-placeholder') || '';
+  ta.placeholder = '';
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= full.length) { clearInterval(iv); return; }
+    ta.placeholder = full.slice(0, ++i);
+  }, 15);
+}
+
 function navigate(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(`screen-${screen}`).classList.add('active');
@@ -2408,6 +2471,7 @@ function navigate(screen) {
   if (screen === 'home') loadDiary();
   if (screen === 'stats') loadStats();
   if (screen === 'weight') loadWeightScreen();
+  if (screen === 'camera') animatePlaceholder();
 }
 
 // ════════════════════════════════════════════════════

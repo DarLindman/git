@@ -3029,11 +3029,16 @@ async function loadWeeklyStats() {
       const found = rows.find(r => r.day.slice(0,10) === ds);
       chartDays.push(found || { day: ds, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
     }
+    const hebrewDays = ['א','ב','ג','ד','ה','ו','ש'];
     chartEl.innerHTML = renderLineChart(chartDays, {
       getValue: r => +r.calories || 0,
       getLabel: r => formatDateShort(r.day.slice(0, 10)),
       isToday: r => r.day.slice(0, 10) === todayDs,
       recommended: rec,
+      dayLetters: chartDays.map(r => {
+        const d = new Date(r.day);
+        return hebrewDays[d.getDay()];
+      }),
     });
     renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
@@ -3061,8 +3066,8 @@ async function loadMonthlyStats() {
 // ════════════════════════════════════════════════════
 // SVG line chart with dots and date labels
 // ════════════════════════════════════════════════════
-function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
-  const W = 320, H = 160, BOTTOM = 26, TOP = 20, LEFT = 8, RIGHT = 14;
+function renderLineChart(rows, { getValue, getLabel, isToday, recommended, dayLetters }) {
+  const W = 320, H = 150, BOTTOM = 28, TOP = 16, LEFT = 8, RIGHT = 14;
   const chartW = W - LEFT - RIGHT;
   const chartH = H - BOTTOM - TOP;
   const n = rows.length;
@@ -3073,51 +3078,75 @@ function renderLineChart(rows, { getValue, getLabel, isToday, recommended }) {
   const pts = rows.map((r, i) => {
     const x = n === 1 ? W / 2 : LEFT + (i / (n - 1)) * chartW;
     const y = TOP + chartH - (getValue(r) / range) * chartH;
-    return { x, y, r };
+    const hasData = getValue(r) > 0;
+    return { x, y, r, hasData };
   });
 
-  const polyline = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaPath = n > 1
-    ? `M ${pts[0].x.toFixed(1)},${(TOP + chartH).toFixed(1)} ` +
-      pts.map(p => `L ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') +
-      ` L ${pts[n-1].x.toFixed(1)},${(TOP + chartH).toFixed(1)} Z`
-    : '';
+  // Polyline only for points that have data
+  const dataPoints = pts.filter(p => p.hasData);
+  const polyline = dataPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
 
-  // Only show label every Nth point to avoid crowding
-  const step = n <= 10 ? 1 : n <= 20 ? 2 : 5;
+  // Estimated total path length for dashoffset animation
+  let pathLen = 0;
+  for (let i = 1; i < dataPoints.length; i++) {
+    const dx = dataPoints[i].x - dataPoints[i-1].x;
+    const dy = dataPoints[i].y - dataPoints[i-1].y;
+    pathLen += Math.sqrt(dx*dx + dy*dy);
+  }
 
   const dots = pts.map(p => {
     const isT = isToday(p.r);
-    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${isT ? '#e8703a' : 'rgba(232,112,58,0.65)'}" stroke="#0d0b09" stroke-width="1.5"/>`;
+    if (p.hasData) {
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isT ? 4.5 : 3.5}"
+        fill="${isT ? 'var(--accent)' : 'rgba(232,112,58,0.8)'}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    } else {
+      return `<circle cx="${p.x.toFixed(1)}" cy="${(TOP + chartH).toFixed(1)}" r="2"
+        fill="var(--muted)" opacity="0.5"/>`;
+    }
   }).join('');
 
+  // Labels: prefer dayLetters if provided, else getLabel
+  const step = n <= 10 ? 1 : n <= 20 ? 2 : 5;
   const labels = pts.map((p, i) => {
     if (i % step !== 0 && i !== n - 1) return '';
     const isT = isToday(p.r);
-    return `<text x="${p.x.toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="8" fill="${isT ? '#e8703a' : '#7a6e62'}" font-family="IBM Plex Mono,monospace">${getLabel(p.r)}</text>`;
+    const lbl = (dayLetters && dayLetters[i]) ? dayLetters[i] : getLabel(p.r);
+    return `<text x="${p.x.toFixed(1)}" y="${H - 6}" text-anchor="middle"
+      font-size="9" fill="${isT ? 'var(--accent)' : 'var(--muted)'}"
+      font-family="IBM Plex Mono,monospace">${lbl}</text>`;
   }).join('');
 
   let recLine = '';
   if (recommended > 0) {
     const ry = TOP + chartH - (recommended / range) * chartH;
-    // Place label below the line when near top, above otherwise
     const labelY = ry < TOP + 12 ? ry + 10 : ry - 3;
-    recLine = `<line x1="${LEFT}" y1="${ry.toFixed(1)}" x2="${W - RIGHT}" y2="${ry.toFixed(1)}" stroke="#e8703a" stroke-dasharray="4,3" opacity="0.5" stroke-width="1"/>
-      <text x="${W - RIGHT - 2}" y="${labelY.toFixed(1)}" text-anchor="end" font-size="8" fill="#e8703a" opacity="0.9" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
+    recLine = `<line x1="${LEFT}" y1="${ry.toFixed(1)}" x2="${W - RIGHT}" y2="${ry.toFixed(1)}"
+      stroke="var(--gold)" stroke-dasharray="4,3" opacity="0.7" stroke-width="1"/>
+      <text x="${W - RIGHT - 2}" y="${labelY.toFixed(1)}" text-anchor="end"
+      font-size="8" fill="var(--gold)" opacity="0.9" font-family="IBM Plex Mono,monospace">${recommended}</text>`;
   }
 
+  const polylineId = 'lc-' + Math.random().toString(36).slice(2, 7);
+
   return `<svg viewBox="0 0 ${W} ${H}" overflow="visible" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="lgrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#e8703a" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#e8703a" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    ${areaPath ? `<path d="${areaPath}" fill="url(#lgrad)"/>` : ''}
-    <polyline points="${polyline}" fill="none" stroke="rgba(232,112,58,0.7)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
     ${recLine}
+    ${dataPoints.length > 1 ? `<polyline id="${polylineId}" points="${polyline}" fill="none"
+      stroke="rgba(232,112,58,0.7)" stroke-width="1.8"
+      stroke-linejoin="round" stroke-linecap="round"
+      stroke-dasharray="${pathLen.toFixed(0)}"
+      stroke-dashoffset="${pathLen.toFixed(0)}"
+      style="transition: stroke-dashoffset 0.6s var(--ease-out, cubic-bezier(0.22,1,0.36,1))"/>` : ''}
     ${dots}
     ${labels}
+    <script>
+      (function(){
+        var el = document.getElementById('${polylineId}');
+        if (!el) return;
+        requestAnimationFrame(function(){ requestAnimationFrame(function(){
+          el.style.strokeDashoffset = '0';
+        }); });
+      })();
+    </script>
   </svg>`;
 }
 

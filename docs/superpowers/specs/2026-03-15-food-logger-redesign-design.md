@@ -1,246 +1,502 @@
-# Food Logger — Redesign Spec
-**Date**: 2026-03-15
-**Approach**: Culinary Journal
-**Status**: Approved
+# Food Logger UI Redesign — Design Spec
+
+**Date:** 2026-03-15
+**Status:** Approved
+**Scope:** Dashboard, Diary, Analysis/Receipt screen, Remotion fire animation
 
 ---
 
 ## Overview
 
-Redesign `food-logger/public/index.html` to feel like a **personal chef's journal** — not a generic app. The current design is functional but reads as "AI-generated UI". The goal is to break visual predictability while preserving the existing color palette and Hebrew RTL layout.
-
-**What stays**: color palette, fonts, PWA structure, all functionality
-**What changes**: layout system, border radius variety, dividers, data visualizations, animations, icons
+Redesign three screens of the food-logger PWA with a cohesive "warm brutalism / leather journal" aesthetic. All existing data, API calls, and functionality remain unchanged — purely a visual and animation overhaul.
 
 ---
 
-## 1. Visual Language
+## Aesthetic Direction
 
-### Typography System
+**Theme:** Warm brutalism meets leather journal. Dark, intimate, personal — like opening a hand-worn diary by candlelight. The receipt screen breaks the pattern intentionally with stark white for contrast and clarity.
 
-| Role | Font | Weight | Size range | Notes |
-|------|------|--------|------------|-------|
-| Hero numbers | Fraunces | 300 italic | 72–96px | Tilted 2deg, feels hand-written |
-| Section headings | Fraunces | 600 | 24–32px | Normal, sharp |
-| Body / labels | DM Sans | 400–500 | 12–16px | Clean, readable |
-| Timestamps / data | IBM Plex Mono | 400 | 10–13px | All nutritional numbers, times |
+**Color Palette — UPDATE ONLY THESE TOKENS, preserve all others:**
 
-**Key principle**: Size contrast is the main hierarchy tool. Giant Fraunces number next to tiny mono label.
-
-### Border Radius — Breaking Uniformity
-
-Remove the current flat `18px` everywhere. Use:
+The following `:root` tokens should be updated. All other existing tokens (`--surface3`, `--gold`, `--protein`, `--carb`, `--fat`, `--fiber`, `--ease-out`, `--ease-spring`, `--dur-fast`, etc.) must be preserved unchanged.
 
 ```css
---radius-sharp:  4px;   /* Main cards — feels like paper */
---radius-pill:   99px;  /* Buttons, tags */
---radius-input:  8px;   /* Form inputs */
---radius-badge:  3px;   /* Macro badges */
+/* Update these in :root */
+--bg:         #0F0A07;
+--surface:    #1A1209;
+--surface2:   #231810;
+--border:     #3D2515;
+--text:       #F5E8D0;
+--text2:      #C4956A;
+--muted:      #8B6B4A;
+--accent:     #E8703A;   /* unchanged */
+--accent-dim: rgba(232,112,58,0.12);
+--accent-glow:rgba(232,112,58,0.25);
 ```
 
-### Dividers
+**Typography:** Fraunces (display), IBM Plex Mono (mono/receipt), DM Sans (body).
 
-Replace `border-bottom: 1px solid var(--border)` section dividers with SVG wavy paths:
+---
 
-```svg
-<path d="M0,4 Q120,0 240,4 Q360,8 480,4" stroke="var(--border)" fill="none" stroke-width="1"/>
+## Screen 1: Dashboard
+
+### Removals
+- Remove the `<video class="dash-ambient-steam">` element from HTML.
+- Remove the `.dash-ambient-steam` CSS rule.
+- The file `ambient-steam.mp4` stays on disk, just no longer referenced.
+
+### Calorie Display Change
+Replace "calories remaining" with consumed/goal format in the hero area.
+
+**JS logic** (in `loadDashboard` or equivalent, where `cal` = total consumed today, `goal` = daily calorie goal):
+- `#dash-cal-remaining` textContent:
+  - If `cal === 0` and `goal === 0`: show `'—'` (unchanged from current "not configured" signal)
+  - If `cal === 0` and `goal > 0`: show `'0'`
+  - Otherwise: show `cal.toLocaleString('he-IL')`
+- `#dash-cal-goal-label` and `#dash-cal-slash`:
+  - If `goal > 0`: show both, set label to `goal.toLocaleString('he-IL')`
+  - If `goal === 0`: hide both
+- Label text `#dash-cal-label-main`: change static text from `קלוריות נשארו` to `קלוריות היום`
+
+**HTML changes** — replace the **entire existing `.dash-cal-label-row` div** (and its contents) with the following block. The `id="dash-cal-goal-label"` is preserved on the new `<span class="dash-cal-goal-num">` so existing JS (`getElementById('dash-cal-goal-label').textContent = ...`) continues to work unchanged:
+```html
+<div class="dash-cal-remaining" id="dash-cal-remaining">—</div>
+<div class="dash-cal-goal-row" id="dash-cal-goal-row" style="display:none">
+  <span class="dash-cal-slash">/</span>
+  <span class="dash-cal-goal-num" id="dash-cal-goal-label"></span>
+</div>
+<div class="dash-cal-label-main">קלוריות היום</div>
+<div class="dash-cal-label-sub" id="dash-cal-label-sub"></div>
 ```
 
-Use between major sections (hero → macros, macros → log entries). Straight borders remain for table rows and small separators.
+**New CSS:**
+```css
+.dash-cal-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  color: var(--text2);
+  font-style: italic;
+}
+```
 
-### Icons
+### Streak Circle + Fire Overlay
 
-Replace all emoji icons in navigation and UI with hand-drawn-style SVG icons:
-- Stroke width: 1.5px
-- Style: outline only (no fill)
-- Size: 20px viewBox, rendered at 22px
-- Consistent corner radius: 2px on paths
+**HTML** — replace the existing bare `.dash-streak-circle` div with:
+```html
+<div class="dash-streak-wrap">
+  <video id="dash-fire-vid" class="dash-fire-vid"
+    src="/fire-loop.mp4" muted playsinline autoplay loop
+    style="display:none" aria-hidden="true"></video>
+  <div class="dash-streak-circle">
+    <div class="dash-streak-num" id="dash-streak-num">—</div>
+    <div class="dash-streak-lbl">ימים ברצף</div>
+  </div>
+</div>
+```
 
-Icons needed: home, camera, stats, weight, settings, plus, trash, check, chevron
+**CSS:**
+```css
+.dash-streak-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 260px;          /* circle 160px + ~100px space above for fire */
+}
 
-### Color Palette (unchanged)
+.dash-streak-circle {
+  width: 160px;           /* enlarged from 140px */
+  height: 160px;
+  position: relative;
+  z-index: 1;
+  /* keep all existing border-radius, background, box-shadow rules */
+}
+
+.dash-fire-vid {
+  position: absolute;
+  bottom: 0;              /* fire base aligns with bottom of circle */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 320px;
+  mix-blend-mode: screen; /* black bg becomes transparent */
+  pointer-events: none;
+  z-index: 2;
+}
+```
+
+**JS:** after loading streak value:
+```js
+document.getElementById('dash-fire-vid').style.display = streak >= 1 ? '' : 'none';
+```
+
+### Entrance Animations
+
+**CSS — define stagger states:**
+```css
+.dash-stagger {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+}
+.dash-stagger.anim-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+```
+
+Add class `dash-stagger` to: `.dash-greeting-line`, `.dash-hero-cal`, `.dash-streak-wrap`, `.dash-cta` (the add-meal button).
+
+**JS — stagger on each dashboard navigation** (not just first load):
+```js
+function animateDashStagger() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.dash-stagger').forEach(el => el.classList.add('anim-visible'));
+    return;
+  }
+  document.querySelectorAll('.dash-stagger').forEach(el => el.classList.remove('anim-visible'));
+  const delays = [0, 150, 300, 450];
+  document.querySelectorAll('.dash-stagger').forEach((el, i) => {
+    setTimeout(() => el.classList.add('anim-visible'), delays[i] || 0);
+  });
+}
+```
+
+**Count-up animation** — respects `prefers-reduced-motion`:
+```js
+function animateCountUp(el, target, duration = 800) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.textContent = target.toLocaleString('he-IL');
+    return;
+  }
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const val = Math.round(t * target);
+    el.textContent = val.toLocaleString('he-IL');
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+```
+Call `animateCountUp` **only when `cal > 0`**. For the `'—'` and `'0'` sentinel cases, set `textContent` directly without calling `animateCountUp` (calling it with `target=0` would overwrite a `'—'` sentinel with `'0'`):
+```js
+if (cal > 0) {
+  animateCountUp(document.getElementById('dash-cal-remaining'), cal);
+} // else textContent was already set by the branch logic above
+```
+
+### Grain Texture
+```css
+.dash-wrap::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 0;
+}
+```
+
+---
+
+## Screen 2: Diary (יומן)
+
+### Background
+```css
+#screen-home {
+  background: linear-gradient(160deg, #1C0F08 0%, #0D0603 100%);
+}
+```
+
+### Date Navigation Stamp
+The `.date-display` element already exists. Style it as a rubber stamp:
+```css
+#diary-date-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 12px;
+}
+```
+
+### Meal List — Ruled Lines
+```css
+#meal-list {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    rgba(61,37,21,0.35) 27px,
+    rgba(61,37,21,0.35) 28px
+  );
+  background-size: 100% 28px;
+  padding: 4px 0;
+}
+```
+
+### Meal Item Rows
+The actual class is **`.meal-item-row`** (not `.meal-item`). The template literal inside `renderMealList()` generates these. Update the CSS for `.meal-item-row`:
 
 ```css
---bg:          #0d0b09;
---surface:     #161310;
---surface2:    #201d18;
---surface3:    #2a2620;
---border:      #2e2920;
---text:        #f0e8dc;
---text2:       #c0b8ac;
---muted:       #7a6e62;
---accent:      #e8703a;
---accent-dim:  rgba(232,112,58,0.15);
---accent-glow: rgba(232,112,58,0.28);
---gold:        #c4a265;
---protein:     #5eead4;
---carb:        #93c5fd;
---fat:         #fca5a5;
---fiber:       #c4b5fd;
+.meal-item-row {
+  border-right: none;          /* remove any existing right border */
+  border-left: 3px solid var(--meal-accent, var(--border));
+  background: transparent;
+  border-bottom: 1px solid rgba(61,37,21,0.3);
+  border-radius: 0;
+}
 ```
 
----
-
-## 2. Animation System
-
-**Principle**: Every animation must express cause-and-effect. No decorative motion.
-
-### Global tokens
+Add meal-type color classes. In `renderMealList()`, add the appropriate class to each row based on `meal.meal_type`:
+```js
+const mealAccentClass = {
+  breakfast: 'meal-accent-breakfast',
+  lunch:     'meal-accent-lunch',
+  dinner:    'meal-accent-dinner',
+  snack:     'meal-accent-snack',
+}[meal.meal_type] || '';
+// Add mealAccentClass to the row element's className
+```
 
 ```css
---ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
---ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
---dur-fast:    150ms;
---dur-mid:     250ms;
---dur-slow:    400ms;
+.meal-accent-breakfast { --meal-accent: #F5A623; }
+.meal-accent-lunch     { --meal-accent: #E8703A; }
+.meal-accent-dinner    { --meal-accent: #C0392B; }
+.meal-accent-snack     { --meal-accent: #8B6B4A; }
 ```
 
-### Rules
-
-- Screen transitions: `translateY(12px) → 0` + `opacity 0 → 1`, 250ms ease-out
-- Staggered list items: 50ms delay per item, max 5 items animated (rest appear instantly)
-- Button press: `scale(0.97)` on active, restored on release — 150ms
-- Exit animations: 60% of enter duration
-- All animations respect `prefers-reduced-motion: reduce`
+### Food Name in Rows
+Inside `renderMealList()`, the `.mir-name` element renders the food name. Add Fraunces italic to this element:
+```css
+.mir-name {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--text);
+}
+```
 
 ---
 
-## 3. Dashboard Screen
+## Screen 3: Analysis / Receipt
 
-**Concept**: First page of a personal cookbook.
-
-### Hero (calories)
-```
-[greeting, Fraunces 300 italic, muted]
-━━━━━━━━━━━━━━━━━━━ (SVG wavy divider)
-
-        1,240
-        ───────── קלוריות נשארו
-         מתוך 2,000
-```
-
-- `1,240`: Fraunces 96px, italic, `transform: rotate(-1.5deg)`, color `--text`
-- "קלוריות נשארו": DM Sans 12px, uppercase, letter-spacing 2px, `--muted`
-- "מתוך 2,000": IBM Plex Mono 12px, `--text2`
-
-**Progress visualization**: Not a bar. An organic ring (SVG circle with `stroke-dashoffset` animation, 0.7s ease-out on mount). When over goal: ring turns `#e85d5d`.
-
-### Macros — "The Plate"
-
-Single SVG (~200px) showing 4 organic arc segments arranged as a circle (plate). Each arc = one macro, colored with the macro token. Arcs have slight gaps between them (4px). On hover/tap: tooltip with `name: Xgr / Yg target`.
-
-No labels inside the SVG — a small legend below in 2-column grid, IBM Plex Mono 11px.
-
-### Streak line
-
-Single line, not a card:
-```
-12 ימים ברצף  ·  השבוע 14,230 קק״ל  ·  ממוצע 2,033
-```
-IBM Plex Mono 11px, `--muted`, centered, with `·` separators.
-
-### Log preview (last 3 entries)
-
-Each entry — asymmetric row, NOT a card:
-```
-[timestamp mono, --muted]  [food name, DM Sans 500]      [kcal, Fraunces 300]
-                            [P xx · C xx · F xx, mono sm]
+### Background
+```css
+#screen-analysis {
+  background: #FAFAF8;
+  color: #1A1A1A;
+}
+#screen-analysis .topbar {
+  background: #FAFAF8;
+  border-bottom: 1px solid #E0DDD8;
+  color: #1A1A1A;
+}
+#screen-analysis .topbar button {
+  color: #1A1A1A;
+}
 ```
 
-Separated by a single thin line (1px, `--border`). No background, no shadow, no border-radius.
+### Receipt Container
+```css
+.receipt {
+  background: #FFFFFF;
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  padding: 24px 20px;
+}
+```
 
-CTA button "הוסף ארוחה" — full width pill, accent background, at the bottom.
+### Receipt Header — Replace Existing
+**Remove** the existing `.receipt-header` div:
+```html
+<!-- REMOVE THIS: -->
+<div class="receipt-header">
+  <span class="receipt-title">── ניתוח ─</span>
+  <span class="receipt-time" id="receipt-time"></span>
+</div>
+```
+
+**Replace with:**
+```html
+<div class="receipt-store-header">FOOD LOG</div>
+<div class="receipt-store-sub" id="receipt-time"></div>
+<hr class="receipt-hr">
+```
+
+Note: `receipt-time` id moves to `.receipt-store-sub` so existing JS that sets `document.getElementById('receipt-time').textContent = hhmm` continues to work without changes.
+
+### Receipt Typography
+```css
+.receipt-store-header {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: #1A1A1A;
+  margin-bottom: 2px;
+}
+.receipt-store-sub {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: #999;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+.receipt-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.receipt-val, .receipt-name-input {
+  font-family: 'IBM Plex Mono', monospace;
+  color: #1A1A1A;
+  background: transparent;
+}
+.receipt-name-input {
+  font-size: 18px;
+  font-weight: 700;
+}
+.receipt-hr {
+  border: none;
+  border-top: 1px dashed #CCCCCC;
+  margin: 10px 0;
+}
+.receipt-unit {
+  color: #888;
+}
+```
+
+### Receipt Footer — Add Below Last `<hr>`
+```html
+<div class="receipt-barcode" id="receipt-barcode"></div>
+<div class="receipt-footer">תודה על הרישום ✓</div>
+```
+
+```css
+.receipt-barcode {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: 12px 0 4px;
+  height: 28px;
+  align-items: flex-end;
+}
+.receipt-barcode span {
+  background: #1A1A1A;
+  border-radius: 0;
+  display: inline-block;
+}
+.receipt-footer {
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: #AAA;
+  letter-spacing: 3px;
+  margin-top: 4px;
+}
+```
+
+**JS — barcode generator** (call when showing receipt):
+```js
+function renderBarcode(el) {
+  el.innerHTML = Array.from({length: 42}, () => {
+    const h = 12 + Math.random() * 16;
+    const w = Math.random() > 0.3 ? (Math.random() > 0.6 ? 3 : 2) : 1;
+    return `<span style="width:${w}px;height:${h}px"></span>`;
+  }).join('');
+}
+// Call: renderBarcode(document.getElementById('receipt-barcode'))
+// when analysis result is displayed
+```
+
+### Meal Type Buttons (on white bg)
+```css
+#screen-analysis .meal-opt {
+  border: 1px solid #DDD;
+  background: #FFF;
+  color: #333;
+}
+#screen-analysis .meal-opt.selected {
+  border-color: #E8703A;
+  background: rgba(232,112,58,0.08);
+  color: #E8703A;
+}
+```
+
+### Save Button (on white bg)
+```css
+#screen-analysis .btn-primary {
+  background: #1A1A1A;
+  color: #FFF;
+  box-shadow: none;
+}
+```
 
 ---
 
-## 4. Camera & Analysis Screens
+## Remotion: FireLoop Composition
 
-### Camera
+### New File: `food-logger/remotion/src/FireLoop.tsx`
 
-**Viewfinder corners**: 4 SVG corner markers (L-shaped, 20px, 1px stroke, accent color). Slow pulse animation (opacity 0.6 → 1, 2s infinite ease-in-out).
+**Specs:**
+- Composition ID: `FireLoop`
+- Size: 200 × 320px
+- Duration: 60 frames @ 30fps (2-second seamless loop)
+- Output: `food-logger/public/fire-loop.mp4`
 
-**Capture button**: 64px circle, double border (inner solid, outer dashed rotating 10s linear infinite). Press: `scale(0.92)` + brief glow.
+**Particle System:**
+- 15 particles active at any frame, staggered across the 60-frame loop
+- Each particle uses a seed derived from its index to randomize: start X offset (±25px from center 100px), horizontal sway amplitude (8–20px), rise speed, size
+- Origin Y: 290px. Destination Y: ~20px
+- Color interpolation by normalized height progress:
+  - 0%: `#FF2200` (deep red)
+  - 40%: `#FF6600` (orange)
+  - 70%: `#FFB300` (amber)
+  - 100%: transparent
+- Radius: `interpolate(progress, [0,1], [8, 1])`
+- Opacity: `interpolate(progress, [0, 0.1, 0.7, 1], [0, 1, 0.8, 0])`
+- Background: solid `#000000`
 
-**Text input**: Characters appear letter-by-letter on input with 15ms per-character fade-in (JS `setInterval` driven).
-
-### Analysis results
-
-Layout styled as a printed receipt / docket:
-
+**Root.tsx:** Add FireLoop alongside existing compositions:
+```tsx
+import { FireLoop } from './FireLoop';
+// ...
+<Composition id="FireLoop" component={FireLoop}
+  durationInFrames={60} fps={30} width={200} height={320} />
 ```
-── ניתוח ─────────────────────── 14:22 ──
 
-  [food name, Fraunces 500, 22px]
-  ──────────────────────────────────────
-  קלוריות          [n] קק״ל      mono
-  חלבון            [n] גר׳       mono
-  פחמימות          [n] גר׳       mono
-  שומן             [n] גר׳       mono
-  ──────────────────────────────────────
-  אמינות   [●●●○○ dots]  [label]
-
-[ + הוסף ליומן ]        [ ✕ ביטול ]
+**Render:**
+```bash
+cd food-logger/remotion
+npx remotion render FireLoop ../public/fire-loop.mp4
 ```
 
-Each row enters from bottom with 60ms stagger delay — simulates printing. Dashes are `<hr>` styled with `border-style: dashed`.
-
 ---
 
-## 5. Stats Screen
+## Files Changed
 
-**Concept**: Field notebook data page.
+| File | Change |
+|------|--------|
+| `food-logger/public/index.html` | All CSS + HTML + JS changes above |
+| `food-logger/remotion/src/FireLoop.tsx` | New component |
+| `food-logger/remotion/src/Root.tsx` | Register FireLoop |
+| `food-logger/public/fire-loop.mp4` | Rendered output (after render step) |
 
-### Weekly view
-
-Dots + connected SVG line (not a bar chart):
-```
-א  ב  ג  ד  ה  ו  ש
-●  ●  ●  ●  ·  ·  ·
-```
-- Logged days: `●` in `--accent`
-- Missing days: `·` in `--muted`
-- SVG polyline connecting logged dots, drawn with `stroke-dashoffset` animation on mount
-- Average line: horizontal dashed SVG line in `--gold`
-
-### Monthly/Yearly views
-
-Heatmap grid (7-column weeks × N rows). Each cell: 8px square, color-coded by calorie intake relative to goal. No axes — dates as tooltip on tap.
-
----
-
-## 6. Remotion — New Asset
-
-New composition: `AmbientSteam` — a 4-second seamless loop of 3 rising steam wisps (SVG paths animating upward with slight sway). Rendered at 400×300 at 30fps to `public/ambient-steam.mp4`.
-
-Embedded in dashboard hero as `<video autoplay muted loop playsinline>` with `opacity: 0.05`, positioned absolutely behind the calorie number. Creates depth without distraction.
-
----
-
-## 7. Screens Not Redesigned
-
-- Auth / Welcome: Minor polish only (apply new border radius, wavy dividers)
-- Weight log: Apply new typography system only
-- Settings: Apply new typography system only
-
-Focus of implementation is: Dashboard, Camera, Analysis, Stats.
-
----
-
-## 8. Implementation Notes
-
-- All changes are confined to `food-logger/public/index.html` (CSS + HTML + JS inline)
-- Remotion changes in `food-logger/remotion/src/` (new `AmbientSteam.tsx` composition)
-- No new dependencies — SVG animations are CSS-only
-- The "receipt" animation in Analysis uses `requestAnimationFrame` / `setTimeout` in existing JS
-- RTL layout must be verified on all modified screens
-- `prefers-reduced-motion` media query must wrap all entrance animations
-
----
-
-## Success Criteria
-
-1. Dashboard calorie number feels like editorial typography, not a widget
-2. The macro "plate" is immediately readable and feels custom-made
-3. Analysis results feel tactile — like a receipt printing
-4. Stats sparkline feels hand-drawn, not charted
-5. No screen looks like it came from a UI kit
+## Files NOT Changed
+- `food-logger/server.js`
+- `food-logger/public/ambient-steam.mp4` (stays on disk)
+- `food-logger/public/salad-logo.mp4`

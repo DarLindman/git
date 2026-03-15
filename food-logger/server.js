@@ -159,10 +159,10 @@ function createToken(user) {
 }
 
 // ─── Auth routes ─────────────────────────────────────────────────────────────
-app.post('/auth/register', async (req, res) => {
+app.post('/auth/register', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password || username.length < 3 || password.length < 6)
-    return res.status(400).json({ error: 'שם משתמש חייב להכיל לפחות 3 תווים, סיסמא לפחות 6' });
+  if (!username || !password || username.length < 3 || username.length > 50 || password.length < 6)
+    return res.status(400).json({ error: 'שם משתמש חייב להכיל 3–50 תווים, סיסמא לפחות 6' });
   try {
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
@@ -222,7 +222,7 @@ async function ensureHebrewFoodName(name) {
     });
     const translated = msg.content[0].text.trim().replace(/^["']|["']$/g, '');
     return translated || name;
-  } catch { return name; }
+  } catch (e) { console.error('ensureHebrewFoodName failed:', e.message); return name; }
 }
 
 // ─── Analyze food image ───────────────────────────────────────────────────────
@@ -311,7 +311,6 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       }]
     });
     const raw = message.content[0].text.trim();
-    console.log('[analyze-text] raw response:', raw);
     const arrMatch = raw.match(/\[[\s\S]*\]/);
     if (!arrMatch) {
       console.error('[analyze-text] no JSON array found in response');
@@ -342,11 +341,18 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
 app.post('/api/food', auth, async (req, res) => {
   const { meal_type, food_name, calories, protein_g, carbs_g, fat_g, fiber_g, notes, logged_at } = req.body;
   if (!food_name) return res.status(400).json({ error: 'שם האוכל חסר' });
+  if (food_name.length > 200) return res.status(400).json({ error: 'שם האוכל ארוך מדי (מקסימום 200 תווים)' });
+  const toNum = (v, max = 99999) => { const n = v === undefined || v === null || v === '' ? null : +v; return (n === null || isNaN(n) || n < 0 || n > max) ? null : Math.round(n * 10) / 10; };
+  const safeCalories = toNum(calories, 99999);
+  const safeProtein = toNum(protein_g, 9999);
+  const safeCarbs = toNum(carbs_g, 9999);
+  const safeFat = toNum(fat_g, 9999);
+  const safeFiber = toNum(fiber_g, 9999);
   try {
     const { rows } = await pool.query(
       `INSERT INTO food_logs (user_id, meal_type, food_name, calories, protein_g, carbs_g, fat_g, fiber_g, notes, logged_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, COALESCE($10::timestamptz, NOW())) RETURNING *`,
-      [req.user.id, meal_type, food_name, calories, protein_g, carbs_g, fat_g, fiber_g, notes, logged_at || null]
+      [req.user.id, meal_type, food_name, safeCalories, safeProtein, safeCarbs, safeFat, safeFiber, notes, logged_at || null]
     );
     res.json(rows[0]);
   } catch (e) {

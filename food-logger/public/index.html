@@ -2485,6 +2485,7 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
     .replace(/'/g, '&#39;');
 }
 
@@ -2496,6 +2497,7 @@ async function apiFetch(path, opts = {}) {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) }
   });
+  if (res.status === 401) { doLogout(); return; }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
   return data;

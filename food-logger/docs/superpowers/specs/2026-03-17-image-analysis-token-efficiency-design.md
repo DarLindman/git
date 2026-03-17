@@ -6,83 +6,70 @@
 ## Problem
 
 Each image analysis request makes 2 API calls, both sending the full image:
-- Call 1 (nutrition): ~2100 tokens
-- Call 2 (naming): ~1550 tokens (image sent again)
+- Call 1 (nutrition): ~2100 tokens (estimate)
+- Call 2 (naming): ~1550 tokens — image sent again (estimate)
 
-Total: ~3650 tokens per request. ~1200 of those are wasted on sending the same image twice.
+Total: ~3650 tokens per request. ~1200 of those are wasted sending the same image twice.
 
 ## Solution
 
-Two changes, combined:
-
 ### 1. Merge both API calls into one (server.js)
 
-Call 1 returns a single JSON object with **both** the dish name and the items array:
+Call 1 returns a single JSON **object** instead of a bare array:
 
 ```json
 {
   "dish_name": "שניצל עם שעועית ירוקה",
   "items": [
-    {"name": "שניצל", "weight_g": 150, "calories": 350, ...},
-    {"name": "שעועית ירוקה", "weight_g": 100, "calories": 30, ...}
+    {"name": "שניצל", "weight_g": 150, "calories": 350, "protein_g": 25, "carbs_g": 20, "fat_g": 18, "fiber_g": 0},
+    {"name": "שעועית ירוקה", "weight_g": 100, "calories": 30, "protein_g": 2, "carbs_g": 5, "fat_g": 0, "fiber_g": 3}
   ]
 }
 ```
 
-The system prompt instructs the model to:
-- Include `dish_name`: everyday Hebrew, up to 10 words, use full dish context for identification, no "בצלחת יש"
-- Include `items[]`: same nutrition breakdown as before
+**System prompt addition:** `dish_name` in everyday spoken Hebrew, up to 10 words, use full dish context for identification (e.g. red meat + seaweed + avocado = tuna, not beef), no "בצלחת יש", no cooking doneness descriptions.
 
-Call 2 is removed entirely. Saves ~1550 tokens per request.
+**Parsing change:** The current parser uses `raw.match(/\[[\s\S]*\]/)` to extract a JSON array. The new parser:
+1. Tries `raw.match(/\{[\s\S]*\}/)` and `JSON.parse()` on the full object
+2. Extracts `parsed.items` as the items array
+3. Extracts `parsed.dish_name` as the food name (fallback: `'מנה'`)
+4. Keeps existing `cleanHebrew` sanitization on item names only — `dish_name` is not passed through `cleanHebrew` since it may legitimately contain spaces and punctuation that `cleanHebrew` would strip
 
-### 2. Resize image client-side before upload (index.html)
+**Call 2 removed entirely.** `ensureHebrewFoodName` is unaffected — it is only used by `/api/analyze-text`, not by `/api/analyze`.
 
-Before `analyzeFood()` sends the image, resize it to max 1024px on the longest side using the Canvas API. Images already smaller than 1024px are untouched.
+### 2. Reduce client-side resize threshold (index.html)
 
-```javascript
-async function resizeImageForUpload(dataUrl, mimeType) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const MAX = 1024;
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      if (scale === 1) return resolve(dataUrl); // already small enough
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.src = dataUrl;
-  });
-}
-```
-
-Saves ~40% of image tokens in Call 1.
+A resize already exists in `onImageSelected()` at line 3107: `const MAX = 1200` at JPEG quality 0.8. Change `MAX` from `1200` to `1024`. No new function needed. Images ≤1024px on the longest side are untouched. Post-resize images are always JPEG regardless of input format (this is already the case — `capturedMime` is hardcoded to `'image/jpeg'`).
 
 ## Files Changed
 
-- `food-logger/server.js` — `/api/analyze` endpoint
-  - Remove Call 2 entirely
-  - Update Call 1 system prompt to include `dish_name` instructions
-  - Update user message JSON schema to include `dish_name` at top level
-  - Parse `dish_name` from response JSON
-  - Update response: `res.json({ foodName: data.dish_name, ...totals })`
+- `food-logger/server.js` — `/api/analyze` endpoint only
+  - Update system prompt: add `dish_name` instructions
+  - Update user message JSON template to include `dish_name` at top level
+  - Update parser: match `{...}` instead of `[...]`, extract `items` and `dish_name`
+  - Remove Call 2 entirely (lines ~307–320)
+  - Response: `res.json({ foodName: dishName, ...totals })`
 
-- `food-logger/public/index.html` — `analyzeFood()` function
-  - Add `resizeImageForUpload()` helper
-  - Call it before sending `capturedImageBase64` to server
+- `food-logger/public/index.html` — `onImageSelected()` only
+  - Change `const MAX = 1200` → `const MAX = 1024`
 
-## Expected Token Savings
+## Expected Token Savings (estimates)
 
-| Before | After | Saved |
-|--------|-------|-------|
-| Call 1: ~2100 | Call 1: ~1300 | ~800 (image resize) |
-| Call 2: ~1550 | Eliminated | ~1550 |
-| **Total: ~3650** | **~1300** | **~64%** |
+| | Before | After | Saved |
+|---|---|---|---|
+| Image tokens (per call) | ~1000 | ~650 (smaller image) | ~350 |
+| Call 1 total | ~2100 | ~1350 | ~750 |
+| Call 2 total | ~1550 | eliminated | ~1550 |
+| **Per request** | **~3650** | **~1350** | **~63%** |
+
+Numbers are estimates based on reported token counts. Actual savings depend on image content and size.
+
+## UX Impact
+
+Single call instead of two sequential calls. Response latency profile changes: one slightly longer wait instead of two shorter ones. Total wait time is shorter overall. No change to UI flow.
 
 ## Verification
 
-1. Upload an image → verify dish name appears
-2. Verify nutritional values are still correct
-3. Check Railway logs for token counts — should be ~1200-1400 per request
+1. Upload a food image → verify dish name appears correctly
+2. Verify nutritional values are correct
+3. Check Railway logs — token count should be ~1200-1500 per request (down from ~3650)

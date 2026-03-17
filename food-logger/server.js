@@ -212,7 +212,8 @@ app.post('/auth/change-password', auth, async (req, res) => {
 
 // ─── Hebrew name sanitizer ────────────────────────────────────────────────────
 async function ensureHebrewFoodName(name) {
-  if (!name || !/[a-zA-Z]/.test(name)) return name;
+  // detect Latin, CJK (Chinese/Japanese/Korean), Arabic, or other non-Hebrew foreign scripts
+  if (!name || !/[a-zA-Z\u4E00-\u9FFF\u3040-\u30FF\u0600-\u06FF]/.test(name)) return name;
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -279,7 +280,8 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    res.json({ foodName: nameMatch[1].trim(), ...totals });
+    const foodName = await ensureHebrewFoodName(nameMatch[1].trim());
+    res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח התמונה' });

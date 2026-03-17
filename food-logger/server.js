@@ -261,7 +261,8 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
 הנחות:
 - מנת מסעדה: הכל גדול יותר ממה שנראה, שמן/חמאה נסתרים תמיד נכללים.
 - אל תעגל לעשרות/מאות — חשב מדויק (למשל 187 ולא 200).
-- שמות בעברית מדוברת ישראלית בלבד — אותיות עבריות בלבד, אסור בשום פנים להשתמש בתווים מכל שפה אחרת.`,
+- שמות מרכיבים בעברית מדוברת ישראלית בלבד — אותיות עבריות בלבד.
+- dish_name: תיאור המנה בעברית מדוברת עד 10 מילים, לפי הקשר המנה המלא, ללא "בצלחת יש", ללא מידת עשייה.`,
       messages: [{
         role: 'user',
         content: [
@@ -271,24 +272,26 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `זהה כל מרכיב בנפרד ופרק למרכיבים ספציפיים. השב עם JSON array בלבד, ללא markdown, ללא הסבר:\n[{"name":"שם בעברית","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nweight_g קודם — אז חשב קלוריות לפי weight_g בלבד.`
+            text: `זהה כל מרכיב בנפרד. השב עם JSON object בלבד, ללא markdown:\n{"dish_name":"תיאור המנה","items":[{"name":"שם בעברית","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]}\nweight_g קודם — אז חשב קלוריות לפי weight_g בלבד.`
           }
         ]
       }]
     });
 
     const raw = message.content[0].text.trim();
-    const arrMatch = raw.match(/\[[\s\S]*\]/);
-    if (!arrMatch) {
-      console.error('[analyze] no array found:', raw);
-      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
-    }
-    let items;
-    try { items = JSON.parse(arrMatch[0]); }
-    catch (parseErr) {
+    let parsed;
+    try {
+      const objMatch = raw.match(/\{[\s\S]*\}/);
+      if (objMatch) parsed = JSON.parse(objMatch[0]);
+    } catch (parseErr) {
       console.error('[analyze] JSON parse error:', parseErr.message, '\nraw:', raw);
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
+    if (!parsed) {
+      console.error('[analyze] no JSON object found:', raw);
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
+    const items = parsed.items;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
@@ -302,22 +305,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    // second call: describe the image directly in Hebrew
-    const nameMsg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 60,
-      temperature: 0.3,
-      system: 'תאר את המנה בעברית מדוברת, עד 10 מילים. השתמש בהקשר של כלל המנה לזיהוי נכון — אם יש אצות ואבוקדו זה כנראה סושי/סשימי, אם יש בצק עלים עם בשר זה כנראה וולינגטון. אל תתאר מידת עשייה. פלט תיאור בלבד, ללא "בצלחת יש".',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
-          { type: 'text', text: 'מה המנה?' }
-        ]
-      }]
-    });
-    const nameText = nameMsg.content.find(b => b.type === 'text')?.text || '';
-    const foodName = nameText.trim() || 'מנה';
+    const foodName = (parsed.dish_name || '').trim() || 'מנה';
     res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);

@@ -310,11 +310,11 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60,
       temperature: 0.3,
-      system: `קבל רשימת מרכיבים ותאר מה יש בצלחת בעברית. עד 2 שורות. פלט תיאור בלבד, ללא הסבר.`,
-      messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nשם המנה:` }]
+      system: `קבל רשימת מרכיבים ותאר בקצרה מה רואים בצלחת — משפט אחד או שניים, בכלליות. אל תפרט כל מרכיב. פלט תיאור בלבד, עברית בלבד.`,
+      messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nתיאור:` }]
     });
     const nameText = nameMsg.content.find(b => b.type === 'text')?.text || '';
-    const foodName = nameText.trim().split('\n').slice(0, 2).join('\n').trim() || 'מנה';
+    const foodName = nameText.trim() || 'מנה';
     res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);

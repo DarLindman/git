@@ -159,6 +159,20 @@ body::after {
   display: flex;
   animation: screenEnter var(--dur-mid) var(--ease-out) both;
 }
+@keyframes screenSlideInRight {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes screenSlideInLeft {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.screen-enter-right {
+  animation: screenSlideInRight 250ms var(--ease-out) both;
+}
+.screen-enter-left {
+  animation: screenSlideInLeft 250ms var(--ease-out) both;
+}
 
 /* ════════════════════════════════════════
    WELCOME
@@ -2486,6 +2500,7 @@ input::placeholder { color: var(--muted); }
 // Config & State
 // ════════════════════════════════════════════════════
 const API = ''; // Same origin
+const SCREEN_ORDER = ['welcome','auth','dashboard','home','camera','analysis','stats','weight','settings'];
 let token = localStorage.getItem('fl_token');
 let username = localStorage.getItem('fl_username');
 let currentScreen = 'auth';
@@ -2953,8 +2968,16 @@ function setPetState(wrapEl, state) {
 
 function navigate(screen) {
   if (currentScreen === 'analysis') hideCapyPopup();
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(`screen-${screen}`).classList.add('active');
+  document.querySelectorAll('.screen').forEach(s =>
+    s.classList.remove('active', 'screen-enter-right', 'screen-enter-left')
+  );
+  const el = document.getElementById(`screen-${screen}`);
+  el.classList.add('active');
+  const from = SCREEN_ORDER.indexOf(currentScreen);
+  const to   = SCREEN_ORDER.indexOf(screen);
+  if (from !== -1 && to !== -1 && from !== to) {
+    el.classList.add(to > from ? 'screen-enter-right' : 'screen-enter-left');
+  }
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navEl = document.getElementById(`nav-${screen}`);
   if (navEl) navEl.classList.add('active');

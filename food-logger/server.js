@@ -450,12 +450,12 @@ app.get('/api/streak', auth, async (req, res) => {
       [req.user.id]
     );
     const days = rows.map(r => r.day); // already 'YYYY-MM-DD' strings
-    if (!days.length) return res.json({ streak: 0 });
+    if (!days.length) return res.json({ streak: 0, lastLogDate: null });
     // Use Israel timezone to match how the frontend stores logged_at (local time sent as-is)
     const toIsraelDate = (d) => d.toLocaleString('sv', { timeZone: 'Asia/Jerusalem' }).slice(0, 10);
     const today = toIsraelDate(new Date());
     const yesterday = toIsraelDate(new Date(Date.now() - 86400000));
-    if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0 });
+    if (days[0] !== today && days[0] !== yesterday) return res.json({ streak: 0, lastLogDate: days[0] });
     let streak = 0;
     let expected = days[0];
     for (const day of days) {
@@ -466,7 +466,13 @@ app.get('/api/streak', auth, async (req, res) => {
       d.setUTCDate(d.getUTCDate() - 1);
       expected = d.toISOString().slice(0, 10);
     }
-    res.json({ streak });
+    // Get the most recent log date
+    const lastRow = await pool.query(
+      `SELECT MAX(logged_at::date) AS last_date FROM food_logs WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const lastLogDate = lastRow.rows[0]?.last_date ?? null;
+    res.json({ streak, lastLogDate });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאת שרת' });

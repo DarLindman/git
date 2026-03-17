@@ -3505,7 +3505,7 @@ async function saveEntry() {
     diaryDate = todayStr();
     showCapyPopup();
     spawnConfetti();
-    navigate('home');
+    setTimeout(() => navigate('home'), 2500);
     showToast('✅ נשמר ביומן!');
     capturedImageBase64 = null;
     document.getElementById('preview-img').style.display = 'none';

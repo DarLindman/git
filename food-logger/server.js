@@ -286,8 +286,6 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
     // second call: generate natural Hebrew dish name from raw ingredient list
     const ingredientList = rawItemNames.join(', ');
-    console.log('[analyze] rawItemNames:', rawItemNames);
-    console.log('[analyze] ingredientList:', ingredientList);
     const nameMsg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 40,
@@ -295,10 +293,8 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       system: 'אתה מומחה לשמות מאכלים ישראליים. קבל רשימת מרכיבים והחזר שם מנה קצר בעברית מדוברת ישראלית, כפי שישראלי ממוצע היה אומר בפה. שם אחד בלבד, ללא הסבר, ללא פיסוק מיותר.',
       messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nשם המנה:` }]
     });
-    console.log('[analyze] nameMsg content:', JSON.stringify(nameMsg.content));
     const nameText = nameMsg.content.find(b => b.type === 'text')?.text || '';
     const foodName = nameText.trim().split('\n')[0].trim() || 'מנה';
-    console.log('[analyze] foodName:', foodName);
     res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);

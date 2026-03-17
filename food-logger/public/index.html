@@ -1356,7 +1356,8 @@ input::placeholder { color: var(--muted); }
   font-size: 14px;
   padding: 12px 14px;
   resize: none;
-  height: 72px;
+  overflow: hidden;
+  min-height: 72px;
   margin-bottom: 10px;
   direction: rtl;
 }
@@ -3756,6 +3757,7 @@ if (token) {
 document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('reg-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
 document.getElementById('res-name').addEventListener('input', function() { autoResizeTextarea(this); });
+document.getElementById('food-text-input').addEventListener('input', function() { autoResizeTextarea(this); });
 </script>
 </body>
 </html>

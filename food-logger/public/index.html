@@ -46,6 +46,74 @@
   --dur-slow:    400ms;
 }
 
+/* ── Capybara pet ───────────────────────────────── */
+.pet-wrap {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+}
+.pet-wrap svg { display: block; overflow: visible; }
+
+@keyframes pet-breathe {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.025); }
+}
+.pet-wrap {
+  animation: pet-breathe 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes pet-tap {
+  0%   { transform: scale(1) translateY(0); }
+  30%  { transform: scale(1.08) translateY(-6px); }
+  60%  { transform: scale(0.95) translateY(2px); }
+  100% { transform: scale(1) translateY(0); }
+}
+.pet-wrap.tapped {
+  animation: pet-tap 0.4s var(--ease-spring) forwards;
+}
+
+/* default (neutral) state — flat eyes, flat mouth */
+.pet-eyes-arc,
+.pet-eyes-closed,
+.pet-eyes-happy,
+.pet-mouth-grin,
+.pet-mouth-frown,
+.pet-blush,
+.pet-brow-sad,
+.pet-tear,
+.pet-zzz { display: none; }
+
+.pet-eyes-neutral { display: inline; }
+.pet-mouth-neutral { display: inline; }
+
+/* happy */
+.pet--happy .pet-eyes-neutral { display: none; }
+.pet--happy .pet-eyes-happy   { display: inline; }
+.pet--happy .pet-mouth-neutral { display: none; }
+.pet--happy .pet-mouth-grin   { display: inline; }
+
+/* ecstatic */
+.pet--ecstatic .pet-eyes-neutral  { display: none; }
+.pet--ecstatic .pet-eyes-arc      { display: inline; }
+.pet--ecstatic .pet-mouth-neutral { display: none; }
+.pet--ecstatic .pet-mouth-grin    { display: inline; }
+.pet--ecstatic .pet-blush         { display: inline; }
+
+/* sad */
+.pet--sad .pet-eyes-neutral  { display: none; }
+.pet--sad .pet-eyes-happy    { display: inline; }
+.pet--sad .pet-brow-sad      { display: inline; }
+.pet--sad .pet-mouth-neutral { display: none; }
+.pet--sad .pet-mouth-frown   { display: inline; }
+.pet--sad .pet-tear          { display: inline; }
+
+/* sleeping */
+.pet--sleeping .pet-eyes-neutral { display: none; }
+.pet--sleeping .pet-eyes-closed  { display: inline; }
+.pet--sleeping .pet-mouth-neutral { display: none; }
+.pet--sleeping .pet-zzz          { display: inline; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 body {
@@ -2762,6 +2830,45 @@ function autoResizeTextarea(el) {
   el.style.height = el.scrollHeight + 'px';
 }
 
+// ── Capybara pet helpers ─────────────────────────
+function cloneCapybara(size) {
+  const tpl = document.getElementById('capy-tpl');
+  const wrap = document.createElement('div');
+  wrap.className = 'pet-wrap';
+  const svg = tpl.content.querySelector('svg').cloneNode(true);
+  if (size) { svg.setAttribute('width', size); svg.setAttribute('height', Math.round(size * 0.91)); }
+  wrap.appendChild(svg);
+  wrap.addEventListener('click', () => {
+    wrap.classList.remove('tapped');
+    void wrap.offsetWidth; // force reflow
+    wrap.classList.add('tapped');
+    wrap.addEventListener('animationend', () => wrap.classList.remove('tapped'), { once: true });
+  });
+  return wrap;
+}
+
+function getPetState(pct, hasLoggedToday, hasLoggedYesterday, daysSinceLastLog) {
+  if (daysSinceLastLog >= 3) return 'sleeping';
+  if (!hasLoggedToday && !hasLoggedYesterday) return 'sad';
+  if (!hasLoggedToday) return 'neutral';
+  if (pct >= 1.0) return 'ecstatic';
+  return 'happy';
+}
+
+const PET_MESSAGES = {
+  ecstatic: name => `כל הכבוד ${name}! הגעת ליעד! 🎉`,
+  happy:    name => `כן ${name}, ככה זה! המשך כך 😊`,
+  neutral:  name => `עוד לא רשמת היום 😐`,
+  sad:      name => `פספסנו אתמול... נתחיל מחדש? 😢`,
+  sleeping: name => `כמה זמן לא ראיתי אותך ${name} 🥺`,
+};
+
+function setPetState(wrapEl, state) {
+  ['ecstatic','happy','neutral','sad','sleeping'].forEach(s =>
+    wrapEl.classList.toggle(`pet--${s}`, s === state)
+  );
+}
+
 function navigate(screen) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(`screen-${screen}`).classList.add('active');
@@ -3759,5 +3866,92 @@ document.getElementById('reg-pass').addEventListener('keydown', e => { if (e.key
 document.getElementById('res-name').addEventListener('input', function() { autoResizeTextarea(this); });
 document.getElementById('food-text-input').addEventListener('input', function() { autoResizeTextarea(this); });
 </script>
+<template id="capy-tpl">
+  <svg width="80" height="73" viewBox="0 0 110 100" xmlns="http://www.w3.org/2000/svg">
+    <!-- body -->
+    <ellipse cx="55" cy="68" rx="38" ry="24" fill="#C4956A"/>
+    <ellipse cx="55" cy="72" rx="26" ry="15" fill="#e8c89a"/>
+    <!-- head -->
+    <rect x="25" y="26" width="60" height="46" rx="18" fill="#C4956A"/>
+    <!-- snout -->
+    <rect x="34" y="44" width="42" height="22" rx="12" fill="#b07d50"/>
+    <!-- ears -->
+    <circle cx="30" cy="28" r="9" fill="#C4956A"/>
+    <circle cx="30" cy="28" r="5" fill="#e0a87a"/>
+    <circle cx="80" cy="28" r="9" fill="#C4956A"/>
+    <circle cx="80" cy="28" r="5" fill="#e0a87a"/>
+    <!-- legs -->
+    <ellipse cx="28" cy="90" rx="10" ry="7" fill="#C4956A"/>
+    <ellipse cx="45" cy="92" rx="10" ry="6" fill="#C4956A"/>
+    <ellipse cx="65" cy="92" rx="10" ry="6" fill="#C4956A"/>
+    <ellipse cx="82" cy="90" rx="10" ry="7" fill="#C4956A"/>
+    <!-- nostrils -->
+    <ellipse cx="47" cy="56" rx="3" ry="2" fill="#8B5E35"/>
+    <ellipse cx="63" cy="56" rx="3" ry="2" fill="#8B5E35"/>
+
+    <!-- NEUTRAL eyes (default) -->
+    <g class="pet-eyes-neutral">
+      <circle cx="32" cy="36" r="5" fill="#2d1a0a"/>
+      <circle cx="32" cy="36" r="3.5" fill="#1a1a1a"/>
+      <circle cx="31" cy="35" r="1" fill="white"/>
+      <circle cx="78" cy="36" r="5" fill="#2d1a0a"/>
+      <circle cx="78" cy="36" r="3.5" fill="#1a1a1a"/>
+      <circle cx="77" cy="35" r="1" fill="white"/>
+    </g>
+
+    <!-- HAPPY eyes (round with shine) -->
+    <g class="pet-eyes-happy">
+      <circle cx="32" cy="36" r="5.5" fill="#2d1a0a"/>
+      <circle cx="32" cy="36" r="4" fill="#1a1a1a"/>
+      <circle cx="30" cy="34" r="1.5" fill="white"/>
+      <circle cx="78" cy="36" r="5.5" fill="#2d1a0a"/>
+      <circle cx="78" cy="36" r="4" fill="#1a1a1a"/>
+      <circle cx="76" cy="34" r="1.5" fill="white"/>
+    </g>
+
+    <!-- ECSTATIC eyes (^_^ arcs upward) -->
+    <g class="pet-eyes-arc">
+      <path d="M 26 36 Q 32 30 38 36" stroke="#2d1a0a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 72 36 Q 78 30 84 36" stroke="#2d1a0a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- SLEEPING eyes (closed — arcs downward, different from ecstatic) -->
+    <g class="pet-eyes-closed">
+      <path d="M 26 34 Q 32 40 38 34" stroke="#2d1a0a" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M 72 34 Q 78 40 84 34" stroke="#2d1a0a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- blush (ecstatic only) -->
+    <g class="pet-blush">
+      <ellipse cx="32" cy="43" rx="7" ry="4" fill="#E8703A" opacity="0.35"/>
+      <ellipse cx="78" cy="43" rx="7" ry="4" fill="#E8703A" opacity="0.35"/>
+    </g>
+
+    <!-- sad brows -->
+    <g class="pet-brow-sad">
+      <path d="M 26 32 Q 32 35 38 32" stroke="#6a3a10" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M 72 32 Q 78 35 84 32" stroke="#6a3a10" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- teardrop -->
+    <g class="pet-tear">
+      <ellipse cx="26" cy="46" rx="2" ry="3.5" fill="#93c5fd" opacity="0.7"/>
+    </g>
+
+    <!-- NEUTRAL mouth (flat line) -->
+    <line class="pet-mouth-neutral" x1="44" y1="63" x2="66" y2="63" stroke="#8B5E35" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- HAPPY/ECSTATIC mouth (smile) -->
+    <path class="pet-mouth-grin" d="M 40 60 Q 55 70 70 60" stroke="#8B5E35" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+    <!-- SAD mouth (frown) -->
+    <path class="pet-mouth-frown" d="M 43 65 Q 55 59 67 65" stroke="#6a3a10" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- ZZZ (sleeping) -->
+    <text class="pet-zzz" x="68" y="28" font-size="10" fill="#8B6B4A" opacity="0.8" font-family="sans-serif">z</text>
+    <text class="pet-zzz" x="74" y="20" font-size="13" fill="#8B6B4A" opacity="0.6" font-family="sans-serif">z</text>
+    <text class="pet-zzz" x="82" y="13" font-size="9"  fill="#8B6B4A" opacity="0.4" font-family="sans-serif">z</text>
+  </svg>
+</template>
 </body>
 </html>

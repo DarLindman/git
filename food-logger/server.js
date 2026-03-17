@@ -238,8 +238,9 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      system: 'אתה מנתח תזונה מדויק למשתמשים ישראלים. זהה כל מרכיב בתמונה בנפרד (בשר, לחם, פירה, רוטב, שמן וכו\'). לכל מרכיב — קבע weight_g קודם ורק אחר כך חשב ערכים תזונתיים עקביים עמו. הנח מנת מסעדה: שמן/חמאה בבישול, רטבים, תוספות — הכל כלול. אל תמעיט. שמות בעברית תקנית בלבד — אפס אנגלית, אפס לטינית.',
+      max_tokens: 700,
+      temperature: 0,
+      system: 'אתה מנתח תזונה. זהה כל מרכיב בתמונה בנפרד. לכל מרכיב קבע weight_g קודם ואז חשב ערכים עקביים. הנח מנת מסעדה: שמן, חמאה, רטבים — הכל כלול. אל תמעיט. שמות בעברית מדוברת ישראלית יומיומית — כפי שישראלי ממוצע אומר את זה בפה, לא תרגום מילולי מאנגלית. דוגמאות: "פירה" ולא "תפוח אדמה מעוך", "צ\'יפס" ולא "תפוחי אדמה מטוגנים", "שניצל" ולא "פרגית מטוגנת בפירורי לחם".',
       messages: [{
         role: 'user',
         content: [
@@ -249,34 +250,36 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `זהה את האוכל בתמונה ופרק לכל מרכיב בנפרד. השב עם JSON בלבד, ללא markdown, ללא הסבר:\n{"foodName":"שם כולל בעברית","items":[{"name":"שם מרכיב","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]}\nקבע weight_g לכל מרכיב קודם, ואז חשב ערכיו בהתאם. כל הערכים מספרים. שמות בעברית תקנית בלבד.`
+            text: `זהה את האוכל ופרק למרכיבים. השב בפורמט הבא בלבד, ללא markdown:\nFOOD_NAME: שם כולל בעברית\n[{"name":"שם","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]`
           }
         ]
       }]
     });
 
-    const text = message.content[0].text.trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
-    let data;
-    try {
-      data = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.error('JSON parse error:', parseErr.message, '\nClaude raw output:', text);
+    const raw = message.content[0].text.trim();
+    const nameMatch = raw.match(/FOOD_NAME:\s*(.+)/);
+    const arrMatch = raw.match(/\[[\s\S]*\]/);
+    if (!nameMatch || !arrMatch) {
+      console.error('[analyze] unexpected format:', raw);
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
-    if (!Array.isArray(data.items) || data.items.length === 0) {
+    let items;
+    try { items = JSON.parse(arrMatch[0]); }
+    catch (parseErr) {
+      console.error('[analyze] JSON parse error:', parseErr.message, '\nraw:', raw);
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
-    const totals = data.items.reduce((acc, item) => ({
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
+    }
+    const totals = items.reduce((acc, item) => ({
       calories:  acc.calories  + (Number(item.calories)  || 0),
       protein_g: acc.protein_g + (Number(item.protein_g) || 0),
       carbs_g:   acc.carbs_g   + (Number(item.carbs_g)   || 0),
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    data.foodName = await ensureHebrewFoodName(data.foodName);
-    res.json({ foodName: data.foodName, ...totals });
+    res.json({ foodName: nameMatch[1].trim(), ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח התמונה' });

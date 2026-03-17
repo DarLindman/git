@@ -239,7 +239,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 700,
+      max_tokens: 1000,
       temperature: 0.3,
       system: 'אתה מנתח תזונה. זהה כל מרכיב בתמונה בנפרד. לכל מרכיב קבע weight_g קודם ואז חשב ערכים עקביים. הנח מנת מסעדה: שמן, חמאה, רטבים — הכל כלול. אל תמעיט. שמות בעברית מדוברת ישראלית בלבד — אותיות עבריות בלבד, דקדוק תקין, אסור בשום פנים להשתמש בתווים מכל שפה אחרת (אנגלית, סינית, ערבית, יפנית וכו\'). דוגמאות: "פירה" ולא "תפוח אדמה מעוך", "צ\'יפס" ולא "תפוחי אדמה מטוגנים", "חרדל" ולא 芥末, "עטוף בבצק" ולא "בעטוף בצק".',
       messages: [{
@@ -251,17 +251,16 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `זהה את האוכל ופרק למרכיבים. השב בפורמט הבא בלבד, ללא markdown:\nFOOD_NAME: שם כולל בעברית\n[{"name":"שם","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]`
+            text: `זהה את האוכל ופרק למרכיבים. השב עם JSON array בלבד, ללא markdown, ללא הסבר:\n[{"name":"שם בעברית","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]`
           }
         ]
       }]
     });
 
     const raw = message.content[0].text.trim();
-    const nameMatch = raw.match(/FOOD_NAME:\s*(.+)/);
     const arrMatch = raw.match(/\[[\s\S]*\]/);
-    if (!nameMatch || !arrMatch) {
-      console.error('[analyze] unexpected format:', raw);
+    if (!arrMatch) {
+      console.error('[analyze] no array found:', raw);
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
     let items;
@@ -273,6 +272,9 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
+    // strip any non-Hebrew chars from item names (defensive)
+    const cleanHebrew = s => (s || '').replace(/[^\u0590-\u05FF\s\d\-'"(),./]/g, '').replace(/\s{2,}/g, ' ').trim();
+    items.forEach(item => { item.name = cleanHebrew(item.name); });
     const totals = items.reduce((acc, item) => ({
       calories:  acc.calories  + (Number(item.calories)  || 0),
       protein_g: acc.protein_g + (Number(item.protein_g) || 0),
@@ -280,8 +282,18 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    const foodName = await ensureHebrewFoodName(nameMatch[1].trim());
-    res.json({ foodName, ...totals });
+    // build food name from top items by calories — never relies on model for name
+    const topNames = [...items]
+      .sort((a, b) => (Number(b.calories) || 0) - (Number(a.calories) || 0))
+      .slice(0, 4)
+      .map(i => i.name)
+      .filter(Boolean);
+    const foodName = topNames.length <= 1
+      ? (topNames[0] || 'מנה')
+      : topNames.length === 2
+        ? `${topNames[0]} עם ${topNames[1]}`
+        : `${topNames.slice(0, -1).join(', ')} ו${topNames[topNames.length - 1]}`;
+    res.json({ foodName: foodName || 'מנה', ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח התמונה' });

@@ -308,9 +308,9 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     const ingredientList = rawItemNames.join(', ');
     const nameMsg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 40,
+      max_tokens: 60,
       temperature: 0.3,
-      system: `קבל רשימת מרכיבים והחזר שם תיאורי קצר (עד 6 מילים) בעברית.
+      system: `קבל רשימת מרכיבים והחזר שם תיאורי בעברית — עד 5 מילים למנה פשוטה, עד 10 מילים אם יש הרבה מרכיבים.
 כללים:
 - אם יש שם מנה מוכר שמתאים בדיוק — השתמש בו: "שניצל עוף", "פסטה קרבונרה", "וולינגטון", "ריזוטו", "קיש"
 - אחרת — תאר לפי המרכיבים הספציפיים: "פילה דג עם פירה וסלט", "כבדי עוף עם בצל מטוגן", "ביצים עם גבינה ועגבניות"

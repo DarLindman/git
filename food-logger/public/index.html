@@ -1040,6 +1040,25 @@ input::placeholder { color: var(--muted); }
 }
 .cal-goal-fill.over { background: #f87171; }
 
+/* Calorie goal glow animations */
+@keyframes goal-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0px var(--accent-glow); }
+  50%       { box-shadow: 0 0 10px 2px var(--accent-glow); }
+}
+@keyframes goal-done-bounce {
+  0%   { transform: scaleY(1); }
+  40%  { transform: scaleY(1.5); }
+  70%  { transform: scaleY(0.9); }
+  100% { transform: scaleY(1); }
+}
+.cal-goal-fill--half {
+  animation: goal-glow-pulse 1.5s ease-in-out 2;
+}
+.cal-goal-fill--done {
+  background: #5a9e3a !important;
+  animation: goal-done-bounce 0.5s var(--ease-spring), goal-glow-pulse 1.5s ease-in-out 3 0.5s;
+}
+
 /* ════════════════════════════════════════
    DONUT CHART (dynamically injected)
 ════════════════════════════════════════ */
@@ -3265,6 +3284,11 @@ function renderDailySummary(entries) {
     const fill = document.getElementById('cal-goal-fill');
     fill.style.width = `${Math.min(pct, 100)}%`;
     fill.className = 'cal-goal-fill' + (isOver ? ' over' : '');
+    // Add glow milestone animations
+    fill.classList.remove('cal-goal-fill--half', 'cal-goal-fill--done');
+    void fill.offsetWidth; // force reflow to restart animation if class is re-added
+    if (pct >= 100) fill.classList.add('cal-goal-fill--done');
+    else if (pct >= 50) fill.classList.add('cal-goal-fill--half');
   } else {
     goalSection.style.display = 'none';
   }

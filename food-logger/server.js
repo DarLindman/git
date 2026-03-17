@@ -282,18 +282,17 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    // build food name from top items by calories — never relies on model for name
-    const topNames = [...items]
-      .sort((a, b) => (Number(b.calories) || 0) - (Number(a.calories) || 0))
-      .slice(0, 4)
-      .map(i => i.name)
-      .filter(Boolean);
-    const foodName = topNames.length <= 1
-      ? (topNames[0] || 'מנה')
-      : topNames.length === 2
-        ? `${topNames[0]} עם ${topNames[1]}`
-        : `${topNames.slice(0, -1).join(', ')} ו${topNames[topNames.length - 1]}`;
-    res.json({ foodName: foodName || 'מנה', ...totals });
+    // second call: generate natural Hebrew dish name from ingredient list
+    const ingredientList = items.map(i => i.name).filter(Boolean).join(', ');
+    const nameMsg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 25,
+      temperature: 0,
+      system: 'אתה מומחה לשמות מאכלים ישראליים. קבל רשימת מרכיבים והחזר שם מנה קצר בעברית מדוברת ישראלית, כפי שישראלי ממוצע היה אומר בפה. שם אחד בלבד, ללא הסבר, ללא פיסוק מיותר.',
+      messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nשם המנה:` }]
+    });
+    const foodName = nameMsg.content[0].text.trim().split('\n')[0].trim() || 'מנה';
+    res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח התמונה' });

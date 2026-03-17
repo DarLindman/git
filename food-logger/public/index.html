@@ -3139,7 +3139,7 @@ async function analyzeText() {
     const data = await apiFetch('/api/analyze-text', { method: 'POST', body: JSON.stringify({ text }) });
     const resName = document.getElementById('res-name');
     resName.value = data.foodName || '';
-    autoResizeTextarea(resName);
+    requestAnimationFrame(() => autoResizeTextarea(resName));
     document.getElementById('res-cal').value = (+data.calories || 0).toFixed(1);
     document.getElementById('res-pro').value = (+data.protein_g || 0).toFixed(1);
     document.getElementById('res-carb').value = (+data.carbs_g || 0).toFixed(1);

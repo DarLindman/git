@@ -240,7 +240,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
-      temperature: 0.3,
+      temperature: 0,
       system: 'אתה מנתח תזונה. זהה כל מרכיב בתמונה בנפרד. לכל מרכיב קבע weight_g קודם ואז חשב ערכים עקביים. הנח מנת מסעדה: שמן, חמאה, רטבים — הכל כלול. אל תמעיט. שמות בעברית מדוברת ישראלית בלבד — אותיות עבריות בלבד, דקדוק תקין, אסור בשום פנים להשתמש בתווים מכל שפה אחרת (אנגלית, סינית, ערבית, יפנית וכו\'). דוגמאות: "פירה" ולא "תפוח אדמה מעוך", "צ\'יפס" ולא "תפוחי אדמה מטוגנים", "חרדל" ולא 芥末, "עטוף בבצק" ולא "בעטוף בצק".',
       messages: [{
         role: 'user',
@@ -272,7 +272,9 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
-    // strip any non-Hebrew chars from item names (defensive)
+    // save raw names before cleaning (needed for dish name generation)
+    const rawItemNames = items.map(i => i.name).filter(Boolean);
+    // strip any non-Hebrew chars from item names (defensive, for display)
     const cleanHebrew = s => (s || '').replace(/[^\u0590-\u05FF\s\d\-'"(),./]/g, '').replace(/\s{2,}/g, ' ').trim();
     items.forEach(item => { item.name = cleanHebrew(item.name); });
     const totals = items.reduce((acc, item) => ({
@@ -282,11 +284,11 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    // second call: generate natural Hebrew dish name from ingredient list
-    const ingredientList = items.map(i => i.name).filter(Boolean).join(', ');
+    // second call: generate natural Hebrew dish name from raw ingredient list
+    const ingredientList = rawItemNames.join(', ');
     const nameMsg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 25,
+      max_tokens: 40,
       temperature: 0,
       system: 'אתה מומחה לשמות מאכלים ישראליים. קבל רשימת מרכיבים והחזר שם מנה קצר בעברית מדוברת ישראלית, כפי שישראלי ממוצע היה אומר בפה. שם אחד בלבד, ללא הסבר, ללא פיסוק מיותר.',
       messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nשם המנה:` }]

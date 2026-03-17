@@ -292,8 +292,6 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(500).json({ error: 'לא ניתן לנתח את תגובת ה-AI' });
     }
-    // save raw names before cleaning (needed for dish name generation)
-    const rawItemNames = items.map(i => i.name).filter(Boolean);
     // strip any non-Hebrew chars from item names (defensive, for display)
     const cleanHebrew = s => (s || '').replace(/[^\u0590-\u05FF\s\d\-'"(),./]/g, '').replace(/\s{2,}/g, ' ').trim();
     items.forEach(item => { item.name = cleanHebrew(item.name); });
@@ -304,15 +302,19 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    // second call: generate dish description from top 3 ingredients by weight
-    const topItems = [...items].sort((a, b) => (b.weight_g || 0) - (a.weight_g || 0)).slice(0, 3);
-    const ingredientList = topItems.map(i => rawItemNames[items.indexOf(i)]).filter(Boolean).join(', ');
+    // second call: describe the image directly in Hebrew
     const nameMsg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60,
       temperature: 0.3,
-      system: `קבל רשימת מרכיבים ותאר בקצרה מה רואים בצלחת — משפט אחד או שניים, בכלליות. אל תפרט כל מרכיב. פלט תיאור בלבד, עברית בלבד.`,
-      messages: [{ role: 'user', content: `מרכיבים: ${ingredientList}\nתיאור:` }]
+      system: 'תאר בקצרה מה אתה רואה בצלחת — משפט אחד או שניים בעברית. פלט תיאור בלבד.',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+          { type: 'text', text: 'מה יש בצלחת?' }
+        ]
+      }]
     });
     const nameText = nameMsg.content.find(b => b.type === 'text')?.text || '';
     const foodName = nameText.trim() || 'מנה';

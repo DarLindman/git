@@ -2757,10 +2757,8 @@ function animatePlaceholder() {
 }
 
 function autoResizeTextarea(el) {
-  requestAnimationFrame(() => {
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  });
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
 }
 
 function navigate(screen) {

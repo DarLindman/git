@@ -271,7 +271,7 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
           },
           {
             type: 'text',
-            text: `הסתכל היטב על כל מה שבתמונה. כתוב שורה קצרה על מה אתה רואה, ואז כתוב JSON array:\n[{"name":"שם בעברית","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nללא markdown. weight_g קודם — אז חשב קלוריות לפי weight_g בלבד.`
+            text: `זהה כל מרכיב בנפרד ופרק למרכיבים ספציפיים. השב עם JSON array בלבד, ללא markdown, ללא הסבר:\n[{"name":"שם בעברית","weight_g":0,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0}]\nweight_g קודם — אז חשב קלוריות לפי weight_g בלבד.`
           }
         ]
       }]

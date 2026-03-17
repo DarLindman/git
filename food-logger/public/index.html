@@ -335,6 +335,37 @@ body::after {
   mix-blend-mode: screen;
 }
 
+.pet-strip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 14px;
+  background: rgba(232,112,58,0.05);
+  border-bottom: 1px solid var(--border);
+  direction: rtl;
+}
+.pet-strip .pet-wrap { flex-shrink: 0; }
+
+.pet-bubble {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 4px 12px;
+  padding: 9px 13px;
+  direction: rtl;
+}
+.pet-bubble-name {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.pet-bubble-name strong { color: var(--accent); }
+.pet-bubble-status {
+  font-size: 12px;
+  color: var(--text2);
+}
+
 /* Hero calorie number */
 .dash-hero-cal {
   display: flex;
@@ -2027,11 +2058,15 @@ input::placeholder { color: var(--muted); }
 <div id="screen-dashboard" class="screen">
   <div class="dash-wrap">
 
-    <!-- Greeting -->
-    <div class="dash-greeting-line dash-stagger">
-      <span class="dash-greeting-text" id="dash-greeting">בוקר טוב</span>
-      <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.webm" muted playsinline autoplay loop></video>
+    <!-- Pet strip -->
+    <div class="pet-strip dash-stagger" id="pet-strip">
+      <div class="pet-bubble" id="pet-bubble">
+        <div class="pet-bubble-name">שלום, <strong id="pet-name-label"></strong> 👋</div>
+        <div class="pet-bubble-status" id="pet-status-text">טוען...</div>
+      </div>
+      <div id="pet-dashboard-wrap"></div>
     </div>
+    <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.webm" muted playsinline autoplay loop></video>
 
     <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0,4 Q25,1 50,4 Q75,7 100,4"/>
@@ -3001,13 +3036,11 @@ function stopFireCanvas() {
 // Dashboard
 // ════════════════════════════════════════════════════
 async function loadDashboard() {
-  const h = new Date().getHours();
-  const greeting = h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב';
-  document.getElementById('dash-greeting').textContent = username ? greeting + ', ' + username : greeting;
+  let entries = [], cal = 0, goal = 0;
 
   try {
-    const entries = await apiFetch(`/api/food?date=${todayStr()}`);
-    const { cal, pro, carb, fat, fiber } = entries.reduce(
+    entries = await apiFetch(`/api/food?date=${todayStr()}`);
+    const { cal: c, pro, carb, fat, fiber } = entries.reduce(
       (s, e) => ({
         cal:   s.cal   + (+e.calories  || 0),
         pro:   s.pro   + (+e.protein_g || 0),
@@ -3017,7 +3050,8 @@ async function loadDashboard() {
       }),
       { cal: 0, pro: 0, carb: 0, fat: 0, fiber: 0 }
     );
-    const goal = calcRecommendedCal(userProfile);
+    cal = c;
+    goal = calcRecommendedCal(userProfile);
     const calEl  = document.getElementById('dash-cal-remaining');
     const sepEl  = document.getElementById('dash-cal-sep');
     const goalEl = document.getElementById('dash-cal-goal-label');
@@ -3044,11 +3078,32 @@ async function loadDashboard() {
   } catch {}
 
   try {
-    const { streak } = await apiFetch('/api/streak');
+    const { streak, lastLogDate } = await apiFetch('/api/streak');
     const numEl = document.getElementById('dash-streak-num');
     if (numEl) numEl.textContent = streak ?? '—';
     if (streak >= 1) startFireCanvas();
     else stopFireCanvas();
+
+    // Pet state
+    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const yesterday = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+    const hasLoggedToday = entries && entries.length > 0;
+    const hasLoggedYesterday = lastLogDate === yesterday;
+    const daysSinceLastLog = lastLogDate
+      ? Math.round((new Date(today) - new Date(lastLogDate)) / 86400000)
+      : 999;
+
+    const state = getPetState(cal / (goal || 2000), hasLoggedToday, hasLoggedYesterday, daysSinceLastLog);
+    const wrapEl = document.getElementById('pet-dashboard-wrap');
+    if (wrapEl && !wrapEl.querySelector('svg')) {
+      wrapEl.appendChild(cloneCapybara(80));
+    }
+    const petWrap = wrapEl?.querySelector('.pet-wrap');
+    if (petWrap) setPetState(petWrap, state);
+
+    const petUsername = username || '';
+    document.getElementById('pet-name-label').textContent = petUsername;
+    document.getElementById('pet-status-text').textContent = PET_MESSAGES[state](petUsername);
   } catch {}
 }
 

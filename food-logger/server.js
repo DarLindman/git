@@ -304,8 +304,9 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       fat_g:     acc.fat_g     + (Number(item.fat_g)     || 0),
       fiber_g:   acc.fiber_g   + (Number(item.fiber_g)   || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    // second call: generate natural Hebrew dish name from raw ingredient list
-    const ingredientList = rawItemNames.join(', ');
+    // second call: generate dish description from top 3 ingredients by weight
+    const topItems = [...items].sort((a, b) => (b.weight_g || 0) - (a.weight_g || 0)).slice(0, 3);
+    const ingredientList = topItems.map(i => rawItemNames[items.indexOf(i)]).filter(Boolean).join(', ');
     const nameMsg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60,

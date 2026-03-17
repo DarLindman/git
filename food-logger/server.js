@@ -218,9 +218,12 @@ async function ensureHebrewFoodName(name) {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60,
       temperature: 0,
-      messages: [{ role: 'user', content: `תרגם את שם האוכל הבא לעברית תקנית בלבד. השב בשם בלבד, ללא הסבר, ללא פיסוק נוסף:\n${name}` }]
+      system: 'You are a translator. Output ONLY the translated Hebrew food name. No explanations, no punctuation, no extra words. Just the name.',
+      messages: [{ role: 'user', content: `Translate to Hebrew (food name only, no explanation):\n${name}` }]
     });
-    const translated = msg.content[0].text.trim().replace(/^["']|["']$/g, '');
+    const raw = msg.content[0].text.trim().replace(/^["']|["']$/g, '');
+    // take only the first line in case the model adds explanation
+    const translated = raw.split('\n')[0].trim();
     return translated || name;
   } catch (e) { console.error('ensureHebrewFoodName failed:', e.message); return name; }
 }
@@ -330,7 +333,8 @@ app.post('/api/analyze-text', auth, analyzeLimiter, async (req, res) => {
       fat_g: acc.fat_g + (Number(item.fat_g) || 0),
       fiber_g: acc.fiber_g + (Number(item.fiber_g) || 0),
     }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
-    res.json({ foodName: text.trim(), ...totals });
+    const foodName = await ensureHebrewFoodName(text.trim());
+    res.json({ foodName, ...totals });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'שגיאה בניתוח הטקסט' });

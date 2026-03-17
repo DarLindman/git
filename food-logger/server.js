@@ -307,12 +307,12 @@ app.post('/api/analyze', auth, analyzeLimiter, async (req, res) => {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60,
       temperature: 0.3,
-      system: 'תאר בקצרה מה אתה רואה בצלחת — משפט אחד או שניים בעברית. פלט תיאור בלבד.',
+      system: 'תאר את המנה בעברית יומיומית, עד 10 מילים. רק מילים מוכרות שכל ישראלי מכיר. אל תתחיל ב"בצלחת יש". אל תפרט כל פרט קטן. פלט תיאור בלבד.',
       messages: [{
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
-          { type: 'text', text: 'מה יש בצלחת?' }
+          { type: 'text', text: 'מה המנה?' }
         ]
       }]
     });

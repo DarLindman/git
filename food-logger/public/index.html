@@ -3394,6 +3394,140 @@ async function deleteEntry(id) {
 }
 
 // ════════════════════════════════════════════════════
+// Meal Edit Modal
+// ════════════════════════════════════════════════════
+const _mealEntries = new Map(); // id → entry; used by renderMealList onclick
+
+let _editEntryId     = null;
+let _editOriginalName = '';
+let _editOriginalDate = '';
+let _editNotes        = null;
+let _editAnalyzing    = false;
+
+function openEditModal(id) {
+  const entry = _mealEntries.get(id);
+  if (!entry) return;
+
+  _editEntryId      = entry.id;
+  _editOriginalName = entry.food_name || '';
+  _editOriginalDate = (entry.logged_at || '').slice(0, 10);
+  _editNotes        = entry.notes ?? null;
+  _editAnalyzing    = false;
+
+  document.getElementById('edit-name').value  = _editOriginalName;
+  document.getElementById('edit-cal').value   = entry.calories  ?? '';
+  document.getElementById('edit-pro').value   = entry.protein_g ?? '';
+  document.getElementById('edit-carb').value  = entry.carbs_g   ?? '';
+  document.getElementById('edit-fat').value   = entry.fat_g     ?? '';
+  document.getElementById('edit-fiber').value = entry.fiber_g   ?? '';
+  document.getElementById('edit-time').value  = (entry.logged_at || '').slice(11, 16);
+
+  document.querySelectorAll('#edit-modal .meal-opt').forEach(b => {
+    b.classList.toggle('selected', b.dataset.meal === entry.meal_type);
+  });
+
+  const closeBtn = document.getElementById('edit-modal-close');
+  closeBtn.disabled = false;
+  closeBtn.style.opacity = '';
+
+  // Wire name input → button toggler (idempotent: replaces any previous listener via named ref)
+  const nameInput = document.getElementById('edit-name');
+  nameInput.removeEventListener('input', updateEditButtons);
+  nameInput.addEventListener('input', updateEditButtons);
+
+  updateEditButtons();
+  openModal('edit-modal');
+}
+
+function closeEditModal() {
+  if (_editAnalyzing) return;
+  closeModal('edit-modal');
+}
+
+function selectEditMeal(btn) {
+  // Scope to edit modal only — does NOT affect the analysis screen's .meal-opt buttons
+  document.querySelectorAll('#edit-modal .meal-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function updateEditButtons() {
+  const nameChanged = document.getElementById('edit-name').value !== _editOriginalName;
+  const row = document.getElementById('edit-btn-row');
+  if (nameChanged) {
+    row.innerHTML = `
+      <button class="btn btn-primary" style="flex:1" onclick="editRecalculate()">חשב מחדש</button>
+      <button class="btn" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text2)" onclick="editSave()">שמור מבלי לחשב מחדש</button>`;
+  } else {
+    row.innerHTML = `<button class="btn btn-primary" style="width:100%" onclick="editSave()">שמור</button>`;
+  }
+}
+
+async function editRecalculate() {
+  if (_editAnalyzing) return;
+  _editAnalyzing = true;
+
+  const closeBtn = document.getElementById('edit-modal-close');
+  closeBtn.disabled = true;
+  closeBtn.style.opacity = '0.4';
+  document.getElementById('edit-btn-row').innerHTML =
+    `<button class="btn btn-primary" style="width:100%" disabled>מחשב... 🔄</button>`;
+
+  const foodName = document.getElementById('edit-name').value.trim();
+  try {
+    const data = await apiFetch('/api/analyze-text', {
+      method: 'POST',
+      body: JSON.stringify({ text: foodName }),
+    });
+    document.getElementById('edit-name').value  = data.foodName || foodName;
+    document.getElementById('edit-cal').value   = (+data.calories  || 0).toFixed(1);
+    document.getElementById('edit-pro').value   = (+data.protein_g || 0).toFixed(1);
+    document.getElementById('edit-carb').value  = (+data.carbs_g   || 0).toFixed(1);
+    document.getElementById('edit-fat').value   = (+data.fat_g     || 0).toFixed(1);
+    document.getElementById('edit-fiber').value = (+data.fiber_g   || 0).toFixed(1);
+    document.getElementById('edit-btn-row').innerHTML =
+      `<button class="btn btn-primary" style="width:100%" onclick="editSave()">שמור</button>`;
+  } catch (e) {
+    const msg = e?.status === 429
+      ? 'הגעת למגבלת הניתוחים לשעה זו'
+      : (e?.message || 'שגיאה בניתוח');
+    showToast(msg);
+    updateEditButtons();
+  } finally {
+    _editAnalyzing = false;
+    closeBtn.disabled = false;
+    closeBtn.style.opacity = '';
+  }
+}
+
+async function editSave() {
+  const mealTypeBtn = document.querySelector('#edit-modal .meal-opt.selected');
+  const timeVal     = document.getElementById('edit-time').value;
+  const nameVal     = document.getElementById('edit-name').value.trim();
+  // Send blank name — server will reject with 400 and caller sees the toast
+  const body = {
+    food_name:  nameVal,
+    calories:   +document.getElementById('edit-cal').value   || 0,
+    protein_g:  +document.getElementById('edit-pro').value   || 0,
+    carbs_g:    +document.getElementById('edit-carb').value  || 0,
+    fat_g:      +document.getElementById('edit-fat').value   || 0,
+    fiber_g:    +document.getElementById('edit-fiber').value || 0,
+    meal_type:  mealTypeBtn?.dataset.meal || 'snack',
+    logged_at:  (timeVal && _editOriginalDate)
+                  ? _editOriginalDate + 'T' + timeVal + ':00'
+                  : null,
+    notes:      _editNotes,
+  };
+  try {
+    await apiFetch(`/api/food/${_editEntryId}`, { method: 'PUT', body: JSON.stringify(body) });
+    closeModal('edit-modal');
+    loadDiary();
+    showToast('✅ המנה עודכנה');
+  } catch (e) {
+    showToast(e?.message || 'שגיאה בשמירה');
+  }
+}
+
+// ════════════════════════════════════════════════════
 // Camera & Analysis
 // ════════════════════════════════════════════════════
 function onImageSelected(e) {

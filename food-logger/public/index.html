@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
 <title>יומן האוכל האישי שלך</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2101,7 +2101,62 @@ input::placeholder { color: var(--muted); }
 <div id="screen-welcome" class="screen">
   <div class="welcome-wrap">
     <div class="welcome-icon fu fu-1">
-      <video src="/salad-logo.webm" autoplay muted playsinline style="border-radius:24px"></video>
+      <svg class="capy-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" width="80" height="80" aria-label="לוגו יומן">
+        <!-- background -->
+        <rect class="capy-logo-bg" x="0" y="0" width="120" height="120" rx="24" fill="#E8703A"/>
+        <!-- capybara body group (breathes) -->
+        <g class="capy-logo-body">
+          <!-- body -->
+          <ellipse cx="60" cy="78" rx="30" ry="18" fill="#C4956A"/>
+          <ellipse cx="60" cy="81" rx="20" ry="11" fill="#e8c89a"/>
+          <!-- head -->
+          <rect x="32" y="38" width="56" height="38" rx="14" fill="#C4956A"/>
+          <!-- snout -->
+          <rect x="39" y="52" width="42" height="18" rx="10" fill="#b07d50"/>
+          <!-- ears -->
+          <circle cx="37" cy="40" r="8" fill="#C4956A"/>
+          <circle cx="37" cy="40" r="4.5" fill="#e0a87a"/>
+          <circle cx="83" cy="40" r="8" fill="#C4956A"/>
+          <circle cx="83" cy="40" r="4.5" fill="#e0a87a"/>
+          <!-- eyes (happy) -->
+          <circle cx="44" cy="46" r="4.5" fill="#2d1a0a"/>
+          <circle cx="44" cy="46" r="3" fill="#1a1a1a"/>
+          <circle cx="43" cy="45" r="1" fill="white"/>
+          <circle cx="76" cy="46" r="4.5" fill="#2d1a0a"/>
+          <circle cx="76" cy="46" r="3" fill="#1a1a1a"/>
+          <circle cx="75" cy="45" r="1" fill="white"/>
+          <!-- nostrils -->
+          <ellipse cx="51" cy="62" rx="2.5" ry="1.8" fill="#8B5E35"/>
+          <ellipse cx="69" cy="62" rx="2.5" ry="1.8" fill="#8B5E35"/>
+          <!-- mouth (grin) -->
+          <path d="M 47 68 Q 60 76 73 68" stroke="#8B5E35" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- blush -->
+          <ellipse cx="38" cy="54" rx="6" ry="3.5" fill="#E8703A" opacity="0.3"/>
+          <ellipse cx="82" cy="54" rx="6" ry="3.5" fill="#E8703A" opacity="0.3"/>
+          <!-- arms -->
+          <path d="M 36 74 Q 28 84 28 93" stroke="#b07d50" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M 84 74 Q 92 84 92 93" stroke="#b07d50" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <!-- paws -->
+          <ellipse cx="28" cy="95" rx="5" ry="3" fill="#b07d50"/>
+          <ellipse cx="92" cy="95" rx="5" ry="3" fill="#b07d50"/>
+        </g>
+        <!-- bowl (animated separately) -->
+        <g class="capy-logo-bowl">
+          <path d="M 20 93 Q 20 113 60 113 Q 100 113 100 93 Z" fill="white" opacity="0.92"/>
+          <ellipse cx="60" cy="93" rx="40" ry="8" fill="white" opacity="0.92"/>
+          <g class="capy-logo-ing" style="--delay:0ms;--ing-rot:25deg"><circle cx="28" cy="104" r="5" fill="#2E7D32"/></g>
+          <g class="capy-logo-ing" style="--delay:120ms;--ing-rot:-20deg"><circle cx="38" cy="107" r="4.5" fill="#EF5350"/></g>
+          <g class="capy-logo-ing" style="--delay:240ms;--ing-rot:30deg"><circle cx="50" cy="108" r="4" fill="#FFD54F"/></g>
+          <g class="capy-logo-ing" style="--delay:360ms;--ing-rot:-15deg"><circle cx="62" cy="109" r="4.5" fill="#A5D6A7"/></g>
+          <g class="capy-logo-ing" style="--delay:480ms;--ing-rot:20deg"><circle cx="74" cy="107" r="4" fill="#E53935"/></g>
+          <g class="capy-logo-ing" style="--delay:600ms;--ing-rot:-25deg"><circle cx="85" cy="104" r="4.5" fill="#2E7D32"/></g>
+          <g class="capy-logo-ing" style="--delay:720ms;--ing-rot:18deg"><circle cx="92" cy="103" r="4" fill="#A5D6A7"/></g>
+          <g class="capy-logo-ing" style="--delay:840ms;--ing-rot:-22deg"><circle cx="35" cy="97" r="4" fill="#FFD54F"/></g>
+          <g class="capy-logo-ing" style="--delay:960ms;--ing-rot:28deg"><circle cx="48" cy="98" r="4.5" fill="#EF5350"/></g>
+          <g class="capy-logo-ing" style="--delay:1080ms;--ing-rot:-18deg"><circle cx="72" cy="98" r="4" fill="#2E7D32"/></g>
+          <g class="capy-logo-ing" style="--delay:1200ms;--ing-rot:15deg"><circle cx="60" cy="90" r="4" fill="#A5D6A7"/></g>
+        </g>
+      </svg>
     </div>
     <div class="welcome-title"><span class="title-word">יומן</span><em>.</em></div>
     <div class="welcome-subtitle fu fu-3">יומן האוכל האישי שלך</div>
@@ -2224,7 +2279,68 @@ input::placeholder { color: var(--muted); }
 
     <!-- Pet strip -->
     <div class="pet-strip dash-stagger" id="pet-strip">
-      <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.webm" muted playsinline autoplay loop></video>
+      <svg class="capy-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" width="80" height="80" aria-label="לוגו יומן">
+        <!-- background -->
+        <rect class="capy-logo-bg" x="0" y="0" width="120" height="120" rx="24" fill="#E8703A"/>
+        <!-- capybara body group (breathes) -->
+        <g class="capy-logo-body">
+          <!-- body -->
+          <ellipse cx="60" cy="78" rx="30" ry="18" fill="#C4956A"/>
+          <ellipse cx="60" cy="81" rx="20" ry="11" fill="#e8c89a"/>
+          <!-- head -->
+          <rect x="32" y="38" width="56" height="38" rx="14" fill="#C4956A"/>
+          <!-- snout -->
+          <rect x="39" y="52" width="42" height="18" rx="10" fill="#b07d50"/>
+          <!-- ears -->
+          <circle cx="37" cy="40" r="8" fill="#C4956A"/>
+          <circle cx="37" cy="40" r="4.5" fill="#e0a87a"/>
+          <circle cx="83" cy="40" r="8" fill="#C4956A"/>
+          <circle cx="83" cy="40" r="4.5" fill="#e0a87a"/>
+          <!-- eyes (happy) -->
+          <circle cx="44" cy="46" r="4.5" fill="#2d1a0a"/>
+          <circle cx="44" cy="46" r="3" fill="#1a1a1a"/>
+          <circle cx="43" cy="45" r="1" fill="white"/>
+          <circle cx="76" cy="46" r="4.5" fill="#2d1a0a"/>
+          <circle cx="76" cy="46" r="3" fill="#1a1a1a"/>
+          <circle cx="75" cy="45" r="1" fill="white"/>
+          <!-- nostrils -->
+          <ellipse cx="51" cy="62" rx="2.5" ry="1.8" fill="#8B5E35"/>
+          <ellipse cx="69" cy="62" rx="2.5" ry="1.8" fill="#8B5E35"/>
+          <!-- mouth (grin) -->
+          <path d="M 47 68 Q 60 76 73 68" stroke="#8B5E35" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- blush -->
+          <ellipse cx="38" cy="54" rx="6" ry="3.5" fill="#E8703A" opacity="0.3"/>
+          <ellipse cx="82" cy="54" rx="6" ry="3.5" fill="#E8703A" opacity="0.3"/>
+          <!-- arms -->
+          <path d="M 36 74 Q 28 84 28 93" stroke="#b07d50" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M 84 74 Q 92 84 92 93" stroke="#b07d50" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <!-- paws -->
+          <ellipse cx="28" cy="95" rx="5" ry="3" fill="#b07d50"/>
+          <ellipse cx="92" cy="95" rx="5" ry="3" fill="#b07d50"/>
+        </g>
+        <!-- bowl (animated separately) -->
+        <g class="capy-logo-bowl">
+          <!-- bowl body -->
+          <path d="M 20 93 Q 20 113 60 113 Q 100 113 100 93 Z" fill="white" opacity="0.92"/>
+          <!-- bowl rim -->
+          <ellipse cx="60" cy="93" rx="40" ry="8" fill="white" opacity="0.92"/>
+          <!-- ingredients — 11 circles, staggered -->
+          <!-- bottom layer, spread wide -->
+          <g class="capy-logo-ing" style="--delay:0ms;--ing-rot:25deg"><circle cx="28" cy="104" r="5" fill="#2E7D32"/></g>
+          <g class="capy-logo-ing" style="--delay:120ms;--ing-rot:-20deg"><circle cx="38" cy="107" r="4.5" fill="#EF5350"/></g>
+          <g class="capy-logo-ing" style="--delay:240ms;--ing-rot:30deg"><circle cx="50" cy="108" r="4" fill="#FFD54F"/></g>
+          <g class="capy-logo-ing" style="--delay:360ms;--ing-rot:-15deg"><circle cx="62" cy="109" r="4.5" fill="#A5D6A7"/></g>
+          <g class="capy-logo-ing" style="--delay:480ms;--ing-rot:20deg"><circle cx="74" cy="107" r="4" fill="#E53935"/></g>
+          <g class="capy-logo-ing" style="--delay:600ms;--ing-rot:-25deg"><circle cx="85" cy="104" r="4.5" fill="#2E7D32"/></g>
+          <g class="capy-logo-ing" style="--delay:720ms;--ing-rot:18deg"><circle cx="92" cy="103" r="4" fill="#A5D6A7"/></g>
+          <!-- mid layer -->
+          <g class="capy-logo-ing" style="--delay:840ms;--ing-rot:-22deg"><circle cx="35" cy="97" r="4" fill="#FFD54F"/></g>
+          <g class="capy-logo-ing" style="--delay:960ms;--ing-rot:28deg"><circle cx="48" cy="98" r="4.5" fill="#EF5350"/></g>
+          <g class="capy-logo-ing" style="--delay:1080ms;--ing-rot:-18deg"><circle cx="72" cy="98" r="4" fill="#2E7D32"/></g>
+          <!-- top peek above rim -->
+          <g class="capy-logo-ing" style="--delay:1200ms;--ing-rot:15deg"><circle cx="60" cy="90" r="4" fill="#A5D6A7"/></g>
+        </g>
+      </svg>
       <div class="pet-bubble" id="pet-bubble">
         <div class="pet-bubble-name">שלום, <strong id="pet-name-label"></strong> 👋</div>
         <div class="pet-bubble-status" id="pet-status-text">טוען...</div>
@@ -4434,14 +4550,6 @@ document.getElementById('reg-pass').addEventListener('keydown', e => { if (e.key
 document.getElementById('res-name').addEventListener('input', function() { autoResizeTextarea(this); });
 document.getElementById('food-text-input').addEventListener('input', function() { autoResizeTextarea(this); });
 
-// Keep salad logo video playing — some browsers freeze looping videos after a few minutes
-(function() {
-  const vid = document.getElementById('dash-logo-vid');
-  if (!vid) return;
-  const resume = () => { if (vid.paused) vid.play().catch(() => {}); };
-  vid.addEventListener('pause', resume);
-  document.addEventListener('visibilitychange', resume);
-})();
 </script>
 <template id="capy-tpl">
   <svg width="80" height="73" viewBox="0 0 110 100" xmlns="http://www.w3.org/2000/svg">

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44">
+  <!-- background -->
+  <rect x="0" y="0" width="44" height="44" rx="10" fill="#E8703A"/>
+  <!-- body -->
+  <ellipse cx="22" cy="32" rx="12" ry="7" fill="#C4956A"/>
+  <!-- head -->
+  <rect x="11" y="14" width="22" height="16" rx="6" fill="#C4956A"/>
+  <!-- snout -->
+  <rect x="14" y="20" width="16" height="8" rx="4" fill="#b07d50"/>
+  <!-- ears -->
+  <circle cx="14" cy="15" r="4" fill="#C4956A"/>
+  <circle cx="14" cy="15" r="2" fill="#e0a87a"/>
+  <circle cx="30" cy="15" r="4" fill="#C4956A"/>
+  <circle cx="30" cy="15" r="2" fill="#e0a87a"/>
+  <!-- eyes -->
+  <circle cx="17" cy="18" r="2.5" fill="#1a1a1a"/>
+  <circle cx="16.5" cy="17.5" r="0.7" fill="white"/>
+  <circle cx="27" cy="18" r="2.5" fill="#1a1a1a"/>
+  <circle cx="26.5" cy="17.5" r="0.7" fill="white"/>
+  <!-- arms -->
+  <path d="M 13 30 Q 9 35 9 39" stroke="#b07d50" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M 31 30 Q 35 35 35 39" stroke="#b07d50" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- bowl -->
+  <path d="M 6 37 Q 6 44 22 44 Q 38 44 38 37 Z" fill="white" opacity="0.9"/>
+  <ellipse cx="22" cy="37" rx="16" ry="4" fill="white" opacity="0.9"/>
+  <!-- 6 key ingredients -->
+  <circle cx="10" cy="41" r="2.5" fill="#2E7D32"/>
+  <circle cx="16" cy="42.5" r="2" fill="#EF5350"/>
+  <circle cx="22" cy="43" r="2" fill="#FFD54F"/>
+  <circle cx="28" cy="42.5" r="2" fill="#A5D6A7"/>
+  <circle cx="34" cy="41" r="2" fill="#E53935"/>
+  <circle cx="22" cy="36" r="2" fill="#2E7D32"/>
+</svg>

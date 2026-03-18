@@ -8,66 +8,90 @@ const { Pool } = require('pg');
 const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
 // ─── PWA Icon ─────────────────────────────────────────────────────────────────
+// Capybara holding a salad bowl — matches favicon.svg design, scaled to 180×180
 let ICON_PNG = null;
 function buildIcon() {
   try {
     const { createCanvas } = require('@napi-rs/canvas');
-    const size = 180, cx = size / 2, cy = size / 2, cr = 40;
+    const size = 180;
+    const s = size / 44; // scale factor from 44×44 favicon.svg viewBox
     const canvas = createCanvas(size, size);
     const ctx = canvas.getContext('2d');
 
-    // Rounded orange background
-    ctx.beginPath();
-    ctx.moveTo(cr, 0); ctx.lineTo(size - cr, 0);
-    ctx.arcTo(size, 0, size, cr, cr);
-    ctx.lineTo(size, size - cr);
-    ctx.arcTo(size, size, size - cr, size, cr);
-    ctx.lineTo(cr, size);
-    ctx.arcTo(0, size, 0, size - cr, cr);
-    ctx.lineTo(0, cr);
-    ctx.arcTo(0, 0, cr, 0, cr);
-    ctx.closePath();
-    ctx.fillStyle = '#E8703A';
-    ctx.fill();
-
-    // Bowl rim
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 18, 62, 18, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Bowl body (bottom half)
-    ctx.beginPath();
-    ctx.arc(cx, cy + 18, 62, 0, Math.PI);
-    ctx.fill();
-
-    // Salad greens (layered circles)
-    for (const [lx, ly, lr, lc] of [
-      [cx,      cy - 12, 19, '#388E3C'],
-      [cx - 22, cy - 4,  18, '#4CAF50'],
-      [cx + 24, cy - 4,  18, '#4CAF50'],
-      [cx - 38, cy + 10, 13, '#66BB6A'],
-      [cx + 38, cy + 10, 13, '#66BB6A'],
-      [cx + 10, cy + 2,  13, '#81C784'],
-      [cx - 10, cy + 4,  11, '#A5D6A7'],
-    ]) {
-      ctx.fillStyle = lc;
+    function roundRect(x, y, w, h, r) {
       ctx.beginPath();
-      ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
     }
 
-    // Red tomato
-    ctx.fillStyle = '#EF5350';
-    ctx.beginPath();
-    ctx.arc(cx - 12, cy + 10, 11, 0, Math.PI * 2);
-    ctx.fill();
+    // Orange rounded background
+    roundRect(0, 0, size, size, 10 * s);
+    ctx.fillStyle = '#E8703A'; ctx.fill();
 
-    // Yellow corn dot
-    ctx.fillStyle = '#FFD54F';
+    // Body
+    ctx.fillStyle = '#C4956A';
+    ctx.beginPath(); ctx.ellipse(22*s, 32*s, 12*s, 7*s, 0, 0, Math.PI*2); ctx.fill();
+
+    // Head
+    roundRect(11*s, 14*s, 22*s, 16*s, 6*s);
+    ctx.fillStyle = '#C4956A'; ctx.fill();
+
+    // Snout
+    roundRect(14*s, 20*s, 16*s, 8*s, 4*s);
+    ctx.fillStyle = '#b07d50'; ctx.fill();
+
+    // Left ear
+    ctx.fillStyle = '#C4956A';
+    ctx.beginPath(); ctx.arc(14*s, 15*s, 4*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#e0a87a';
+    ctx.beginPath(); ctx.arc(14*s, 15*s, 2*s, 0, Math.PI*2); ctx.fill();
+
+    // Right ear
+    ctx.fillStyle = '#C4956A';
+    ctx.beginPath(); ctx.arc(30*s, 15*s, 4*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#e0a87a';
+    ctx.beginPath(); ctx.arc(30*s, 15*s, 2*s, 0, Math.PI*2); ctx.fill();
+
+    // Eyes
+    for (const [ex, ey] of [[17, 18], [27, 18]]) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath(); ctx.arc(ex*s, ey*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.beginPath(); ctx.arc((ex-0.5)*s, (ey-0.5)*s, 0.7*s, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Arms
+    ctx.strokeStyle = '#b07d50'; ctx.lineWidth = 2.5*s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(13*s, 30*s); ctx.quadraticCurveTo(9*s, 35*s, 9*s, 39*s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(31*s, 30*s); ctx.quadraticCurveTo(35*s, 35*s, 35*s, 39*s); ctx.stroke();
+
+    // Bowl body
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.beginPath();
-    ctx.arc(cx + 16, cy + 12, 7, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(6*s, 37*s);
+    ctx.quadraticCurveTo(6*s, 44*s, 22*s, 44*s);
+    ctx.quadraticCurveTo(38*s, 44*s, 38*s, 37*s);
+    ctx.closePath(); ctx.fill();
+
+    // Bowl rim ellipse
+    ctx.beginPath(); ctx.ellipse(22*s, 37*s, 16*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+
+    // 6 ingredients
+    for (const [ix, iy, ir, ic] of [
+      [10, 41, 2.5, '#2E7D32'],
+      [16, 42.5, 2, '#EF5350'],
+      [22, 43,   2, '#FFD54F'],
+      [28, 42.5, 2, '#A5D6A7'],
+      [34, 41,   2, '#E53935'],
+      [22, 36,   2, '#2E7D32'],
+    ]) {
+      ctx.fillStyle = ic;
+      ctx.beginPath(); ctx.arc(ix*s, iy*s, ir*s, 0, Math.PI*2); ctx.fill();
+    }
 
     ICON_PNG = canvas.toBuffer('image/png');
     console.log('PWA icon generated');
@@ -100,6 +124,8 @@ app.use(express.json({ limit: '15mb' }));
 const loginLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
 const analyzeLimiter = rateLimit({ windowMs: 3_600_000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.get('/favicon.ico', serveIcon);
+app.get('/apple-touch-icon.png', serveIcon);
+app.get('/apple-touch-icon-precomposed.png', serveIcon);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── DB Init ─────────────────────────────────────────────────────────────────

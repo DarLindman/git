@@ -3285,7 +3285,7 @@ function navigate(screen) {
   else stopStatsCapyWalk();
   if (screen === 'weight') loadWeightScreen();
   if (screen === 'camera') animatePlaceholder();
-  if (screen === 'analysis') _cameraCapyState('neutral');
+  if (screen === 'analysis' && typeof _cameraCapyState === 'function') _cameraCapyState('neutral');
 }
 
 // ════════════════════════════════════════════════════
@@ -3468,8 +3468,8 @@ async function loadDashboard() {
     if (wrapEl && !wrapEl.querySelector('svg')) {
       wrapEl.appendChild(cloneCapybara(80));
       _dashPetWrap = wrapEl.querySelector('.pet-wrap');
-      startIdleAnimations(_dashPetWrap);
     }
+    if (_dashPetWrap) startIdleAnimations(_dashPetWrap);
     const petWrap = wrapEl?.querySelector('.pet-wrap');
     if (petWrap) setPetState(petWrap, state);
 

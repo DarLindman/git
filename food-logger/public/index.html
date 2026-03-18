@@ -62,13 +62,6 @@
   animation: pet-breathe 4s cubic-bezier(0.45,0,0.55,1) infinite;
   transform-origin: center bottom;
 }
-/* Tail wag */
-@keyframes pet-tail-wag {
-  0%, 100% { transform: rotate(0deg); }
-  25%       { transform: rotate(18deg); }
-  75%       { transform: rotate(-10deg); }
-}
-.pet-wagging .pet-tail { animation: pet-tail-wag 0.6s ease-in-out; }
 /* Ear twitch */
 @keyframes pet-ear-twitch {
   0%, 100% { transform: scaleY(1); }
@@ -4747,11 +4740,6 @@ document.getElementById('food-text-input').addEventListener('input', function() 
     <text class="pet-zzz" x="68" y="28" font-size="10" fill="#8B6B4A" opacity="0.8" font-family="sans-serif">z</text>
     <text class="pet-zzz" x="74" y="20" font-size="13" fill="#8B6B4A" opacity="0.6" font-family="sans-serif">z</text>
     <text class="pet-zzz" x="82" y="13" font-size="9"  fill="#8B6B4A" opacity="0.4" font-family="sans-serif">z</text>
-
-    <!-- tail -->
-    <g class="pet-tail" style="transform-box:fill-box;transform-origin:center">
-      <path d="M 88 72 Q 96 68 94 78" stroke="#b07d50" stroke-width="4" fill="none" stroke-linecap="round"/>
-    </g>
 
     <!-- SURPRISED mouth -->
     <ellipse class="pet-mouth-surprised" cx="55" cy="62" rx="5" ry="4" fill="#8B5E35"/>

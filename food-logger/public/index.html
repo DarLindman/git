@@ -2423,6 +2423,7 @@ input::placeholder { color: var(--muted); }
           <div class="cal-goal-track"><div class="cal-goal-fill" id="cal-goal-fill" style="width:0%"></div></div>
         </div>
       </div>
+      <div id="pet-diary-wrap" style="position:absolute;bottom:8px;left:8px;z-index:1;pointer-events:none"></div>
     </div>
 
     <div class="card">
@@ -3611,6 +3612,13 @@ function renderMealList(entries) {
 </div>`).join('');
 }
 
+function getDiaryPetState(cal, goal) {
+  if (cal === 0)               return 'sleeping';
+  if (goal > 0 && cal > goal)  return 'surprised';
+  if (cal > 0)                 return 'happy';
+  return 'neutral';
+}
+
 function renderDailySummary(entries) {
   const totals = entries.reduce((a, e) => ({
     cal: a.cal + (+e.calories || 0),
@@ -3650,6 +3658,18 @@ function renderDailySummary(entries) {
     goalSection.style.display = 'none';
   }
 
+  // Diary capybara
+  const diaryWrapEl = document.getElementById('pet-diary-wrap');
+  if (diaryWrapEl) {
+    if (!diaryWrapEl.querySelector('svg')) {
+      const pet = cloneCapybara(48);
+      diaryWrapEl.appendChild(pet);
+      _diaryPetWrap = pet;
+      startIdleAnimations(pet);
+    }
+    const pet = diaryWrapEl.querySelector('.pet-wrap');
+    if (pet) setPetState(pet, getDiaryPetState(totals.cal, calcRecommendedCal()));
+  }
 }
 
 async function deleteEntry(id) {

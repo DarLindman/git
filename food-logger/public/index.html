@@ -359,8 +359,8 @@ body::after {
 
 
 .dash-logo-vid {
-  width: 44px;
-  height: 44px;
+  width: 80px;
+  height: 80px;
   border-radius: var(--radius-sharp);
   flex-shrink: 0;
   mix-blend-mode: screen;
@@ -4352,6 +4352,15 @@ document.getElementById('login-pass').addEventListener('keydown', e => { if (e.k
 document.getElementById('reg-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
 document.getElementById('res-name').addEventListener('input', function() { autoResizeTextarea(this); });
 document.getElementById('food-text-input').addEventListener('input', function() { autoResizeTextarea(this); });
+
+// Keep salad logo video playing — some browsers freeze looping videos after a few minutes
+(function() {
+  const vid = document.getElementById('dash-logo-vid');
+  if (!vid) return;
+  const resume = () => { if (vid.paused) vid.play().catch(() => {}); };
+  vid.addEventListener('pause', resume);
+  document.addEventListener('visibilitychange', resume);
+})();
 </script>
 <template id="capy-tpl">
   <svg width="80" height="73" viewBox="0 0 110 100" xmlns="http://www.w3.org/2000/svg">

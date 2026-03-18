@@ -2469,6 +2469,7 @@ input::placeholder { color: var(--muted); }
     <button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 13px;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit" onclick="navigate('camera')">✕</button>
   </div>
   <div class="page">
+    <div id="pet-camera-wrap" style="display:flex;justify-content:center;padding:8px 0 4px"></div>
     <img id="analysis-img" class="analysis-img" alt="">
     <div id="analysis-loading" class="spinner">🔄</div>
     <div id="analysis-result" style="display:none">
@@ -3215,6 +3216,22 @@ function stopIdleAnimations(petWrap) {
 }
 
 // ── Capybara pet helpers ─────────────────────────
+function _cameraCapyState(state) {
+  const wrap = document.getElementById('pet-camera-wrap');
+  if (!wrap) return;
+  if (!wrap.querySelector('svg')) {
+    const pet = cloneCapybara(56);
+    wrap.appendChild(pet);
+    _cameraPetWrap = pet;
+    startIdleAnimations(pet);
+  }
+  const pet = wrap.querySelector('.pet-wrap');
+  if (!pet) return;
+  const baseState = state === 'thinking' ? 'neutral' : state;
+  setPetState(pet, baseState);
+  pet.classList.toggle('pet--thinking', state === 'thinking');
+}
+
 function cloneCapybara(size) {
   const tpl = document.getElementById('capy-tpl');
   const wrap = document.createElement('div');
@@ -3814,12 +3831,15 @@ async function analyzeText() {
   const btn = document.getElementById('text-analyze-btn');
   btn.disabled = true;
   navigate('analysis');
+  _cameraCapyState('thinking');
   document.getElementById('analysis-img').style.display = 'none';
   document.getElementById('analysis-loading').style.display = 'block';
   document.getElementById('analysis-result').style.display = 'none';
   document.getElementById('analysis-error').textContent = '';
   try {
     const data = await apiFetch('/api/analyze-text', { method: 'POST', body: JSON.stringify({ text }) });
+    _cameraCapyState('ecstatic');
+    setTimeout(() => _cameraCapyState('happy'), 2000);
     const resName = document.getElementById('res-name');
     resName.value = data.foodName || '';
     requestAnimationFrame(() => autoResizeTextarea(resName));
@@ -3841,6 +3861,7 @@ async function analyzeText() {
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
+    _cameraCapyState('sad');
     document.getElementById('analysis-loading').style.display = 'none';
     document.getElementById('analysis-error').textContent = e.message;
   }
@@ -3850,6 +3871,7 @@ async function analyzeText() {
 async function analyzeFood() {
   if (!capturedImageBase64) return;
   navigate('analysis');
+  _cameraCapyState('thinking');
   document.getElementById('analysis-img').src = `data:${capturedMime};base64,${capturedImageBase64}`;
   document.getElementById('analysis-img').style.display = 'block';
   document.getElementById('analysis-loading').style.display = 'block';
@@ -3880,8 +3902,11 @@ async function analyzeFood() {
     // Re-trigger stagger animation by forcing reflow
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
+    _cameraCapyState('ecstatic');
+    setTimeout(() => _cameraCapyState('happy'), 2000);
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
+    _cameraCapyState('sad');
     document.getElementById('analysis-loading').style.display = 'none';
     document.getElementById('analysis-error').textContent = e.message;
   }

@@ -3186,6 +3186,34 @@ function autoResizeTextarea(el) {
   el.style.height = el.scrollHeight + 'px';
 }
 
+// ── Idle animation refs ──────────────────────────────────────────────────────
+let _dashPetWrap   = null;
+let _diaryPetWrap  = null;
+let _cameraPetWrap = null;
+
+function startIdleAnimations(petWrap) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  stopIdleAnimations(petWrap);
+  const intervals = [];
+  // Tail wag: random 5–8s
+  intervals.push(setInterval(() => {
+    petWrap.classList.add('pet-wagging');
+    setTimeout(() => petWrap.classList.remove('pet-wagging'), 600);
+  }, 5000 + Math.random() * 3000));
+  // Ear twitch: random 8–12s
+  intervals.push(setInterval(() => {
+    petWrap.classList.add('pet-ear-twitching');
+    setTimeout(() => petWrap.classList.remove('pet-ear-twitching'), 150);
+  }, 8000 + Math.random() * 4000));
+  petWrap._idleIntervals = intervals;
+}
+
+function stopIdleAnimations(petWrap) {
+  if (!petWrap?._idleIntervals) return;
+  petWrap._idleIntervals.forEach(clearInterval);
+  petWrap._idleIntervals = [];
+}
+
 // ── Capybara pet helpers ─────────────────────────
 function cloneCapybara(size) {
   const tpl = document.getElementById('capy-tpl');
@@ -3220,13 +3248,22 @@ const PET_MESSAGES = {
 };
 
 function setPetState(wrapEl, state) {
-  ['ecstatic','happy','neutral','sad','sleeping'].forEach(s =>
+  ['ecstatic','happy','neutral','sad','sleeping','surprised'].forEach(s =>
     wrapEl.classList.toggle(`pet--${s}`, s === state)
   );
+  // brief pop animation on state change
+  wrapEl.classList.remove('pet-state-pop');
+  void wrapEl.offsetWidth; // force reflow to restart animation
+  wrapEl.classList.add('pet-state-pop');
+  setTimeout(() => wrapEl.classList.remove('pet-state-pop'), 250);
 }
 
 function navigate(screen) {
   if (currentScreen === 'analysis') hideCapyPopup();
+  // stop all idle animations unconditionally on every navigation
+  stopIdleAnimations(_dashPetWrap);
+  stopIdleAnimations(_diaryPetWrap);
+  stopIdleAnimations(_cameraPetWrap);
   document.querySelectorAll('.screen').forEach(s =>
     s.classList.remove('active', 'screen-enter-right', 'screen-enter-left')
   );
@@ -3248,6 +3285,7 @@ function navigate(screen) {
   else stopStatsCapyWalk();
   if (screen === 'weight') loadWeightScreen();
   if (screen === 'camera') animatePlaceholder();
+  if (screen === 'analysis') _cameraCapyState('neutral');
 }
 
 // ════════════════════════════════════════════════════
@@ -3429,6 +3467,8 @@ async function loadDashboard() {
     const wrapEl = document.getElementById('pet-dashboard-wrap');
     if (wrapEl && !wrapEl.querySelector('svg')) {
       wrapEl.appendChild(cloneCapybara(80));
+      _dashPetWrap = wrapEl.querySelector('.pet-wrap');
+      startIdleAnimations(_dashPetWrap);
     }
     const petWrap = wrapEl?.querySelector('.pet-wrap');
     if (petWrap) setPetState(petWrap, state);

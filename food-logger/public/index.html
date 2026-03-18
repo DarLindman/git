@@ -4372,10 +4372,14 @@ document.getElementById('food-text-input').addEventListener('input', function() 
     <!-- snout -->
     <rect x="34" y="44" width="42" height="22" rx="12" fill="#b07d50"/>
     <!-- ears -->
-    <circle cx="30" cy="28" r="9" fill="#C4956A"/>
-    <circle cx="30" cy="28" r="5" fill="#e0a87a"/>
-    <circle cx="80" cy="28" r="9" fill="#C4956A"/>
-    <circle cx="80" cy="28" r="5" fill="#e0a87a"/>
+    <g class="pet-ear-left" style="transform-box:fill-box;transform-origin:center bottom">
+      <circle cx="30" cy="28" r="9" fill="#C4956A"/>
+      <circle cx="30" cy="28" r="5" fill="#e0a87a"/>
+    </g>
+    <g class="pet-ear-right" style="transform-box:fill-box;transform-origin:center bottom">
+      <circle cx="80" cy="28" r="9" fill="#C4956A"/>
+      <circle cx="80" cy="28" r="5" fill="#e0a87a"/>
+    </g>
     <!-- legs -->
     <ellipse cx="28" cy="90" rx="10" ry="7" fill="#C4956A"/>
     <ellipse cx="45" cy="92" rx="10" ry="6" fill="#C4956A"/>
@@ -4447,6 +4451,17 @@ document.getElementById('food-text-input').addEventListener('input', function() 
     <text class="pet-zzz" x="68" y="28" font-size="10" fill="#8B6B4A" opacity="0.8" font-family="sans-serif">z</text>
     <text class="pet-zzz" x="74" y="20" font-size="13" fill="#8B6B4A" opacity="0.6" font-family="sans-serif">z</text>
     <text class="pet-zzz" x="82" y="13" font-size="9"  fill="#8B6B4A" opacity="0.4" font-family="sans-serif">z</text>
+
+    <!-- tail -->
+    <g class="pet-tail" style="transform-box:fill-box;transform-origin:center">
+      <path d="M 88 72 Q 96 68 94 78" stroke="#b07d50" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- SURPRISED mouth -->
+    <ellipse class="pet-mouth-surprised" cx="55" cy="62" rx="5" ry="4" fill="#8B5E35"/>
+
+    <!-- thinking question mark -->
+    <text class="pet-think-q" x="82" y="18" font-size="14" fill="#E8703A" font-family="sans-serif" font-weight="bold" opacity="0">?</text>
   </svg>
 </template>
 </body>

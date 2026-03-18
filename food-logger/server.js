@@ -466,9 +466,9 @@ app.get('/api/streak', auth, async (req, res) => {
       d.setUTCDate(d.getUTCDate() - 1);
       expected = d.toISOString().slice(0, 10);
     }
-    // Get the most recent log date
+    // Get the most recent log date in Israel timezone (consistent with streak calculation)
     const lastRow = await pool.query(
-      `SELECT MAX(logged_at::date) AS last_date FROM food_logs WHERE user_id = $1`,
+      `SELECT MAX((logged_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jerusalem')::date)::text AS last_date FROM food_logs WHERE user_id = $1`,
       [req.user.id]
     );
     const lastLogDate = lastRow.rows[0]?.last_date ?? null;

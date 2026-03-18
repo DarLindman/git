@@ -62,8 +62,33 @@
   animation: pet-breathe 3s ease-in-out infinite;
   transform-origin: center bottom;
 }
+/* ── Walking capybara on stats ──────────────────── */
+#pet-stats-wrap {
+  position: relative;
+  height: 72px;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+}
+.capy-walk-stage {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  will-change: transform;
+}
+/* Override breathe with a walking body-bob */
 #pet-stats-wrap .pet-wrap {
-  animation: pet-breathe 4s ease-in-out infinite;
+  animation: capy-walk-bob 0.45s cubic-bezier(0.25, 1, 0.5, 1) infinite !important;
+  transform-origin: center bottom;
+}
+@keyframes capy-walk-bob {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25%       { transform: rotate(-2deg) translateY(-2px); }
+  75%       { transform: rotate(2deg) translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capy-walk-stage { animation: none !important; will-change: auto; }
+  #pet-stats-wrap .pet-wrap { animation: none !important; }
 }
 
 @keyframes pet-tap {
@@ -332,10 +357,10 @@ body::after {
 
 
 .dash-logo-vid {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sharp);
-  display: block;
+  flex-shrink: 0;
   mix-blend-mode: screen;
 }
 
@@ -355,7 +380,7 @@ body::after {
   flex: 1;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px 12px 4px 12px;
+  border-radius: 12px 12px 12px 4px;
   padding: 9px 13px;
   direction: rtl;
 }
@@ -1491,8 +1516,8 @@ input::placeholder { color: var(--muted); }
 ════════════════════════════════════════ */
 #screen-analysis { background: var(--bg); position: relative; overflow: hidden; }
 #capy-popup {
-  position: absolute;
-  bottom: 90px; /* above bottom nav */
+  position: fixed;
+  bottom: calc(var(--nav-h) + 12px); /* above bottom nav */
   right: 16px;
   display: flex;
   align-items: flex-end;
@@ -1501,7 +1526,7 @@ input::placeholder { color: var(--muted); }
   transform: translateX(300px);
   transition: transform 0.4s var(--ease-spring);
   pointer-events: none;
-  z-index: 50;
+  z-index: 200;
 }
 #capy-popup-bubble {
   background: var(--surface);
@@ -1515,11 +1540,11 @@ input::placeholder { color: var(--muted); }
   transition: opacity 0.2s 0.3s;
 }
 #confetti-canvas {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   width: 100%; height: 100%;
   pointer-events: none;
-  z-index: 49;
+  z-index: 199;
 }
 
 .analysis-img {
@@ -2114,13 +2139,13 @@ input::placeholder { color: var(--muted); }
 
     <!-- Pet strip -->
     <div class="pet-strip dash-stagger" id="pet-strip">
+      <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.webm" muted playsinline autoplay loop></video>
       <div class="pet-bubble" id="pet-bubble">
         <div class="pet-bubble-name">שלום, <strong id="pet-name-label"></strong> 👋</div>
         <div class="pet-bubble-status" id="pet-status-text">טוען...</div>
       </div>
       <div id="pet-dashboard-wrap"></div>
     </div>
-    <video id="dash-logo-vid" class="dash-logo-vid" src="/salad-logo.webm" muted playsinline autoplay loop></video>
 
     <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0,4 Q25,1 50,4 Q75,7 100,4"/>
@@ -2985,7 +3010,8 @@ function navigate(screen) {
   if (screen === 'dashboard') { loadDashboard(); animateDashStagger(); }
   else stopFireCanvas();
   if (screen === 'home') loadDiary();
-  if (screen === 'stats') loadStats();
+  if (screen === 'stats') { loadStats(); }
+  else stopStatsCapyWalk();
   if (screen === 'weight') loadWeightScreen();
   if (screen === 'camera') animatePlaceholder();
 }
@@ -3155,9 +3181,10 @@ async function loadDashboard() {
     if (streak >= 1) startFireCanvas();
     else stopFireCanvas();
 
-    // Pet state
-    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
-    const yesterday = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+    // Pet state — use Israel timezone to match server streak calculation
+    const toIsraelDate = d => d.toLocaleString('sv', { timeZone: 'Asia/Jerusalem' }).slice(0, 10);
+    const today = toIsraelDate(new Date());
+    const yesterday = toIsraelDate(new Date(Date.now() - 86400000));
     const hasLoggedToday = entries && entries.length > 0;
     const hasLoggedYesterday = lastLogDate === yesterday;
     const daysSinceLastLog = lastLogDate
@@ -3572,6 +3599,47 @@ async function saveEntry() {
 }
 
 // ════════════════════════════════════════════════════
+// Walking capybara (stats screen)
+// ════════════════════════════════════════════════════
+let _capyWalkRaf = null;
+let _capyWalkX = 0;
+let _capyWalkDir = 1;
+
+function startStatsCapyWalk() {
+  if (_capyWalkRaf) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const wrap = document.getElementById('pet-stats-wrap');
+  const stage = wrap?.querySelector('.capy-walk-stage');
+  const pet = wrap?.querySelector('.pet-wrap');
+  if (!stage || !pet) return;
+
+  let lastT = null;
+  function tick(t) {
+    if (!lastT) lastT = t;
+    const dt = Math.min(t - lastT, 50);
+    lastT = t;
+    const maxX = wrap.offsetWidth - 64;
+    _capyWalkX += _capyWalkDir * 0.5 * (dt / 16);
+    if (_capyWalkX >= maxX) {
+      _capyWalkX = maxX;
+      _capyWalkDir = -1;
+      pet.style.transform = 'scaleX(-1)';
+    } else if (_capyWalkX <= 0) {
+      _capyWalkX = 0;
+      _capyWalkDir = 1;
+      pet.style.transform = 'scaleX(1)';
+    }
+    stage.style.transform = `translateX(${_capyWalkX}px)`;
+    _capyWalkRaf = requestAnimationFrame(tick);
+  }
+  _capyWalkRaf = requestAnimationFrame(tick);
+}
+
+function stopStatsCapyWalk() {
+  if (_capyWalkRaf) { cancelAnimationFrame(_capyWalkRaf); _capyWalkRaf = null; }
+}
+
+// ════════════════════════════════════════════════════
 // Stats
 // ════════════════════════════════════════════════════
 function switchStats(tab) {
@@ -3674,7 +3742,13 @@ async function loadWeeklyStats() {
     renderStatMacros('weekly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
     const wrapEl = document.getElementById('pet-stats-wrap');
     if (wrapEl) {
-      if (!wrapEl.querySelector('svg')) wrapEl.appendChild(cloneCapybara(56));
+      if (!wrapEl.querySelector('.capy-walk-stage')) {
+        const stage = document.createElement('div');
+        stage.className = 'capy-walk-stage';
+        stage.appendChild(cloneCapybara(56));
+        wrapEl.innerHTML = '';
+        wrapEl.appendChild(stage);
+      }
       const avgCal = rows.length
         ? rows.reduce((s, r) => s + (+r.calories || 0), 0) / rows.length
         : 0;
@@ -3682,6 +3756,8 @@ async function loadWeeklyStats() {
       const weeklyState = pct >= 0.9 ? 'happy' : pct >= 0.5 ? 'neutral' : 'sad';
       const petWrap = wrapEl.querySelector('.pet-wrap');
       if (petWrap) setPetState(petWrap, weeklyState);
+      stopStatsCapyWalk();
+      startStatsCapyWalk();
     }
   } catch { }
 }

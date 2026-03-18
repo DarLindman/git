@@ -3323,7 +3323,11 @@ function renderMealList(entries) {
     return;
   }
   const ACCENT = { breakfast: 'meal-accent-breakfast', lunch: 'meal-accent-lunch', dinner: 'meal-accent-dinner', snack: 'meal-accent-snack' };
-  el.innerHTML = entries.map(e => `<div class="meal-item-row ${ACCENT[e.meal_type] || ''}" id="entry-${e.id}">
+  _mealEntries.clear();
+  entries.forEach(e => _mealEntries.set(e.id, e));
+
+  el.innerHTML = entries.map(e => `<div class="meal-item-row ${ACCENT[e.meal_type] || ''}" id="entry-${e.id}"
+  style="cursor:pointer" onclick="openEditModal(${e.id})">
   <div class="mir-time-col">
     <div class="mir-food-icon">${getFoodEmoji(e.food_name)}</div>
     <div class="mir-time">${e.logged_at ? e.logged_at.slice(11, 16) : ''}</div>
@@ -3334,7 +3338,7 @@ function renderMealList(entries) {
   </div>
   <div class="mir-right">
     <div class="mir-kcal">${Math.round(e.calories || 0)}</div>
-    <button class="mir-delete" onclick="deleteEntry(${e.id})" aria-label="מחק">
+    <button class="mir-delete" onclick="event.stopPropagation();deleteEntry(${e.id})" aria-label="מחק">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
       </svg>

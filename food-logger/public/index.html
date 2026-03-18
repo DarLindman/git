@@ -3188,9 +3188,10 @@ function autoResizeTextarea(el) {
 }
 
 // ── Idle animation refs ──────────────────────────────────────────────────────
-let _dashPetWrap   = null;
-let _diaryPetWrap  = null;
-let _cameraPetWrap = null;
+let _dashPetWrap    = null;
+let _diaryPetWrap   = null;
+let _cameraPetWrap  = null;
+let _cameraHappyTimer = null;
 
 function startIdleAnimations(petWrap) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -3281,6 +3282,7 @@ function navigate(screen) {
   stopIdleAnimations(_dashPetWrap);
   stopIdleAnimations(_diaryPetWrap);
   stopIdleAnimations(_cameraPetWrap);
+  clearTimeout(_cameraHappyTimer);
   document.querySelectorAll('.screen').forEach(s =>
     s.classList.remove('active', 'screen-enter-right', 'screen-enter-left')
   );
@@ -3839,7 +3841,8 @@ async function analyzeText() {
   try {
     const data = await apiFetch('/api/analyze-text', { method: 'POST', body: JSON.stringify({ text }) });
     _cameraCapyState('ecstatic');
-    setTimeout(() => _cameraCapyState('happy'), 2000);
+    clearTimeout(_cameraHappyTimer);
+    _cameraHappyTimer = setTimeout(() => _cameraCapyState('happy'), 2000);
     const resName = document.getElementById('res-name');
     resName.value = data.foodName || '';
     requestAnimationFrame(() => autoResizeTextarea(resName));
@@ -3903,7 +3906,8 @@ async function analyzeFood() {
     const rb = document.getElementById('receipt-body');
     if (rb) { rb.querySelectorAll('.receipt-entry').forEach(r => { r.style.animation = 'none'; r.offsetHeight; r.style.animation = ''; }); }
     _cameraCapyState('ecstatic');
-    setTimeout(() => _cameraCapyState('happy'), 2000);
+    clearTimeout(_cameraHappyTimer);
+    _cameraHappyTimer = setTimeout(() => _cameraCapyState('happy'), 2000);
     document.getElementById('analysis-result').style.display = 'block';
   } catch (e) {
     _cameraCapyState('sad');

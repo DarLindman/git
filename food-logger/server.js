@@ -94,9 +94,11 @@ function buildIcon() {
     }
 
     ICON_PNG = canvas.toBuffer('image/png');
-    console.log('PWA icon generated');
+    const fs = require('fs');
+    fs.writeFileSync(path.join(__dirname, 'public', 'apple-touch-icon.png'), ICON_PNG);
+    console.log('PWA icon generated (%d bytes)', ICON_PNG.length);
   } catch (e) {
-    console.warn('icon generation failed:', e.message);
+    console.error('icon generation failed:', e);
   }
 }
 buildIcon();

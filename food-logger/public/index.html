@@ -2522,6 +2522,39 @@ input::placeholder { color: var(--muted); }
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- ════════════════ EDIT MEAL MODAL ════════════════ -->
+<div class="modal-overlay" id="edit-modal" onclick="closeEditModal()">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="direction:rtl">
+    <div style="display:flex;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">עריכת מנה</div>
+      <button id="edit-modal-close" class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="receipt">
+      <div class="receipt-row receipt-name-row">
+        <input id="edit-name" type="text" class="receipt-name-input" placeholder="שם המנה" style="border-bottom:1px solid var(--border)">
+      </div>
+      <hr class="receipt-hr">
+      <div class="receipt-row receipt-entry"><label class="receipt-lbl">קלוריות</label><input id="edit-cal" type="number" min="0" step="1" class="receipt-val"><span class="receipt-unit">קק״ל</span></div>
+      <div class="receipt-row receipt-entry"><label class="receipt-lbl">חלבון</label><input id="edit-pro" type="number" min="0" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+      <div class="receipt-row receipt-entry"><label class="receipt-lbl">פחמימות</label><input id="edit-carb" type="number" min="0" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+      <div class="receipt-row receipt-entry"><label class="receipt-lbl">שומן</label><input id="edit-fat" type="number" min="0" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+      <div class="receipt-row receipt-entry"><label class="receipt-lbl">סיבים</label><input id="edit-fiber" type="number" min="0" step="0.1" class="receipt-val"><span class="receipt-unit">גר׳</span></div>
+      <hr class="receipt-hr">
+      <div class="receipt-row receipt-entry">
+        <label class="receipt-lbl">שעה</label>
+        <input id="edit-time" type="time" class="receipt-val" style="direction:ltr;text-align:left">
+      </div>
+    </div>
+    <div class="meal-select" style="margin:14px 0 4px">
+      <button class="meal-opt" data-meal="breakfast" onclick="selectEditMeal(this)">בוקר</button>
+      <button class="meal-opt" data-meal="lunch"     onclick="selectEditMeal(this)">צהריים</button>
+      <button class="meal-opt" data-meal="dinner"    onclick="selectEditMeal(this)">ערב</button>
+      <button class="meal-opt" data-meal="snack"     onclick="selectEditMeal(this)">חטיף</button>
+    </div>
+    <div id="edit-btn-row" style="display:flex;gap:8px;margin-top:16px;flex-direction:row-reverse"></div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════════
 // Config & State

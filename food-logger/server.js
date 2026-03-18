@@ -441,6 +441,34 @@ app.delete('/api/food/:id', auth, async (req, res) => {
   }
 });
 
+app.put('/api/food/:id', auth, async (req, res) => {
+  const { food_name, calories, protein_g, carbs_g, fat_g, fiber_g, meal_type, logged_at, notes } = req.body;
+  const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+  const trimmed = (food_name || '').trim();
+  if (!trimmed) return res.status(400).json({ error: 'שם האוכל חסר' });
+  if (trimmed.length > 200) return res.status(400).json({ error: 'שם האוכל ארוך מדי (מקסימום 200 תווים)' });
+  if (!VALID_MEAL_TYPES.includes(meal_type)) return res.status(400).json({ error: 'סוג ארוחה לא תקין' });
+  const toNum = (v, max = 99999) => { const n = (v === undefined || v === null || v === '') ? null : +v; return (n === null || isNaN(n) || n < 0 || n > max) ? null : Math.round(n * 10) / 10; };
+  try {
+    const { rows, rowCount } = await pool.query(
+      `UPDATE food_logs
+       SET food_name=$3, calories=$4, protein_g=$5, carbs_g=$6, fat_g=$7, fiber_g=$8,
+           meal_type=$9, logged_at=COALESCE($10::timestamptz, logged_at), notes=$11
+       WHERE id=$1 AND user_id=$2
+       RETURNING *`,
+      [req.params.id, req.user.id, trimmed,
+       toNum(calories, 99999), toNum(protein_g, 9999), toNum(carbs_g, 9999),
+       toNum(fat_g, 9999), toNum(fiber_g, 9999),
+       meal_type, logged_at || null, notes ?? null]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'לא נמצא' });
+    res.json(rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'שגיאת שרת' });
+  }
+});
+
 // ─── Streak ───────────────────────────────────────────────────────────────────
 app.get('/api/streak', auth, async (req, res) => {
   try {

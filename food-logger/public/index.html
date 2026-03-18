@@ -214,7 +214,6 @@
 .pet--surprised .pet-mouth-grin      { display: none; }
 .pet--surprised .pet-mouth-frown     { display: none; }
 
-#daily-summary-card { position: relative; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -306,6 +305,7 @@ body::after {
   padding: 48px 24px 36px;
   min-height: 100dvh;
   justify-content: center;
+  margin-inline: auto;
 }
 .welcome-icon {
   width: 110px;
@@ -1078,7 +1078,7 @@ input::placeholder { color: var(--muted); }
 /* ════════════════════════════════════════
    PAGE CONTENT
 ════════════════════════════════════════ */
-.page { flex: 1; overflow-y: auto; padding: 16px; }
+.page { flex: 1; overflow-y: auto; padding: 16px; max-width: 480px; margin-inline: auto; width: 100%; }
 
 /* ════════════════════════════════════════
    CARDS
@@ -1141,19 +1141,23 @@ input::placeholder { color: var(--muted); }
 }
 .cal-goal-label {
   display: flex;
-  justify-content: space-between;
   font-size: 12px;
   color: var(--text2);
   margin-bottom: 6px;
 }
-.cal-goal-label .cal-goal-pct {
+.cal-goal-pct {
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
-  width: 48px;
+  font-size: 11px;
   text-align: center;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
-.cal-goal-label .cal-goal-pct.over { color: #f87171; }
+.cal-goal-pct.over { color: #f87171; }
+.cal-goal-track-outer {
+  position: relative;
+  padding-top: 68px;
+  overflow: visible;
+}
 .cal-goal-track {
   height: 7px;
   background: var(--surface3);
@@ -2419,12 +2423,15 @@ input::placeholder { color: var(--muted); }
         <div class="cal-goal-bar">
           <div class="cal-goal-label">
             <span id="cal-goal-text">0 / 0 קל'</span>
-            <span class="cal-goal-pct" id="cal-goal-pct">0%</span>
           </div>
-          <div class="cal-goal-track"><div class="cal-goal-fill" id="cal-goal-fill" style="width:0%"></div></div>
+          <div class="cal-goal-track-outer">
+            <div id="pet-diary-wrap" style="position:absolute;bottom:7px;right:-24px;z-index:1;pointer-events:none;display:flex;flex-direction:column;align-items:center;width:48px;transition:right .7s cubic-bezier(.4,0,.2,1)">
+              <span class="cal-goal-pct" id="cal-goal-pct" style="margin-bottom:2px">0%</span>
+            </div>
+            <div class="cal-goal-track"><div class="cal-goal-fill" id="cal-goal-fill" style="width:0%"></div></div>
+          </div>
         </div>
       </div>
-      <div id="pet-diary-wrap" style="position:absolute;bottom:8px;left:18px;z-index:1;pointer-events:none"></div>
     </div>
 
     <div class="card">
@@ -3658,8 +3665,11 @@ function renderDailySummary(entries) {
     pctEl.textContent = `${Math.round(consumed / rec * 100)}%`;
     pctEl.className = 'cal-goal-pct' + (isOver ? ' over' : '');
     const fill = document.getElementById('cal-goal-fill');
-    fill.style.width = `${Math.min(pct, 100)}%`;
+    const visPct = Math.min(Math.round(consumed / rec * 100), 100);
+    fill.style.width = `${visPct}%`;
     fill.className = 'cal-goal-fill' + (isOver ? ' over' : '');
+    const diaryPosEl = document.getElementById('pet-diary-wrap');
+    if (diaryPosEl) diaryPosEl.style.right = `calc(${visPct}% - 24px)`;
     // Add glow milestone animations
     fill.classList.remove('cal-goal-fill--half', 'cal-goal-fill--done');
     void fill.offsetWidth; // force reflow to restart animation if class is re-added

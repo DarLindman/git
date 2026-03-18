@@ -2697,7 +2697,7 @@ async function apiFetch(path, opts = {}) {
   });
   if (res.status === 401) { doLogout(); return; }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
+  if (!res.ok) { const err = new Error(data.error || 'שגיאת שרת'); err.status = res.status; throw err; }
   return data;
 }
 

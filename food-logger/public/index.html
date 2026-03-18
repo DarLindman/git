@@ -3232,6 +3232,16 @@ function _cameraCapyState(state) {
   const baseState = state === 'thinking' ? 'neutral' : state;
   setPetState(pet, baseState);
   pet.classList.toggle('pet--thinking', state === 'thinking');
+  if (state === 'ecstatic') {
+    pet.style.animation = 'none';
+    void pet.offsetWidth;
+    pet.style.animation = 'pet-tap 0.4s var(--ease-spring) forwards';
+    setTimeout(() => {
+      pet.style.animation = 'none';
+      void pet.offsetWidth;
+      pet.style.animation = 'pet-tap 0.4s var(--ease-spring) forwards';
+    }, 450);
+  }
 }
 
 function cloneCapybara(size) {

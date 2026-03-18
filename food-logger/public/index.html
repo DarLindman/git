@@ -153,8 +153,8 @@
 }
 @keyframes capy-walk-bob {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  25%       { transform: rotate(-2deg) translateY(-2px); }
-  75%       { transform: rotate(2deg) translateY(-2px); }
+  25%       { transform: rotate(-3deg) translateY(-3px); }
+  75%       { transform: rotate(3deg) translateY(-3px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .capy-walk-stage { animation: none !important; will-change: auto; }
@@ -4037,15 +4037,23 @@ function startStatsCapyWalk() {
     const dt = Math.min(t - lastT, 50);
     lastT = t;
     const maxX = wrap.offsetWidth - 64;
-    _capyWalkX += _capyWalkDir * 0.5 * (dt / 16);
+    _capyWalkX += _capyWalkDir * 0.85 * (dt / 16);
     if (_capyWalkX >= maxX) {
       _capyWalkX = maxX;
       _capyWalkDir = -1;
-      pet.style.transform = 'scaleX(-1)';
+      pet.classList.add('pet-hopping');
+      setTimeout(() => {
+        pet.style.transform = 'scaleX(-1)';
+        pet.classList.remove('pet-hopping');
+      }, 75);
     } else if (_capyWalkX <= 0) {
       _capyWalkX = 0;
       _capyWalkDir = 1;
-      pet.style.transform = 'scaleX(1)';
+      pet.classList.add('pet-hopping');
+      setTimeout(() => {
+        pet.style.transform = 'scaleX(1)';
+        pet.classList.remove('pet-hopping');
+      }, 75);
     }
     stage.style.transform = `translateX(${_capyWalkX}px)`;
     _capyWalkRaf = requestAnimationFrame(tick);

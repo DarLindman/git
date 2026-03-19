@@ -2459,7 +2459,10 @@ input::placeholder { color: var(--muted); }
     <button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 13px;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit" onclick="navigate('camera')">✕</button>
   </div>
   <div class="page">
-    <div id="pet-camera-wrap" style="display:flex;justify-content:center;padding:8px 0 4px"></div>
+    <div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:8px 0 4px;direction:rtl">
+      <div id="pet-camera-wrap"></div>
+      <div id="pet-camera-bubble" style="background:var(--surface);border:1px solid var(--border);border-radius:12px 12px 4px 12px;padding:8px 12px;font-size:13px;color:var(--text);white-space:nowrap;opacity:0;transition:opacity 0.3s 0.1s;pointer-events:none">נרשם! כל הכבוד 🎉</div>
+    </div>
     <img id="analysis-img" class="analysis-img" alt="">
     <div id="analysis-loading" class="spinner">🔄</div>
     <div id="analysis-result" style="display:none">
@@ -3495,20 +3498,6 @@ async function loadDashboard() {
     document.getElementById('pet-name-label').textContent = petUsername;
     document.getElementById('pet-status-text').textContent = PET_MESSAGES[state](petUsername);
 
-    if (_celebrateOnLoad && petWrap) {
-      _celebrateOnLoad = false;
-      setPetState(petWrap, 'ecstatic');
-      petWrap.style.animation = 'none';
-      void petWrap.offsetWidth;
-      petWrap.style.animation = 'pet-tap 0.4s var(--ease-spring) 2';
-      document.getElementById('pet-status-text').textContent = 'כל הכבוד! הארוחה נרשמה 🎉';
-      setTimeout(() => {
-        if (petWrap) {
-          setPetState(petWrap, state);
-          document.getElementById('pet-status-text').textContent = PET_MESSAGES[state](petUsername);
-        }
-      }, 3000);
-    }
   } catch {}
 }
 
@@ -3958,7 +3947,6 @@ function selectMeal(btn) {
   selectedMeal = btn.dataset.meal;
 }
 
-let _celebrateOnLoad = false;
 let _confettiFrame = null; // module-scope so rapid calls cancel previous animation
 
 
@@ -4024,9 +4012,19 @@ async function saveEntry() {
     saveBtn.disabled = false;
     saveBtn.textContent = 'שמור ביומן';
     diaryDate = todayStr();
-    _celebrateOnLoad = true;
+    if (typeof _cameraCapyState === 'function') _cameraCapyState('ecstatic');
+    if (_cameraPetWrap) {
+      _cameraPetWrap.style.animation = 'none';
+      void _cameraPetWrap.offsetWidth;
+      _cameraPetWrap.style.animation = 'pet-tap 0.4s var(--ease-spring) 2';
+    }
+    const camBubble = document.getElementById('pet-camera-bubble');
+    if (camBubble) camBubble.style.opacity = '1';
     spawnConfetti();
-    navigate('dashboard');
+    setTimeout(() => {
+      if (camBubble) camBubble.style.opacity = '0';
+      navigate('home');
+    }, 2500);
     showToast('✅ נשמר ביומן!');
     capturedImageBase64 = null;
     document.getElementById('preview-img').style.display = 'none';

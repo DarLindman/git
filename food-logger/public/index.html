@@ -1609,30 +1609,6 @@ input::placeholder { color: var(--muted); }
    ANALYSIS
 ════════════════════════════════════════ */
 #screen-analysis { background: var(--bg); position: relative; overflow: hidden; }
-#capy-popup {
-  position: fixed;
-  top: 42%;
-  right: 16px;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  direction: rtl;
-  transform: translateY(-50%) translateX(300px);
-  transition: transform 0.4s var(--ease-spring);
-  pointer-events: none;
-  z-index: 200;
-}
-#capy-popup-bubble {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px 12px 12px 4px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text);
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s 0.3s;
-}
 #confetti-canvas {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -2529,12 +2505,6 @@ input::placeholder { color: var(--muted); }
     </div>
     <div id="analysis-error" class="error-msg" style="margin-top:16px"></div>
   </div>
-  <!-- Capybara save popup -->
-  <div id="capy-popup" aria-hidden="true">
-    <div id="capy-popup-bubble">נרשם! כל הכבוד 🎉</div>
-    <div id="capy-popup-pet"></div>
-  </div>
-  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
 </div>
 
 <!-- ════════════════ STATS ════════════════ -->
@@ -3307,7 +3277,6 @@ function setPetState(wrapEl, state) {
 }
 
 function navigate(screen) {
-  if (currentScreen === 'analysis') hideCapyPopup();
   // stop all idle animations unconditionally on every navigation
   stopIdleAnimations(_dashPetWrap);
   stopIdleAnimations(_diaryPetWrap);
@@ -3525,6 +3494,21 @@ async function loadDashboard() {
     const petUsername = username || '';
     document.getElementById('pet-name-label').textContent = petUsername;
     document.getElementById('pet-status-text').textContent = PET_MESSAGES[state](petUsername);
+
+    if (_celebrateOnLoad && petWrap) {
+      _celebrateOnLoad = false;
+      setPetState(petWrap, 'ecstatic');
+      petWrap.style.animation = 'none';
+      void petWrap.offsetWidth;
+      petWrap.style.animation = 'pet-tap 0.4s var(--ease-spring) 2';
+      document.getElementById('pet-status-text').textContent = 'כל הכבוד! הארוחה נרשמה 🎉';
+      setTimeout(() => {
+        if (petWrap) {
+          setPetState(petWrap, state);
+          document.getElementById('pet-status-text').textContent = PET_MESSAGES[state](petUsername);
+        }
+      }, 3000);
+    }
   } catch {}
 }
 
@@ -3974,49 +3958,9 @@ function selectMeal(btn) {
   selectedMeal = btn.dataset.meal;
 }
 
-let _capyPopupTimeout = null;
+let _celebrateOnLoad = false;
 let _confettiFrame = null; // module-scope so rapid calls cancel previous animation
 
-function showCapyPopup() {
-  const popup = document.getElementById('capy-popup');
-  const bubble = document.getElementById('capy-popup-bubble');
-  const petWrap = document.getElementById('capy-popup-pet');
-  if (!popup) return;
-
-  // Inject SVG if first time
-  if (!petWrap.querySelector('svg')) {
-    const wrap = cloneCapybara(68);
-    setPetState(wrap, 'ecstatic');
-    petWrap.appendChild(wrap);
-  }
-
-  // Slide in
-  popup.style.transition = 'transform 0.4s var(--ease-spring)';
-  popup.style.transform = 'translateY(-50%) translateX(0)';
-  bubble.style.opacity = '1';
-
-  // Bounce
-  const petWrapEl = petWrap.querySelector('.pet-wrap');
-  if (petWrapEl) {
-    petWrapEl.style.animation = 'none';
-    void petWrapEl.offsetWidth;
-    petWrapEl.style.animation = 'pet-tap 0.4s var(--ease-spring) 2';
-  }
-
-  // Schedule hide
-  if (_capyPopupTimeout) clearTimeout(_capyPopupTimeout);
-  _capyPopupTimeout = setTimeout(() => hideCapyPopup(), 2200);
-}
-
-function hideCapyPopup() {
-  const popup = document.getElementById('capy-popup');
-  const bubble = document.getElementById('capy-popup-bubble');
-  if (!popup) return;
-  if (_capyPopupTimeout) { clearTimeout(_capyPopupTimeout); _capyPopupTimeout = null; }
-  popup.style.transition = 'transform 0.35s ease-in';
-  popup.style.transform = 'translateY(-50%) translateX(300px)';
-  bubble.style.opacity = '0';
-}
 
 function spawnConfetti() {
   const canvas = document.getElementById('confetti-canvas');
@@ -4080,9 +4024,9 @@ async function saveEntry() {
     saveBtn.disabled = false;
     saveBtn.textContent = 'שמור ביומן';
     diaryDate = todayStr();
-    showCapyPopup();
+    _celebrateOnLoad = true;
     spawnConfetti();
-    setTimeout(() => navigate('home'), 2500);
+    navigate('dashboard');
     showToast('✅ נשמר ביומן!');
     capturedImageBase64 = null;
     document.getElementById('preview-img').style.display = 'none';
@@ -4777,5 +4721,6 @@ document.getElementById('food-text-input').addEventListener('input', function() 
     <text class="pet-think-q" x="82" y="18" font-size="14" fill="#E8703A" font-family="sans-serif" font-weight="bold" opacity="0">?</text>
   </svg>
 </template>
+<canvas id="confetti-canvas" aria-hidden="true"></canvas>
 </body>
 </html>

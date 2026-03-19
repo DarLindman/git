@@ -2236,7 +2236,7 @@ input::placeholder { color: var(--muted); }
 
       <!-- Step 2: body profile (shown after register) -->
       <div id="auth-step2" style="display:none">
-        <button class="btn btn-ghost" style="margin-bottom:12px;width:auto;padding:8px 16px;font-size:13px" onclick="document.getElementById('auth-step1').style.display='';document.getElementById('auth-step2').style.display='none'">&#8592; חזור</button>
+        <button class="btn btn-ghost" style="margin-bottom:12px;width:auto;padding:8px 16px;font-size:13px" onclick="pendingToken=null;pendingUsername=null;document.getElementById('auth-step1').style.display='';document.getElementById('auth-step2').style.display='none'">חזור &#8594;</button>
         <div class="profile-step-title">ספר לנו עליך</div>
         <div class="profile-step-sub">נחשב עבורך המלצת קלוריות יומית</div>
 

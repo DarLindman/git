@@ -2236,7 +2236,7 @@ input::placeholder { color: var(--muted); }
 
       <!-- Step 2: body profile (shown after register) -->
       <div id="auth-step2" style="display:none">
-        <button class="btn btn-ghost" style="margin-bottom:12px;width:auto;padding:8px 16px;font-size:13px" onclick="pendingToken=null;pendingUsername=null;document.getElementById('auth-step1').style.display='';document.getElementById('auth-step2').style.display='none'">חזור &#8594;</button>
+        <button class="btn btn-ghost" dir="ltr" style="margin-bottom:12px;width:auto;padding:8px 16px;font-size:13px" onclick="pendingRegUser=null;pendingRegPass=null;document.getElementById('auth-step1').style.display='';document.getElementById('auth-step2').style.display='none'">חזור &#8594;</button>
         <div class="profile-step-title">ספר לנו עליך</div>
         <div class="profile-step-sub">נחשב עבורך המלצת קלוריות יומית</div>
 
@@ -2787,6 +2787,8 @@ let currentStatsTab = 'weekly';
 let userProfile = null;
 let pendingToken = null;
 let pendingUsername = null;
+let pendingRegUser = null;
+let pendingRegPass = null;
 let regGender = 'male';
 let regActivity = 'light';
 let regGoalKg = 0;
@@ -2976,28 +2978,28 @@ async function doLogin() {
   } catch (e) { document.getElementById('auth-error').textContent = e.message; }
 }
 
-async function doRegister() {
+function doRegister() {
   const u = document.getElementById('reg-user').value.trim();
   const p = document.getElementById('reg-pass').value;
   document.getElementById('auth-error2').textContent = '';
-  try {
-    const data = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ username: u, password: p }) });
-    // Store pending credentials; show profile step
-    pendingToken = data.token;
-    pendingUsername = data.username;
-    // Switch to step 2
-    document.getElementById('auth-step1').style.display = 'none';
-    document.getElementById('auth-step2').style.display = '';
-    // Reset reg profile state
-    regGender = 'male'; regActivity = 'light'; regGoalKg = 0;
-    document.getElementById('reg-male-btn').classList.add('selected');
-    document.getElementById('reg-female-btn').classList.remove('selected');
-    document.querySelectorAll('#reg-activity-list .activity-opt').forEach(b => {
-      b.classList.toggle('selected', b.dataset.val === 'light');
-    });
-    const regGoalSel = document.getElementById('reg-goal-select');
-    if (regGoalSel) regGoalSel.value = '0';
-  } catch (e) { document.getElementById('auth-error2').textContent = e.message; }
+  if (u.length < 3 || u.length > 50 || p.length < 6) {
+    document.getElementById('auth-error2').textContent = 'שם משתמש חייב להכיל 3–50 תווים, סיסמא לפחות 6';
+    return;
+  }
+  // Store credentials; advance to profile step WITHOUT creating the account yet
+  pendingRegUser = u;
+  pendingRegPass = p;
+  document.getElementById('auth-step1').style.display = 'none';
+  document.getElementById('auth-step2').style.display = '';
+  document.getElementById('auth-error3').textContent = '';
+  regGender = 'male'; regActivity = 'light'; regGoalKg = 0;
+  document.getElementById('reg-male-btn').classList.add('selected');
+  document.getElementById('reg-female-btn').classList.remove('selected');
+  document.querySelectorAll('#reg-activity-list .activity-opt').forEach(b => {
+    b.classList.toggle('selected', b.dataset.val === 'light');
+  });
+  const regGoalSel = document.getElementById('reg-goal-select');
+  if (regGoalSel) regGoalSel.value = '0';
 }
 
 function setRegGender(g) {
@@ -3020,37 +3022,37 @@ function setRegGoal(v) {
 }
 
 async function saveRegProfile() {
+  document.getElementById('auth-error3').textContent = '';
+  try {
+    const data = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ username: pendingRegUser, password: pendingRegPass }) });
+    pendingToken = data.token; pendingUsername = data.username;
+  } catch(e) { document.getElementById('auth-error3').textContent = e.message; return; }
   const birthDate = document.getElementById('reg-birthdate').value || '';
   const height = +document.getElementById('reg-height').value || 0;
   const weight = +document.getElementById('reg-weight').value || 0;
   const profile = { gender: regGender, birthDate, height, weight, activity: regActivity, goalKg: regGoalKg };
   localStorage.setItem('fl_profile', JSON.stringify(profile));
-  // Save to server using pendingToken (passed explicitly to avoid mutating the global)
-  if (pendingToken) {
-    const authHeader = { Authorization: `Bearer ${pendingToken}` };
-    try {
-      await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile), headers: authHeader });
-    } catch(e) { /* non-critical */ }
-    // Auto-log registration weight
-    if (weight > 0) {
-      try {
-        await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }), headers: authHeader });
-      } catch(e) { /* non-critical */ }
-    }
+  const authHeader = { Authorization: `Bearer ${pendingToken}` };
+  try { await apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(profile), headers: authHeader }); } catch(e) {}
+  if (weight > 0) {
+    try { await apiFetch('/api/weight', { method: 'POST', body: JSON.stringify({ weight_kg: weight, logged_at: todayStr() }), headers: authHeader }); } catch(e) {}
   }
   finishLogin();
 }
 
-function skipRegProfile() {
+async function skipRegProfile() {
+  document.getElementById('auth-error3').textContent = '';
+  try {
+    const data = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ username: pendingRegUser, password: pendingRegPass }) });
+    pendingToken = data.token; pendingUsername = data.username;
+  } catch(e) { document.getElementById('auth-error3').textContent = e.message; return; }
   finishLogin();
 }
 
 function finishLogin() {
   loadProfile();
   setLoggedIn(pendingToken, pendingUsername);
-  pendingToken = null;
-  pendingUsername = null;
-  // Reset step UI for next time
+  pendingToken = null; pendingUsername = null; pendingRegUser = null; pendingRegPass = null;
   document.getElementById('auth-step1').style.display = '';
   document.getElementById('auth-step2').style.display = 'none';
 }

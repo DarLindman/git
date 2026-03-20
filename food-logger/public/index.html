@@ -4042,6 +4042,8 @@ async function saveEntry() {
       }
       const pw = savePetSlot.querySelector('.pet-wrap');
       if (pw) setPetState(pw, 'ecstatic');
+      const camWrap = document.getElementById('pet-camera-wrap');
+      if (camWrap) camWrap.style.opacity = '0';
       savePopup.classList.add('visible');
       // Bounce after spring lands (~650ms)
       setTimeout(() => {

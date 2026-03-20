@@ -245,9 +245,9 @@ body::after {
 
 /* ── Screens ── */
 .screen { display: none; flex-direction: column; min-height: 100dvh; padding-bottom: var(--nav-h); }
-#screen-dashboard { overflow: hidden; max-height: 100dvh; }
-#screen-settings { overflow: hidden; max-height: 100dvh; }
-#screen-settings .page { overflow: hidden; }
+#screen-dashboard { overflow-x: hidden; overflow-y: auto; }
+#screen-settings { overflow-x: hidden; }
+#screen-settings .page { overflow-y: auto; }
 
 @keyframes screenEnter {
   from { opacity: 0; transform: translateY(12px); }
@@ -437,6 +437,8 @@ body::after {
   max-width: 560px;
   margin-inline: auto;
   width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 

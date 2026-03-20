@@ -1609,6 +1609,30 @@ input::placeholder { color: var(--muted); }
    ANALYSIS
 ════════════════════════════════════════ */
 #screen-analysis { background: var(--bg); position: relative; overflow: hidden; }
+#capy-save-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% - 120vh));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 300;
+  transition: transform 0.65s var(--ease-spring), opacity 0.25s;
+  opacity: 0;
+}
+#capy-save-popup.visible { transform: translate(-50%, -50%); opacity: 1; }
+#capy-save-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 15px;
+  color: var(--text);
+  white-space: nowrap;
+}
 #confetti-canvas {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -2459,10 +2483,7 @@ input::placeholder { color: var(--muted); }
     <button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 13px;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit" onclick="navigate('camera')">✕</button>
   </div>
   <div class="page">
-    <div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:8px 0 4px;direction:rtl">
-      <div id="pet-camera-wrap"></div>
-      <div id="pet-camera-bubble" style="background:var(--surface);border:1px solid var(--border);border-radius:12px 12px 4px 12px;padding:8px 12px;font-size:13px;color:var(--text);white-space:nowrap;opacity:0;transition:opacity 0.3s 0.1s;pointer-events:none">נרשם! כל הכבוד 🎉</div>
-    </div>
+    <div id="pet-camera-wrap" style="display:flex;justify-content:center;padding:8px 0 4px"></div>
     <img id="analysis-img" class="analysis-img" alt="">
     <div id="analysis-loading" class="spinner">🔄</div>
     <div id="analysis-result" style="display:none">
@@ -4012,19 +4033,24 @@ async function saveEntry() {
     saveBtn.disabled = false;
     saveBtn.textContent = 'שמור ביומן';
     diaryDate = todayStr();
-    if (typeof _cameraCapyState === 'function') _cameraCapyState('ecstatic');
-    if (_cameraPetWrap) {
-      _cameraPetWrap.style.animation = 'none';
-      void _cameraPetWrap.offsetWidth;
-      _cameraPetWrap.style.animation = 'pet-tap 0.4s var(--ease-spring) 2';
+    // Fly-in celebration popup
+    const savePopup = document.getElementById('capy-save-popup');
+    const savePetSlot = document.getElementById('capy-save-pet');
+    if (savePopup && savePetSlot) {
+      if (!savePetSlot.querySelector('svg')) {
+        const w = cloneCapybara(80); setPetState(w, 'ecstatic'); savePetSlot.appendChild(w);
+      }
+      const pw = savePetSlot.querySelector('.pet-wrap');
+      if (pw) setPetState(pw, 'ecstatic');
+      savePopup.classList.add('visible');
+      // Bounce after spring lands (~650ms)
+      setTimeout(() => {
+        if (pw) { pw.style.animation = 'none'; void pw.offsetWidth; pw.style.animation = 'pet-tap 0.4s var(--ease-spring) 2'; }
+      }, 650);
+      setTimeout(() => savePopup.classList.remove('visible'), 2400);
     }
-    const camBubble = document.getElementById('pet-camera-bubble');
-    if (camBubble) camBubble.style.opacity = '1';
     spawnConfetti();
-    setTimeout(() => {
-      if (camBubble) camBubble.style.opacity = '0';
-      navigate('home');
-    }, 2500);
+    setTimeout(() => navigate('home'), 2700);
     showToast('✅ נשמר ביומן!');
     capturedImageBase64 = null;
     document.getElementById('preview-img').style.display = 'none';
@@ -4720,5 +4746,9 @@ document.getElementById('food-text-input').addEventListener('input', function() 
   </svg>
 </template>
 <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+<div id="capy-save-popup" aria-live="polite">
+  <div id="capy-save-pet"></div>
+  <div id="capy-save-bubble">נרשם! כל הכבוד 🎉</div>
+</div>
 </body>
 </html>

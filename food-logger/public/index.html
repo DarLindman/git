@@ -520,7 +520,6 @@ body::after {
   background: rgba(232,112,58,0.05);
   border-bottom: 1px solid var(--border);
   direction: rtl;
-  margin-inline: -20px;
 }
 .pet-strip .pet-wrap { flex-shrink: 0; }
 
@@ -2358,10 +2357,7 @@ input::placeholder { color: var(--muted); }
 
 <!-- ════════════════ DASHBOARD ════════════════ -->
 <div id="screen-dashboard" class="screen">
-  <div class="dash-wrap">
-
-    <!-- Pet strip -->
-    <div class="pet-strip dash-stagger" id="pet-strip">
+  <div class="pet-strip dash-stagger" id="pet-strip">
       <svg class="capy-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" width="80" height="80" aria-label="לוגו יומן">
         <!-- background -->
         <rect class="capy-logo-bg" x="0" y="0" width="120" height="120" rx="24" fill="#E8703A"/>
@@ -2429,7 +2425,8 @@ input::placeholder { color: var(--muted); }
         <div class="pet-bubble-status" id="pet-status-text">טוען...</div>
       </div>
       <div id="pet-dashboard-wrap"></div>
-    </div>
+  </div>
+  <div class="dash-wrap">
 
     <svg class="wavy-divider" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0,4 Q25,1 50,4 Q75,7 100,4"/>

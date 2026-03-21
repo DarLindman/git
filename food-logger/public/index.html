@@ -222,16 +222,18 @@
 .bg-mesh { position: absolute; inset: 0; }
 .bg-mesh::before {
   content: ''; position: absolute;
-  width: 55%; height: 55%; top: -8%; right: -8%;
-  background: radial-gradient(circle, rgba(232,112,58,0.13) 0%, transparent 70%);
+  width: 75%; height: 75%; top: -20%; right: -20%;
+  background: radial-gradient(circle, rgba(232,112,58,0.14) 0%, rgba(232,112,58,0.04) 50%, transparent 80%);
   border-radius: 50%;
+  filter: blur(40px);
   animation: meshBlob1 22s ease-in-out infinite; will-change: transform;
 }
 .bg-mesh::after {
   content: ''; position: absolute;
-  width: 65%; height: 60%; bottom: -20%; left: -15%;
-  background: radial-gradient(circle, rgba(139,30,0,0.11) 0%, transparent 70%);
+  width: 80%; height: 70%; bottom: -25%; left: -20%;
+  background: radial-gradient(circle, rgba(139,30,0,0.13) 0%, rgba(139,30,0,0.04) 50%, transparent 80%);
   border-radius: 50%;
+  filter: blur(50px);
   animation: meshBlob2 28s ease-in-out infinite; will-change: transform;
 }
 @keyframes meshBlob1 {
@@ -2169,12 +2171,12 @@ input::placeholder { color: var(--muted); }
 <div id="bg-fx" aria-hidden="true">
   <div class="bg-mesh"></div>
   <div class="bg-glow"></div>
-  <div class="bg-ember" style="--x:12%;--delay:0s;--dur:18s"></div>
-  <div class="bg-ember" style="--x:28%;--delay:5s;--dur:14s"></div>
-  <div class="bg-ember" style="--x:48%;--delay:9s;--dur:21s"></div>
-  <div class="bg-ember" style="--x:65%;--delay:3s;--dur:16s"></div>
-  <div class="bg-ember" style="--x:80%;--delay:13s;--dur:20s"></div>
-  <div class="bg-ember" style="--x:38%;--delay:7s;--dur:15s"></div>
+  <div class="bg-ember" style="--x:12%;--delay:-3s;--dur:18s"></div>
+  <div class="bg-ember" style="--x:28%;--delay:-8s;--dur:14s"></div>
+  <div class="bg-ember" style="--x:48%;--delay:-15s;--dur:21s"></div>
+  <div class="bg-ember" style="--x:65%;--delay:-6s;--dur:16s"></div>
+  <div class="bg-ember" style="--x:80%;--delay:-11s;--dur:20s"></div>
+  <div class="bg-ember" style="--x:38%;--delay:-2s;--dur:15s"></div>
 </div>
 
 <!-- ════════════════ WELCOME ════════════════ -->

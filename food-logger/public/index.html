@@ -4300,7 +4300,7 @@ async function loadWeeklyStats() {
         ? rows.reduce((s, r) => s + (+r.calories || 0), 0) / rows.length
         : 0;
       const pct = rec > 0 ? avgCal / rec : 0;
-      const weeklyState = pct >= 0.9 ? 'happy' : pct >= 0.5 ? 'neutral' : 'sad';
+      const weeklyState = 'happy';
       const petWrap = wrapEl.querySelector('.pet-wrap');
       if (petWrap) setPetState(petWrap, weeklyState);
       stopStatsCapyWalk();
@@ -4324,6 +4324,16 @@ async function loadMonthlyStats() {
       isToday: r => r.day.slice(0, 10) === todayS,
       recommended: rec,
     });
+    const polylineEl = chartEl.querySelector('polyline[id^="lc-"]');
+    if (polylineEl) {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        polylineEl.style.strokeDashoffset = '0';
+      } else {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          polylineEl.style.strokeDashoffset = '0';
+        }));
+      }
+    }
     renderStatMacros('monthly-macro', rows, `ממוצע יומי ב-${rows.length} ימים`);
   } catch { }
 }

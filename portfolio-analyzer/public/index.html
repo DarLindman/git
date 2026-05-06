@@ -129,6 +129,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .seg-btn { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: pointer; text-align: center; font-family: var(--font); transition: .15s; }
 .seg-btn.active { background: rgba(100,255,218,.12); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
+.info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+.info-box.warn { border-color: rgba(251,191,36,.3); background: rgba(251,191,36,.06); }
+.info-box.accent { border-color: rgba(100,255,218,.25); background: rgba(100,255,218,.06); }
+.alert-level-cards { display: flex; flex-direction: column; gap: 8px; }
+.alert-card { background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: .15s; }
+.alert-card.active { border-color: var(--accent); background: rgba(100,255,218,.08); }
+.alert-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.alert-card-title { font-size: 14px; font-weight: 600; }
+.alert-card-badge { font-size: 10px; padding: 2px 8px; border-radius: 8px; background: var(--surface); color: var(--text-muted); }
+.alert-card.active .alert-card-badge { background: rgba(100,255,218,.15); color: var(--accent); }
+.alert-card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .mt-12 { margin-top: 12px; }
 .mt-20 { margin-top: 20px; }
 .flex-gap { display: flex; gap: 6px; }
@@ -565,7 +576,43 @@ async function loadNotifications() {
   }).join('')
 }
 
+let _showPassForm = false
+function togglePasswordForm() { _showPassForm = !_showPassForm; renderSettings(); if (_showPassForm) setTimeout(()=>document.getElementById('cur-pass')?.focus(),50) }
+
 function renderSettings() {
+  const isHe = lang === 'he'
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  const isIOSChrome = isIOS && /CriOS/.test(navigator.userAgent)
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches
+
+  const alertLevels = [
+    { level: 1, label: isHe ? 'נמוך' : 'Low', desc: isHe ? 'דוחות רבעוניים, מיזוגים ורכישות (M&A), התפטרות CEO/CFO' : 'Earnings reports, M&A deals, CEO/CFO departures' },
+    { level: 2, label: isHe ? 'בינוני' : 'Medium', desc: isHe ? 'כל האמור + שינוי המלצת אנליסט, תביעות, שינוי תחזית חברה' : 'All above + analyst upgrades/downgrades, lawsuits, guidance changes' },
+    { level: 3, label: isHe ? 'גבוה' : 'High', desc: isHe ? 'כל כתבה שמוזכרת בה המניה' : 'Every article mentioning your stocks' }
+  ]
+
+  let pushSection
+  if (isIOSChrome) {
+    pushSection = `<div class="info-box warn">
+      <div style="font-size:13px;font-weight:600;color:var(--warn);margin-bottom:6px">${isHe ? '⚠ Chrome על iPhone לא נתמך' : '⚠ Chrome on iPhone not supported'}</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">${isHe ? 'Apple לא מאפשרת התראות ב-Chrome. כדי לקבל התראות:' : "Apple doesn't allow push in Chrome. To enable notifications:"}</div>
+    </div>
+    <div class="info-box accent" style="margin-top:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 כיצד לעבור ל-Safari' : '📱 How to switch to Safari'}</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.8">${isHe ? '1. העתק את כתובת האתר<br>2. פתח Safari<br>3. הדבק את הכתובת<br>4. לחץ על כפתור השיתוף (□↑)<br>5. "הוסף למסך הבית"<br>6. פתח מהמסך הבית והפעל התראות' : '1. Copy the website URL<br>2. Open Safari<br>3. Paste the URL<br>4. Tap Share button (□↑)<br>5. "Add to Home Screen"<br>6. Open from Home Screen and enable notifications'}</div>
+    </div>`
+  } else if (isIOS && !isStandalone) {
+    pushSection = `<div class="info-box accent">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 נדרש: הוסף למסך הבית' : '📱 Required: Add to Home Screen'}</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">${isHe ? 'כדי לקבל התראות ב-iPhone יש להתקין את האפליקציה:<br>Safari → כפתור שיתוף (□↑) → "הוסף למסך הבית"<br>ואז פתח מהמסך ובית הפעל התראות.' : 'To receive notifications on iPhone, install the app first:<br>Safari → Share button (□↑) → "Add to Home Screen"<br>Then open from Home Screen and enable notifications.'}</div>
+    </div>`
+  } else {
+    pushSection = `<div class="settings-row">
+      <span>${t('settings_push')}</span>
+      <label class="toggle"><input type="checkbox" id="push-toggle" ${window._pushEnabled?'checked':''} onchange="togglePush(this.checked)"><span class="toggle-slider"></span></label>
+    </div>`
+  }
+
   document.getElementById('settings-content').innerHTML = `
     <div class="settings-section">
       <div class="settings-label">${t('settings_language')}</div>
@@ -574,27 +621,39 @@ function renderSettings() {
         <div class="seg-btn ${lang==='en'?'active':''}" onclick="setLanguage('en')">English</div>
       </div>
     </div>
+
     <div class="settings-section">
       <div class="settings-label">${t('settings_alert_level')}</div>
-      <div class="level-btns">
-        <div class="level-btn ${profile.alert_level===1?'active':''}" onclick="setAlertLevel(1)">${t('level_low')}</div>
-        <div class="level-btn ${profile.alert_level===2?'active':''}" onclick="setAlertLevel(2)">${t('level_mid')}</div>
-        <div class="level-btn ${profile.alert_level===3?'active':''}" onclick="setAlertLevel(3)">${t('level_high')}</div>
+      <div class="alert-level-cards">
+        ${alertLevels.map(a => `
+        <div class="alert-card ${profile.alert_level===a.level?'active':''}" onclick="setAlertLevel(${a.level})">
+          <div class="alert-card-header">
+            <span class="alert-card-title">${a.label}</span>
+            ${profile.alert_level===a.level ? `<span class="alert-card-badge">${isHe?'פעיל':'Active'}</span>` : ''}
+          </div>
+          <div class="alert-card-desc">${a.desc}</div>
+        </div>`).join('')}
       </div>
     </div>
+
     <div class="settings-section">
       <div class="settings-label">${t('settings_push')}</div>
-      <div class="settings-row">
-        <span>${t('settings_push')}</span>
-        <label class="toggle"><input type="checkbox" id="push-toggle" ${window._pushEnabled?'checked':''} onchange="togglePush(this.checked)"><span class="toggle-slider"></span></label>
-      </div>
+      ${pushSection}
     </div>
+
     <div class="settings-section">
       <div class="settings-label">${t('settings_password')}</div>
-      <div class="input-group"><input class="input" id="cur-pass" type="password" placeholder="${lang==='he'?'סיסמה נוכחית':'Current password'}"></div>
-      <div class="input-group"><input class="input" id="new-pass" type="password" placeholder="${lang==='he'?'סיסמה חדשה':'New password'}"></div>
-      <button class="btn btn-secondary btn-full mt-12" onclick="changePassword()">${t('settings_password')}</button>
+      <button class="btn btn-secondary btn-full" onclick="togglePasswordForm()">
+        ${_showPassForm ? (isHe?'ביטול':'Cancel') : t('settings_password')}
+      </button>
+      ${_showPassForm ? `
+      <div style="margin-top:12px">
+        <div class="input-group"><input class="input" id="cur-pass" type="password" placeholder="${isHe?'סיסמה נוכחית':'Current password'}" autocomplete="current-password"></div>
+        <div class="input-group"><input class="input" id="new-pass" type="password" placeholder="${isHe?'סיסמה חדשה (לפחות 6 תווים)':'New password (min 6 chars)'}" autocomplete="new-password"></div>
+        <button class="btn btn-primary btn-full" onclick="changePassword()">${isHe?'אשר שינוי':'Confirm Change'}</button>
+      </div>` : ''}
     </div>
+
     <div class="divider"></div>
     <button class="btn btn-danger btn-full" onclick="logout()">${t('settings_logout')}</button>`
 }

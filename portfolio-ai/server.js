@@ -6,7 +6,19 @@ const { Pool } = require('pg')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
 const Anthropic = require('@anthropic-ai/sdk')
-const yahooFinance = require('yahoo-finance2').default || require('yahoo-finance2')
+let _yf = null
+async function getYF() {
+  if (!_yf) {
+    try {
+      // eslint-disable-next-line
+      _yf = require('yahoo-finance2').default || require('yahoo-finance2')
+    } catch {
+      const m = await import('yahoo-finance2')
+      _yf = m.default || m
+    }
+  }
+  return _yf
+}
 const webpush = require('web-push')
 const axios = require('axios')
 const cheerio = require('cheerio')
@@ -188,9 +200,10 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
 async function fetchStockData(ticker, exchange) {
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
   try {
+    const yf = await getYF()
     const [quote, summary] = await Promise.all([
-      yahooFinance.quote(symbol),
-      yahooFinance.quoteSummary(symbol, { modules: ['summaryDetail', 'defaultKeyStatistics', 'assetProfile'] }).catch(() => null)
+      yf.quote(symbol),
+      yf.quoteSummary(symbol, { modules: ['summaryDetail', 'defaultKeyStatistics', 'assetProfile'] }).catch(() => null)
     ])
     return {
       ticker,

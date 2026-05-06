@@ -1,5 +1,5 @@
 {
-  "name": "portfolio-ai",
+  "name": "portfolio-analyzer",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

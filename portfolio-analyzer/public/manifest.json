@@ -1,6 +1,6 @@
 {
-  "name": "Portfolio AI",
-  "short_name": "Portfolio AI",
+  "name": "Portfolio Analyzer",
+  "short_name": "Portfolio Analyzer",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f2027",

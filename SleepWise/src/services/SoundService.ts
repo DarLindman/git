@@ -34,7 +34,7 @@ export const SoundService = {
       staysActiveInBackground: true,
       playsInSilentModeIOS: true,
     });
-    const { sound } = await Audio.Sound.createAsync(SOUND_FILES[soundId], {
+    const { sound } = await Audio.Sound.createAsync(SOUND_FILES[soundId] as any, {
       isLooping: true,
       volume: 0.1,
     });

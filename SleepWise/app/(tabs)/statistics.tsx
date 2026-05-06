@@ -5,7 +5,7 @@ import { Colors, Spacing } from '../../src/design/tokens';
 import { i18n } from '../../src/i18n';
 import { SleepSession, totalSleepMs, deepPct, remPct, corePct } from '../../src/models/SleepSession';
 import { calculate } from '../../src/engine/SleepScore';
-import { HealthKitService } from '../../src/services/HealthKitService';
+import { getSleepProvider } from '../../src/services/SleepProviderFactory';
 
 function avg(nums: number[]): number {
   if (!nums.length) return 0;
@@ -39,9 +39,10 @@ export default function StatisticsScreen() {
 
   useEffect(() => {
     async function load() {
+      const provider = await getSleepProvider();
       const [sessions7, sessions30] = await Promise.all([
-        HealthKitService.fetchSessions(Date.now() - 7 * 86_400_000, Date.now()),
-        HealthKitService.fetchSessions(Date.now() - 30 * 86_400_000, Date.now()),
+        provider.fetchSessions(Date.now() - 7 * 86_400_000, Date.now()),
+        provider.fetchSessions(Date.now() - 30 * 86_400_000, Date.now()),
       ]);
 
       setStats({

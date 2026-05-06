@@ -10,14 +10,13 @@ import { SleepSession } from '../../src/models/SleepSession';
 import { SleepStage, stageDisplayName } from '../../src/models/SleepStage';
 import { calculate } from '../../src/engine/SleepScore';
 import { evaluate, AlarmDecision, snoozeDecision, SnoozeDecision, SNOOZE_DELAY_MS } from '../../src/engine/AlarmEngine';
-import { HealthKitService } from '../../src/services/HealthKitService';
 import { MotionService } from '../../src/services/MotionService';
 import { SoundService } from '../../src/services/SoundService';
+import { getSleepProvider, isMockMode, pollIntervalMs, SleepProvider } from '../../src/services/SleepProviderFactory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ScreenState = 'before' | 'active' | 'summary';
 const ALARM_KEY = 'sw_alarm_config';
-const POLL_MS = 2 * 60 * 1000;
 
 export default function TonightScreen() {
   const t = i18n.t();
@@ -32,9 +31,11 @@ export default function TonightScreen() {
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [lastSession, setLastSession] = useState<SleepSession | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [mockMode, setMockMode] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const providerRef = useRef<SleepProvider | null>(null);
 
   useEffect(() => {
     // Update clock every 30s
@@ -60,19 +61,15 @@ export default function TonightScreen() {
         setConfig(c => ({ ...c, targetTimeMs: targetMs }));
       }
 
-      try {
-        await HealthKitService.requestPermissions();
-        const hasWatch = await HealthKitService.isWatchTrackingEnabled();
-        setWatchEnabled(hasWatch);
-        if (hasWatch) {
-          // Watch auto-tracks — begin polling immediately
-          startTracking(true);
-        }
-      } catch {
-        setWatchEnabled(false);
-      }
+      const provider = await getSleepProvider();
+      providerRef.current = provider;
+      setMockMode(isMockMode());
 
-      const sessions = await HealthKitService.fetchSessions(Date.now() - 86_400_000, Date.now());
+      const hasWatch = await provider.isWatchTrackingEnabled();
+      setWatchEnabled(hasWatch);
+      if (hasWatch) startTracking(true);
+
+      const sessions = await provider.fetchSessions(Date.now() - 86_400_000, Date.now());
       if (sessions.length) setLastSession(sessions[sessions.length - 1]);
     }
     load();
@@ -86,19 +83,23 @@ export default function TonightScreen() {
 
   const beginPolling = () => {
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(poll, POLL_MS);
+    const interval = pollIntervalMs();
+    pollRef.current = setInterval(poll, interval);
     poll();
   };
 
   const poll = async () => {
-    const provider = watchEnabled ? HealthKitService : MotionService;
+    const provider = providerRef.current;
+    if (!provider) return;
+    const interval = pollIntervalMs();
     const stage = await provider.currentStage();
     setCurrentStage(stage);
+    setNow(Date.now());
 
     const nowMs = Date.now();
     setEntries(prev => [
       ...prev,
-      { id: String(nowMs), stage: stage ?? SleepStage.Core, startMs: nowMs - POLL_MS, endMs: nowMs },
+      { id: String(nowMs), stage: stage ?? SleepStage.Core, startMs: nowMs - interval, endMs: nowMs },
     ]);
 
     const decision = evaluate(config, nowMs, stage);
@@ -107,7 +108,7 @@ export default function TonightScreen() {
 
   const fireAlarm = async (stage: SleepStage | null) => {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (!watchEnabled) MotionService.stop();
+    if (!watchEnabled && !isMockMode()) MotionService.stop();
     setWokeInStage(stage);
     await SoundService.play(config.soundId as any, config.maxVolume);
     setState('summary');
@@ -144,6 +145,15 @@ export default function TonightScreen() {
   return (
     <AuroraBackground>
       <SafeAreaView style={s.safe}>
+
+        {/* Demo mode badge */}
+        {mockMode && (
+          <View style={s.demoBadge}>
+            <Text style={s.demoText}>
+              {lang === 'he' ? '⚙ מצב הדגמה — נתונים מדומים' : '⚙ Demo Mode — simulated data'}
+            </Text>
+          </View>
+        )}
 
         {/* ── BEFORE ── */}
         {state === 'before' && (
@@ -232,6 +242,23 @@ export default function TonightScreen() {
 const s = StyleSheet.create({
   safe:   { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg, gap: Spacing.md },
+
+  demoBadge: {
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,180,0,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,180,0,0.25)',
+  },
+  demoText: {
+    fontFamily: 'InstrumentSans',
+    fontSize: 10,
+    color: 'rgba(255,200,80,0.7)',
+    letterSpacing: 0.5,
+  },
 
   lastNightCard: {
     alignItems: 'center',

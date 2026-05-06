@@ -6,7 +6,7 @@ import { Colors, Spacing } from '../../src/design/tokens';
 import { i18n } from '../../src/i18n';
 import { SleepSession, totalSleepMs } from '../../src/models/SleepSession';
 import { calculate } from '../../src/engine/SleepScore';
-import { HealthKitService } from '../../src/services/HealthKitService';
+import { getSleepProvider } from '../../src/services/SleepProviderFactory';
 
 type Period = 'weekly' | 'monthly';
 
@@ -30,7 +30,8 @@ export default function HistoryScreen() {
     async function load() {
       setLoading(true);
       const days = period === 'weekly' ? 7 : 30;
-      const data = await HealthKitService.fetchSessions(
+      const provider = await getSleepProvider();
+      const data = await provider.fetchSessions(
         Date.now() - days * 86_400_000,
         Date.now(),
       );

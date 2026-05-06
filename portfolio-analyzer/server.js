@@ -248,7 +248,45 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
   }
 })
 
+async function fetchStockDataFinnhub(ticker) {
+  const apiKey = process.env.FINNHUB_API_KEY
+  try {
+    const [quoteRes, profileRes, metricRes] = await Promise.all([
+      axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
+      axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
+      axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: ticker, metric: 'all', token: apiKey }, timeout: 8000 })
+    ])
+    const q = quoteRes.data
+    const p = profileRes.data
+    const m = metricRes.data?.metric || {}
+    if (!q?.c) return null
+    return {
+      ticker, symbol: ticker,
+      price: q.c,
+      change_pct: parseFloat((q.dp ?? 0).toFixed(2)),
+      market_cap: p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null,
+      pe_ratio: m.peBasicExclExtraTTM || null,
+      eps: m.epsInclExtraOrderTTM || null,
+      week52_high: m['52WeekHigh'] || null,
+      week52_low: m['52WeekLow'] || null,
+      sector: p.finnhubIndustry || 'N/A',
+      industry: p.finnhubIndustry || 'N/A',
+      short_name: p.name || ticker,
+      currency: p.currency || 'USD'
+    }
+  } catch (e) {
+    console.warn(`Finnhub failed for ${ticker}:`, e.message)
+    return null
+  }
+}
+
 async function fetchStockData(ticker, exchange) {
+  // Use Finnhub for non-TASE stocks when FINNHUB_API_KEY is set (bypasses Yahoo auth restrictions)
+  if (process.env.FINNHUB_API_KEY && exchange !== 'TASE') {
+    const data = await fetchStockDataFinnhub(ticker)
+    if (data) return data
+    console.warn(`Finnhub returned no data for ${ticker}, falling back to Yahoo`)
+  }
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -505,6 +543,10 @@ Respond ONLY with the JSON array.` }
     console.error(err)
     res.status(500).json({ error: 'שגיאה בעיבוד הצילום' })
   }
+})
+
+app.get('/api/status', (req, res) => {
+  res.json({ finnhub: !!process.env.FINNHUB_API_KEY, news: !!process.env.NEWS_API_KEY })
 })
 
 app.get('/api/profile', auth, async (req, res) => {

@@ -272,6 +272,7 @@ const T = {
   }
 }
 let lang = 'he', profile = { language:'he', alert_level:2 }
+let _serverStatus = { finnhub: false, news: false }
 let token = localStorage.getItem('token')
 let currentTab = 'portfolio', addMode = 'screenshot', addExchange = 'US'
 let pendingHoldings = []
@@ -324,7 +325,9 @@ function logout() {
 async function initApp() {
   document.getElementById('auth-wrapper').classList.remove('active')
   document.getElementById('app').style.display = 'flex'
-  profile = await api('GET', '/api/profile') || profile
+  const [prof, status] = await Promise.all([api('GET', '/api/profile'), api('GET', '/api/status')])
+  if (prof) profile = prof
+  if (status) _serverStatus = status
   applyLang(profile.language || 'he')
   registerSW()
   loadPortfolio()
@@ -620,6 +623,19 @@ function renderSettings() {
         <div class="seg-btn ${lang==='he'?'active':''}" onclick="setLanguage('he')">עברית</div>
         <div class="seg-btn ${lang==='en'?'active':''}" onclick="setLanguage('en')">English</div>
       </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label">${isHe ? 'מקורות נתונים' : 'Data Sources'}</div>
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.7">
+        <div>Yahoo Finance &mdash; ${isHe ? 'מחיר, שינוי, 52W' : 'price, change, 52W'} ✓</div>
+        <div>Finnhub &mdash; P/E, EPS, ${isHe ? 'שווי שוק, סקטור' : 'market cap, sector'} ${_serverStatus.finnhub ? '✓' : '✗'}</div>
+      </div>
+      ${!_serverStatus.finnhub ? `<div class="info-box" style="margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.7">
+        ${isHe
+          ? 'לנתונים מלאים: הירשם בחינם ב-<a href="https://finnhub.io" target="_blank" style="color:var(--accent)">finnhub.io</a>, קבל API key וצור משתנה סביבה <code style="background:var(--surface-2);padding:1px 4px;border-radius:3px">FINNHUB_API_KEY</code> ב-Railway.'
+          : 'For full data: register free at <a href="https://finnhub.io" target="_blank" style="color:var(--accent)">finnhub.io</a>, get an API key and add env variable <code style="background:var(--surface-2);padding:1px 4px;border-radius:3px">FINNHUB_API_KEY</code> in Railway.'}
+      </div>` : ''}
     </div>
 
     <div class="settings-section">

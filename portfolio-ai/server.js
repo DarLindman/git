@@ -410,6 +410,149 @@ async function sendPushToUser(userId, payload) {
   }
 }
 
+async function filterNewsWithClaude(ticker, articleTitle, articleContent, alertLevel) {
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      system: [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
+      messages: [{
+        role: 'user',
+        content: `Ticker: ${ticker}
+Alert level: ${alertLevel}
+Level 1 = only: earnings reports, M&A, CEO/CFO departure
+Level 2 = also: analyst rating changes, lawsuits, guidance revision
+Level 3 = all mentions
+
+Article title: ${articleTitle}
+Article snippet: ${articleContent.slice(0, 500)}
+
+Should this trigger a notification? Return JSON:
+{ "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }`
+      }]
+    })
+    return extractJson(message.content[0].text)
+  } catch (err) {
+    console.error('filterNewsWithClaude error:', err.message)
+    return null
+  }
+}
+
+async function summarizeEarningsCall(articleText) {
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      system: [{ type: 'text', text: 'You are a skeptical financial analyst. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
+      messages: [{
+        role: 'user',
+        content: `Summarize this earnings call article in exactly 5 Hebrew bullet points for a skeptical investor.
+Flag if management seemed evasive on: growth, margins, competition, or guidance.
+
+Article: ${articleText.slice(0, 3000)}
+
+Return JSON: { "bullets": ["bullet1", "bullet2", "bullet3", "bullet4", "bullet5"], "evasion_warning": null }`
+      }]
+    })
+    return extractJson(message.content[0].text)
+  } catch (err) {
+    console.error('summarizeEarningsCall error:', err.message)
+    return null
+  }
+}
+
+async function pollNews() {
+  if (!process.env.NEWS_API_KEY) return
+  try {
+    const { rows: usersWithSubs } = await pool.query(
+      `SELECT DISTINCT ps.user_id, COALESCE(up.profile_json->>'alert_level', '2') as alert_level
+       FROM push_subscriptions ps
+       LEFT JOIN user_profiles up ON up.user_id = ps.user_id`
+    )
+
+    for (const userRow of usersWithSubs) {
+      const alertLevel = parseInt(userRow.alert_level) || 2
+      const portfolioId = await getUserPortfolioId(userRow.user_id)
+      if (!portfolioId) continue
+
+      const { rows: holdings } = await pool.query(
+        'SELECT ticker, exchange FROM holdings WHERE portfolio_id = $1', [portfolioId]
+      )
+      if (!holdings.length) continue
+
+      for (const holding of holdings) {
+        try {
+          const newsRes = await axios.get('https://newsapi.org/v2/everything', {
+            params: {
+              q: holding.ticker,
+              sortBy: 'publishedAt',
+              pageSize: 5,
+              language: 'en',
+              apiKey: process.env.NEWS_API_KEY
+            },
+            timeout: 10000
+          })
+
+          const articles = newsRes.data.articles || []
+          for (const article of articles) {
+            if (!article.url) continue
+
+            const { rowCount } = await pool.query(
+              'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2',
+              [userRow.user_id, article.url]
+            )
+            if (rowCount > 0) continue
+
+            await pool.query(
+              'INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [userRow.user_id, article.url]
+            )
+
+            const filter = await filterNewsWithClaude(
+              holding.ticker,
+              article.title || '',
+              article.description || article.content || '',
+              alertLevel
+            )
+            if (!filter?.notify) continue
+
+            let earningsBullets = null
+            let evasionWarning = null
+            if (filter.is_earnings && article.content) {
+              const summary = await summarizeEarningsCall(article.content)
+              earningsBullets = summary?.bullets || null
+              evasionWarning = summary?.evasion_warning || null
+            }
+
+            await pool.query(
+              `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [userRow.user_id, holding.ticker, article.title, filter.summary, filter.category, article.url,
+               earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
+            )
+
+            await sendPushToUser(userRow.user_id, {
+              title: `${holding.ticker} — ${filter.category}`,
+              body: filter.summary,
+              tag: `${holding.ticker}-${Date.now()}`,
+              url: '/'
+            })
+          }
+        } catch (err) {
+          console.error(`pollNews error for ${holding.ticker}:`, err.message)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('pollNews top-level error:', err.message)
+  }
+}
+
+function startPolling() {
+  console.log('Background news polling started (every 15 min)')
+  setInterval(pollNews, 15 * 60 * 1000)
+}
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -480,11 +623,13 @@ async function initDB() {
 
 module.exports = app
 module.exports.fetchStockData = fetchStockData
+module.exports.pollNews = pollNews
 
 if (require.main === module) {
   initDB().then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`)
+      startPolling()
     })
   }).catch(err => { console.error('DB init failed', err); process.exit(1) })
 }

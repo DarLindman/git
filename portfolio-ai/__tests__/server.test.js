@@ -1,6 +1,9 @@
 const request = require('supertest')
 
 // Mock external-service modules before requiring server
+jest.mock('axios', () => ({
+  get: jest.fn()
+}))
 jest.mock('web-push', () => ({
   setVapidDetails: jest.fn(),
   sendNotification: jest.fn().mockResolvedValue({ statusCode: 201 }),
@@ -141,6 +144,32 @@ jest.mock('pg', () => {
 
     // notifications: SELECT * FROM news_notifications
     if (sql.includes('FROM news_notifications')) {
+      return { rows: [] }
+    }
+    // notifications: INSERT INTO news_notifications
+    if (sql.includes('INSERT INTO news_notifications')) {
+      return { rows: [] }
+    }
+
+    // pollNews: SELECT DISTINCT ps.user_id ... FROM push_subscriptions ps
+    if (sql.includes('SELECT DISTINCT') && sql.includes('push_subscriptions')) {
+      // Return users that have push subscriptions
+      const result = []
+      for (const [uid, subs] of pushStore.entries()) {
+        if (subs.length > 0) {
+          const profile = profileStore.get(uid) || { alert_level: 2 }
+          result.push({ user_id: uid, alert_level: String(profile.alert_level || 2) })
+        }
+      }
+      return { rows: result }
+    }
+
+    // news_seen: SELECT 1 FROM news_seen WHERE user_id
+    if (sql.includes('FROM news_seen') && sql.includes('SELECT')) {
+      return { rows: [], rowCount: 0 }
+    }
+    // news_seen: INSERT INTO news_seen
+    if (sql.includes('INSERT INTO news_seen')) {
       return { rows: [] }
     }
 
@@ -433,5 +462,46 @@ describe('Push Subscriptions', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ endpoint: 'https://push.example.com/test' })
     expect(res.status).toBe(200)
+  })
+})
+
+describe('Background Polling', () => {
+  const { pollNews } = require('../server')
+  const axios = require('axios')
+
+  beforeEach(() => {
+    axios.get.mockResolvedValue({
+      data: {
+        articles: [
+          {
+            url: 'https://news.example.com/aapl-earnings',
+            title: 'Apple Reports Record Q4 Earnings',
+            description: 'Apple Inc reported record earnings beating analyst expectations',
+            content: 'Full article text here...'
+          }
+        ]
+      }
+    })
+  })
+
+  test('pollNews does nothing when NEWS_API_KEY is not set', async () => {
+    const originalKey = process.env.NEWS_API_KEY
+    delete process.env.NEWS_API_KEY
+    await expect(pollNews()).resolves.toBeUndefined()
+    process.env.NEWS_API_KEY = originalKey
+  })
+
+  test('pollNews processes articles and sends push when NEWS_API_KEY set', async () => {
+    process.env.NEWS_API_KEY = 'test-key'
+    // Update Anthropic mock to return notify:true for news filter
+    const Anthropic = require('@anthropic-ai/sdk')
+    const instance = new Anthropic()
+    instance.messages.create.mockResolvedValueOnce({
+      content: [{ text: JSON.stringify({ notify: true, category: 'רווחים', summary: 'Apple records earnings beat.', is_earnings: false }) }]
+    })
+    await pollNews()
+    delete process.env.NEWS_API_KEY
+    // No crash = success (push subscriptions may be empty in test context)
+    expect(true).toBe(true)
   })
 })

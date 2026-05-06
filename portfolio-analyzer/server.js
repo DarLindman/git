@@ -16,28 +16,42 @@ let _yfCrumb = ''
 
 async function refreshYFAuth() {
   if (process.env.NODE_ENV === 'test') return
+  const ua = YF_HEADERS['User-Agent']
+  const crumbHeaders = (cookie) => ({
+    'User-Agent': ua,
+    'Accept': 'text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    ...(cookie ? { Cookie: cookie } : {})
+  })
+  // Attempt 1: crumb directly from query1 then query2 (works on US servers without cookie)
+  for (const base of ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com']) {
+    try {
+      const r = await axios.get(`${base}/v1/test/getcrumb`, { headers: crumbHeaders(_yfCookie), timeout: 5000 })
+      if (typeof r.data === 'string' && r.data.length > 0 && r.data.length < 50 && !r.data.startsWith('<')) {
+        _yfCrumb = r.data
+        console.log('YF crumb from', base)
+        return
+      }
+    } catch {}
+  }
+  // Attempt 2: get cookie from finance.yahoo.com with proper HTML Accept header, then crumb
+  // finance.yahoo.com sends large cookie headers — --max-http-header-size=131072 is set in package.json
   try {
-    // Attempt 1: crumb directly without cookie (works on US-region servers)
-    const direct = await axios.get('https://query2.finance.yahoo.com/v1/test/getcrumb', {
-      headers: YF_HEADERS, timeout: 5000
-    }).catch(() => null)
-    if (direct && typeof direct.data === 'string' && direct.data.length < 50 && !direct.data.startsWith('<')) {
-      _yfCrumb = direct.data
-      console.log('YF crumb obtained directly')
-      return
-    }
-    // Attempt 2: get session cookie from finance.yahoo.com, then fetch crumb
-    // (finance.yahoo.com sends >16KB cookie headers — requires --max-http-header-size=131072 in package.json)
     const r1 = await axios.get('https://finance.yahoo.com', {
-      headers: { 'User-Agent': YF_HEADERS['User-Agent'] },
-      timeout: 8000, maxRedirects: 5
+      headers: {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      timeout: 10000, maxRedirects: 5
     })
     _yfCookie = (r1.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ')
     const r2 = await axios.get('https://query2.finance.yahoo.com/v1/test/getcrumb', {
-      headers: { ...YF_HEADERS, Cookie: _yfCookie }, timeout: 5000
+      headers: crumbHeaders(_yfCookie), timeout: 5000
     })
     _yfCrumb = typeof r2.data === 'string' ? r2.data : ''
-    console.log('YF crumb refreshed:', _yfCrumb ? 'ok' : 'empty')
+    if (_yfCrumb) console.log('YF crumb refreshed via finance.yahoo.com')
+    else console.warn('YF crumb empty after finance.yahoo.com flow')
   } catch (e) {
     console.warn('YF auth refresh failed:', e.message)
   }
@@ -235,36 +249,39 @@ async function fetchStockData(ticker, exchange) {
     try {
       const headers = { ...YF_HEADERS, ...(_yfCookie ? { Cookie: _yfCookie } : {}) }
       const crumbParam = _yfCrumb ? { crumb: _yfCrumb } : {}
-      const [quoteRes, profileRes] = await Promise.all([
-        axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
-          params: { symbols: symbol, ...crumbParam }, headers, timeout: 12000
+      // v8/chart is more permissive on auth than v7/quote
+      const [chartRes, summaryRes] = await Promise.all([
+        axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
+          params: { interval: '1d', range: '1d', ...crumbParam }, headers, timeout: 12000
         }),
         axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
-          params: { modules: 'assetProfile', ...crumbParam }, headers, timeout: 8000
-        }).catch(e => { console.warn(`assetProfile failed for ${symbol}:`, e.message); return null })
+          params: { modules: 'summaryDetail,defaultKeyStatistics,price,assetProfile', ...crumbParam },
+          headers, timeout: 8000
+        }).catch(e => { console.warn(`quoteSummary failed for ${symbol}:`, e.message); return null })
       ])
-      const q = quoteRes.data?.quoteResponse?.result?.[0]
-      if (!q?.regularMarketPrice) {
+      const meta = chartRes.data?.chart?.result?.[0]?.meta
+      if (!meta?.regularMarketPrice) {
         return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
       }
-      const profile = profileRes?.data?.quoteSummary?.result?.[0]?.assetProfile || {}
+      const s = summaryRes?.data?.quoteSummary?.result?.[0] || {}
+      const prevClose = meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice
       return {
         ticker, symbol,
-        price: q.regularMarketPrice,
-        change_pct: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
-        market_cap: q.marketCap,
-        pe_ratio: q.trailingPE,
-        eps: q.epsTrailingTwelveMonths,
-        week52_high: q.fiftyTwoWeekHigh,
-        week52_low: q.fiftyTwoWeekLow,
-        sector: profile.sector || q.sector || 'N/A',
-        industry: profile.industry || q.industry || 'N/A',
-        short_name: q.shortName || q.longName || ticker,
-        currency: q.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+        price: meta.regularMarketPrice,
+        change_pct: parseFloat(((meta.regularMarketPrice - prevClose) / prevClose * 100).toFixed(2)),
+        market_cap: s.price?.marketCap?.raw ?? null,
+        pe_ratio: s.summaryDetail?.trailingPE?.raw ?? null,
+        eps: s.defaultKeyStatistics?.trailingEps?.raw ?? null,
+        week52_high: meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null,
+        week52_low: meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null,
+        sector: s.assetProfile?.sector || 'N/A',
+        industry: s.assetProfile?.industry || 'N/A',
+        short_name: meta.shortName || meta.longName || ticker,
+        currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
       }
     } catch (err) {
       if (err.response?.status === 401 && attempt === 0) {
-        console.warn(`YF 401 for ${symbol}, refreshing crumb and retrying...`)
+        console.warn(`YF 401 for ${symbol}, refreshing crumb...`)
         await refreshYFAuth()
         continue
       }

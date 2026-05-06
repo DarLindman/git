@@ -298,15 +298,15 @@ describe('fetchStockData', () => {
   const { fetchStockData } = require('../server')
   const axios = require('axios')
 
-  const mockQuoteResponse = (price, changePct, currency = 'USD') => ({
-    data: { quoteResponse: { result: [{ regularMarketPrice: price, regularMarketChangePercent: changePct, trailingPE: 28.4, epsTrailingTwelveMonths: 6.66, marketCap: 2900000000000, fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Test Stock', currency }] } }
+  const mockChartResponse = (price, changePct, currency = 'USD') => ({
+    data: { chart: { result: [{ meta: { regularMarketPrice: price, chartPreviousClose: price / (1 + changePct / 100), fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Test Stock', currency } }] } }
   })
-  const mockProfileResponse = () => ({
-    data: { quoteSummary: { result: [{ assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' } }] } }
+  const mockSummaryResponse = () => ({
+    data: { quoteSummary: { result: [{ summaryDetail: { trailingPE: { raw: 28.4 } }, defaultKeyStatistics: { trailingEps: { raw: 6.66 } }, price: { marketCap: { raw: 2900000000000 } }, assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' } }] } }
   })
 
   test('returns financial data for AAPL (US)', async () => {
-    axios.get.mockResolvedValueOnce(mockQuoteResponse(189.42, 2.4)).mockResolvedValueOnce(mockProfileResponse())
+    axios.get.mockResolvedValueOnce(mockChartResponse(189.42, 2.4)).mockResolvedValueOnce(mockSummaryResponse())
     const data = await fetchStockData('AAPL', 'US')
     expect(data.price).toBe(189.42)
     expect(data.pe_ratio).toBeDefined()
@@ -315,14 +315,14 @@ describe('fetchStockData', () => {
   })
 
   test('uses .TA suffix for TASE stocks', async () => {
-    axios.get.mockResolvedValueOnce(mockQuoteResponse(41.2, -1.1, 'ILS')).mockResolvedValueOnce(mockProfileResponse())
+    axios.get.mockResolvedValueOnce(mockChartResponse(41.2, -1.1, 'ILS')).mockResolvedValueOnce(mockSummaryResponse())
     const data = await fetchStockData('TEVA', 'TASE')
     expect(data.symbol).toBe('TEVA.TA')
     expect(data.currency).toBe('ILS')
   })
 
   test('returns null price when ticker not found', async () => {
-    axios.get.mockResolvedValueOnce({ data: { quoteResponse: { result: [] } } }).mockResolvedValueOnce(null)
+    axios.get.mockResolvedValueOnce({ data: { chart: { result: [{ meta: {} }] } } }).mockResolvedValueOnce(null)
     const data = await fetchStockData('BADTICKER', 'US')
     expect(data.price).toBeNull()
     expect(data.error).toBeDefined()
@@ -332,8 +332,8 @@ describe('fetchStockData', () => {
 describe('Analysis', () => {
   let token
   const axios = require('axios')
-  const mockYFQuote = (price = 189.42) => ({ data: { quoteResponse: { result: [{ regularMarketPrice: price, regularMarketChangePercent: 2.4, trailingPE: 28.4, epsTrailingTwelveMonths: 6.66, marketCap: 2900000000000, fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Apple Inc.', currency: 'USD' }] } } })
-  const mockYFProfile = () => ({ data: { quoteSummary: { result: [{ assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' } }] } } })
+  const mockYFChart = (price = 189.42) => ({ data: { chart: { result: [{ meta: { regularMarketPrice: price, chartPreviousClose: price / 1.024, fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Apple Inc.', currency: 'USD' } }] } } })
+  const mockYFSummary = () => ({ data: { quoteSummary: { result: [{ summaryDetail: { trailingPE: { raw: 28.4 } }, defaultKeyStatistics: { trailingEps: { raw: 6.66 } }, price: { marketCap: { raw: 2900000000000 } }, assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' } }] } } })
 
   beforeAll(async () => {
     const u = { username: `analysis_${Date.now()}`, password: 'TestPass123!' }
@@ -346,7 +346,7 @@ describe('Analysis', () => {
   })
 
   beforeEach(() => {
-    axios.get.mockResolvedValueOnce(mockYFQuote()).mockResolvedValueOnce(mockYFProfile())
+    axios.get.mockResolvedValueOnce(mockYFChart()).mockResolvedValueOnce(mockYFSummary())
   })
 
   test('POST /api/analyze/:ticker returns analysis with bear case', async () => {

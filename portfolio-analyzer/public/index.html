@@ -154,11 +154,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div id="app">
   <div id="screen-portfolio" class="screen active">
     <div class="screen-header">
-      <div class="screen-title" id="portfolio-title">הפורטפוליו שלי</div>
+      <div class="screen-title" id="portfolio-title" data-i18n="portfolio_title">הפורטפוליו שלי</div>
       <div class="total-badge" id="portfolio-total">—</div>
     </div>
     <div id="holdings-list"></div>
-    <div class="mt-12"><button class="btn btn-secondary btn-full" onclick="openAddModal()" id="add-btn">+ הוסף מניות</button></div>
+    <div class="mt-12 flex-gap">
+      <button class="btn btn-secondary" style="flex:1" onclick="openAddModal()" id="add-btn" data-i18n="add_stocks">+ הוסף מניות</button>
+      <button class="btn btn-secondary" style="flex:1" id="refresh-all-btn" onclick="refreshAllAnalysis()" data-i18n="refresh_all">רענן הכל</button>
+    </div>
   </div>
 
   <div id="screen-notifications" class="screen">
@@ -226,31 +229,35 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 const T = {
   he: {
     tab_portfolio:'תיק', tab_notifications:'התראות', tab_settings:'הגדרות',
-    add_stocks:'הוסף מניות', upload_screenshot:'העלאת צילום מסך', manual_entry:'הזנה ידנית',
+    portfolio_title:'הפורטפוליו שלי',
+    add_stocks:'+ הוסף מניות', upload_screenshot:'העלאת צילום מסך', manual_entry:'הזנה ידנית',
     choose_image:'בחר תמונה', cancel:'ביטול', add:'הוסף',
     settings_language:'שפה', settings_alert_level:'רמת התראות', settings_push:'התראות Push',
     settings_password:'שינוי סיסמה', settings_logout:'התנתקות',
     level_low:'נמוך', level_mid:'בינוני', level_high:'גבוה',
     no_holdings:'אין מניות בתיק', no_holdings_sub:'לחץ על "הוסף מניות" כדי להתחיל',
-    no_notifications:'אין חדשות מעניינות כרגע', refresh_analysis:'רענן ניתוח',
+    no_notifications:'אין חדשות עדיין — מחפש...', refresh_analysis:'רענן ניתוח',
+    refresh_all:'רענן הכל', refreshing_all:'מרענן...',
     financial_metrics:'מדדים פיננסיים', ai_analysis:'ניתוח AI',
     bear_case:'למה אני טועה?', ecosystem:'Ecosystem Mapping',
-    no_analysis:'אין ניתוח עדיין', analyzing:'מנתח...',
-    push_enabled:'פעיל', push_disabled:'כבוי'
+    no_analysis:'ללא ניתוח — לחץ לניתוח', analyzing:'מנתח...',
+    remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?'
   },
   en: {
     tab_portfolio:'Portfolio', tab_notifications:'Alerts', tab_settings:'Settings',
-    add_stocks:'Add Stocks', upload_screenshot:'Upload Screenshot', manual_entry:'Manual Entry',
+    portfolio_title:'My Portfolio',
+    add_stocks:'+ Add Stocks', upload_screenshot:'Upload Screenshot', manual_entry:'Manual Entry',
     choose_image:'Choose Image', cancel:'Cancel', add:'Add',
     settings_language:'Language', settings_alert_level:'Alert Level', settings_push:'Push Notifications',
     settings_password:'Change Password', settings_logout:'Log Out',
     level_low:'Low', level_mid:'Medium', level_high:'High',
     no_holdings:'No holdings yet', no_holdings_sub:'Tap "Add Stocks" to get started',
-    no_notifications:'No relevant news right now', refresh_analysis:'Refresh Analysis',
+    no_notifications:'No news yet — fetching...', refresh_analysis:'Refresh Analysis',
+    refresh_all:'Refresh All', refreshing_all:'Refreshing...',
     financial_metrics:'Financial Metrics', ai_analysis:'AI Analysis',
     bear_case:'Why Am I Wrong?', ecosystem:'Ecosystem Mapping',
-    no_analysis:'No analysis yet', analyzing:'Analyzing...',
-    push_enabled:'Enabled', push_disabled:'Disabled'
+    no_analysis:'No analysis — tap to analyze', analyzing:'Analyzing...',
+    remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?'
   }
 }
 let lang = 'he', profile = { language:'he', alert_level:2 }
@@ -366,9 +373,12 @@ function renderHoldings(holdings) {
     return `<div class="card" onclick="openAnalysis('${h.ticker}','${h.exchange}')">
       <div class="card-row">
         <div><span class="ticker">${h.ticker}</span><span class="exchange-badge">${h.exchange}</span></div>
-        <span class="${cc}">${cs}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="${cc}">${cs}</span>
+          <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="event.stopPropagation();deleteHolding(${h.id},'${h.ticker}')">${t('remove')}</button>
+        </div>
       </div>
-      <div class="card-sub">${price} · ${h.quantity} units${h.avg_cost ? ` · avg ${cur}${h.avg_cost}` : ''}</div>
+      <div class="card-sub">${price} · ${h.quantity} מניות${h.avg_cost ? ` · ממוצע: ${cur}${h.avg_cost}` : ''}</div>
       <div class="tags">${moatTag}${valTag}${riskTag}${noAnalysis}</div>
     </div>`
   }).join('')
@@ -442,7 +452,7 @@ async function openAnalysis(ticker, exchange) {
 async function runAnalysis(ticker, exchange) {
   const lbl = document.getElementById('refresh-lbl')
   if (lbl) lbl.innerHTML = `<span class="spinner"></span> ${t('analyzing')}`
-  const result = await api('POST', `/api/analyze/${ticker}`, { exchange })
+  const result = await api('POST', `/api/analyze/${ticker}`, { exchange, language: lang })
   if (result?.error) {
     if (lbl) lbl.textContent = t('refresh_analysis')
     alert(result.error)
@@ -453,6 +463,29 @@ async function runAnalysis(ticker, exchange) {
 }
 
 function closeSheet() { document.getElementById('analysis-sheet').classList.remove('open') }
+
+async function deleteHolding(id, ticker) {
+  if (!confirm(t('remove_confirm').replace('{ticker}', ticker))) return
+  await api('DELETE', `/api/portfolio/holdings/${id}`)
+  loadPortfolio()
+}
+
+async function refreshAllAnalysis() {
+  const data = await api('GET', '/api/portfolio')
+  const holdings = data?.holdings || []
+  if (!holdings.length) return
+  const btn = document.getElementById('refresh-all-btn')
+  btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')} (0/${holdings.length})`
+  btn.disabled = true
+  for (let i = 0; i < holdings.length; i++) {
+    const h = holdings[i]
+    btn.innerHTML = `<span class="spinner"></span> ${i+1}/${holdings.length}`
+    await api('POST', `/api/analyze/${h.ticker}`, { exchange: h.exchange, language: lang })
+  }
+  btn.textContent = t('refresh_all')
+  btn.disabled = false
+  loadPortfolio()
+}
 function handleSheetOverlayClick(e) { if (e.target === document.getElementById('analysis-sheet')) closeSheet() }
 function handleModalOverlayClick(e, id) { if (e.target === document.getElementById(id)) closeModal(id) }
 

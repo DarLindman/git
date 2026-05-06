@@ -239,7 +239,8 @@ async function fetchStockData(ticker, exchange) {
     return { ticker, symbol, price: null, error: err.message }
   }
 }
-async function analyzeStock(stockData, allPortfolioTickers) {
+async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
+  const isEn = language === 'en'
   const prompt = `You are a skeptical financial analyst. Here is financial data for ${stockData.ticker}:
 
 Price: ${stockData.price} ${stockData.currency}
@@ -249,6 +250,7 @@ EPS: ${stockData.eps || 'N/A'}
 Market Cap: ${stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'}
 Sector: ${stockData.sector} | Industry: ${stockData.industry}
 
+Respond in ${isEn ? 'English' : 'Hebrew'} for all narrative fields.
 Provide a JSON response with this exact structure:
 {
   "valuation": "cheap|fair|expensive",
@@ -257,11 +259,11 @@ Provide a JSON response with this exact structure:
   "moat_note": "one sentence explaining moat source",
   "management": "one sentence on management quality",
   "outlook": "2-3 sentences on 12-24 month outlook",
-  "bear_case": "2-3 sentences arguing why this analysis could be wrong",
+  "bear_case": "2-3 sentences arguing why this analysis could be wrong — real risks, red flags, threats",
   "tags": {
-    "moat": "חפיר רחב|חפיר צר|ללא חפיר",
-    "valuation": "יקר|הוגן|זול",
-    "risk": "גבוה|בינוני|נמוך"
+    "moat": "${isEn ? 'wide moat|narrow moat|no moat' : 'חפיר רחב|חפיר צר|ללא חפיר'}",
+    "valuation": "${isEn ? 'expensive|fair|cheap' : 'יקר|הוגן|זול'}",
+    "risk": "${isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'}"
   },
   "ecosystem": []
 }
@@ -284,7 +286,7 @@ Be direct. No disclaimers. Respond ONLY with the JSON object.`
 
 app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
   const { ticker } = req.params
-  const { exchange = 'US' } = req.body
+  const { exchange = 'US', language = 'he' } = req.body
   try {
     const portfolioId = await getUserPortfolioId(req.user.id)
     const { rows: allHoldings } = await pool.query(
@@ -293,9 +295,9 @@ app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
     const allTickers = allHoldings.map(h => h.ticker).filter(t => t !== ticker)
 
     const stockData = await fetchStockData(ticker, exchange)
-    if (stockData.error) return res.status(502).json({ error: `לא ניתן לשלוף נתונים עבור ${ticker}` })
+    if (stockData.error) return res.status(502).json({ error: `Cannot fetch data for ${ticker}: ${stockData.error}` })
 
-    const analysis = await analyzeStock(stockData, allTickers)
+    const analysis = await analyzeStock(stockData, allTickers, language)
 
     await pool.query(
       'UPDATE holdings SET analysis_json = $1, analyzed_at = NOW() WHERE portfolio_id = $2 AND ticker = $3',
@@ -408,6 +410,12 @@ app.get('/api/notifications', auth, async (req, res) => {
       `SELECT * FROM news_notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     )
+    // If no notifications yet, kick off a background fetch so next visit has results
+    if (!rows.length && !offset && process.env.NEWS_API_KEY) {
+      const { rows: prof } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id = $1', [req.user.id])
+      const alertLevel = parseInt(prof[0]?.profile_json?.alert_level) || 2
+      pollNewsForUser(req.user.id, alertLevel).catch(e => console.error('bg news fetch:', e.message))
+    }
     res.json({ notifications: rows })
   } catch {
     res.json({ notifications: [] })
@@ -511,89 +519,68 @@ Return JSON: { "bullets": ["bullet1", "bullet2", "bullet3", "bullet4", "bullet5"
   }
 }
 
+async function pollNewsForUser(userId, alertLevel) {
+  if (!process.env.NEWS_API_KEY) return
+  const portfolioId = await getUserPortfolioId(userId)
+  if (!portfolioId) return
+
+  const { rows: holdings } = await pool.query(
+    'SELECT ticker, exchange FROM holdings WHERE portfolio_id = $1', [portfolioId]
+  )
+  if (!holdings.length) return
+
+  for (const holding of holdings) {
+    try {
+      const newsRes = await axios.get('https://newsapi.org/v2/everything', {
+        params: { q: holding.ticker, sortBy: 'publishedAt', pageSize: 5, language: 'en', apiKey: process.env.NEWS_API_KEY },
+        timeout: 10000
+      })
+      const articles = newsRes.data.articles || []
+      for (const article of articles) {
+        if (!article.url) continue
+        const { rowCount } = await pool.query(
+          'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2', [userId, article.url]
+        )
+        if (rowCount > 0) continue
+        await pool.query(
+          'INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, article.url]
+        )
+        const filter = await filterNewsWithClaude(holding.ticker, article.title || '', article.description || article.content || '', alertLevel)
+        if (!filter?.notify) continue
+        let earningsBullets = null, evasionWarning = null
+        if (filter.is_earnings && article.content) {
+          const summary = await summarizeEarningsCall(article.content)
+          earningsBullets = summary?.bullets || null
+          evasionWarning = summary?.evasion_warning || null
+        }
+        await pool.query(
+          `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [userId, holding.ticker, article.title, filter.summary, filter.category, article.url,
+           earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
+        )
+        await sendPushToUser(userId, {
+          title: `${holding.ticker} — ${filter.category}`,
+          body: filter.summary,
+          tag: `${holding.ticker}-${Date.now()}`,
+          url: '/'
+        })
+      }
+    } catch (err) {
+      console.error(`pollNewsForUser error for ${holding.ticker}:`, err.message)
+    }
+  }
+}
+
 async function pollNews() {
   if (!process.env.NEWS_API_KEY) return
   try {
-    const { rows: usersWithSubs } = await pool.query(
+    const { rows: users } = await pool.query(
       `SELECT DISTINCT po.user_id, COALESCE(up.profile_json->>'alert_level', '2') as alert_level
-       FROM portfolios po
-       JOIN holdings h ON h.portfolio_id = po.id
+       FROM portfolios po JOIN holdings h ON h.portfolio_id = po.id
        LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
-
-    for (const userRow of usersWithSubs) {
-      const alertLevel = parseInt(userRow.alert_level) || 2
-      const portfolioId = await getUserPortfolioId(userRow.user_id)
-      if (!portfolioId) continue
-
-      const { rows: holdings } = await pool.query(
-        'SELECT ticker, exchange FROM holdings WHERE portfolio_id = $1', [portfolioId]
-      )
-      if (!holdings.length) continue
-
-      for (const holding of holdings) {
-        try {
-          const newsRes = await axios.get('https://newsapi.org/v2/everything', {
-            params: {
-              q: holding.ticker,
-              sortBy: 'publishedAt',
-              pageSize: 5,
-              language: 'en',
-              apiKey: process.env.NEWS_API_KEY
-            },
-            timeout: 10000
-          })
-
-          const articles = newsRes.data.articles || []
-          for (const article of articles) {
-            if (!article.url) continue
-
-            const { rowCount } = await pool.query(
-              'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2',
-              [userRow.user_id, article.url]
-            )
-            if (rowCount > 0) continue
-
-            await pool.query(
-              'INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-              [userRow.user_id, article.url]
-            )
-
-            const filter = await filterNewsWithClaude(
-              holding.ticker,
-              article.title || '',
-              article.description || article.content || '',
-              alertLevel
-            )
-            if (!filter?.notify) continue
-
-            let earningsBullets = null
-            let evasionWarning = null
-            if (filter.is_earnings && article.content) {
-              const summary = await summarizeEarningsCall(article.content)
-              earningsBullets = summary?.bullets || null
-              evasionWarning = summary?.evasion_warning || null
-            }
-
-            await pool.query(
-              `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-              [userRow.user_id, holding.ticker, article.title, filter.summary, filter.category, article.url,
-               earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
-            )
-
-            await sendPushToUser(userRow.user_id, {
-              title: `${holding.ticker} — ${filter.category}`,
-              body: filter.summary,
-              tag: `${holding.ticker}-${Date.now()}`,
-              url: '/'
-            })
-          }
-        } catch (err) {
-          console.error(`pollNews error for ${holding.ticker}:`, err.message)
-        }
-      }
-    }
+    for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2)
   } catch (err) {
     console.error('pollNews top-level error:', err.message)
   }

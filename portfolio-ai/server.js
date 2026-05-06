@@ -32,9 +32,11 @@ webpush.setVapidDetails(
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
 
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10 })
-const analyzeLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20 })
-const screenshotLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10 })
+const isTest = process.env.NODE_ENV === 'test'
+const noopLimiter = (req, res, next) => next()
+const authLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 1000, max: 10 })
+const analyzeLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 20 })
+const screenshotLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 10 })
 
 function auth(req, res, next) {
   const header = req.headers.authorization
@@ -48,10 +50,20 @@ function auth(req, res, next) {
 }
 
 function extractJson(text) {
+  // Try parsing whole text first (Claude often returns clean JSON)
+  try { return JSON.parse(text.trim()) } catch {}
+  // Find largest object or array match; prefer whichever starts earlier
   const arr = text.match(/\[[\s\S]*\]/)
   const obj = text.match(/\{[\s\S]*\}/)
-  try { if (arr) return JSON.parse(arr[0]) } catch {}
-  try { if (obj) return JSON.parse(obj[0]) } catch {}
+  const arrIdx = arr ? text.indexOf(arr[0]) : Infinity
+  const objIdx = obj ? text.indexOf(obj[0]) : Infinity
+  if (objIdx <= arrIdx) {
+    try { if (obj) return JSON.parse(obj[0]) } catch {}
+    try { if (arr) return JSON.parse(arr[0]) } catch {}
+  } else {
+    try { if (arr) return JSON.parse(arr[0]) } catch {}
+    try { if (obj) return JSON.parse(obj[0]) } catch {}
+  }
   return null
 }
 
@@ -200,6 +212,114 @@ async function fetchStockData(ticker, exchange) {
     return { ticker, symbol, price: null, error: err.message }
   }
 }
+async function analyzeStock(stockData, allPortfolioTickers) {
+  const prompt = `You are a skeptical financial analyst. Here is financial data for ${stockData.ticker}:
+
+Price: ${stockData.price} ${stockData.currency}
+P/E: ${stockData.pe_ratio || 'N/A'}
+EPS: ${stockData.eps || 'N/A'}
+52W High: ${stockData.week52_high} | 52W Low: ${stockData.week52_low}
+Market Cap: ${stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'}
+Sector: ${stockData.sector} | Industry: ${stockData.industry}
+
+Provide a JSON response with this exact structure:
+{
+  "valuation": "cheap|fair|expensive",
+  "valuation_note": "one sentence explaining vs sector peers",
+  "moat": "wide|narrow|none",
+  "moat_note": "one sentence explaining moat source",
+  "management": "one sentence on management quality",
+  "outlook": "2-3 sentences on 12-24 month outlook",
+  "bear_case": "2-3 sentences arguing why this analysis could be wrong",
+  "tags": {
+    "moat": "חפיר רחב|חפיר צר|ללא חפיר",
+    "valuation": "יקר|הוגן|זול",
+    "risk": "גבוה|בינוני|נמוך"
+  },
+  "ecosystem": []
+}
+
+For ecosystem: if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include { "ticker": "X", "impact": "one sentence" } for each. If none, return [].
+
+Be direct. No disclaimers. Respond ONLY with the JSON object.`
+
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 800,
+    system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: prompt }]
+  })
+
+  const result = extractJson(message.content[0].text)
+  if (!result) throw new Error('Claude returned invalid JSON')
+  return result
+}
+
+app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
+  const { ticker } = req.params
+  const { exchange = 'US' } = req.body
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    const { rows: allHoldings } = await pool.query(
+      'SELECT ticker FROM holdings WHERE portfolio_id = $1', [portfolioId]
+    )
+    const allTickers = allHoldings.map(h => h.ticker).filter(t => t !== ticker)
+
+    const stockData = await fetchStockData(ticker, exchange)
+    if (stockData.error) return res.status(502).json({ error: `לא ניתן לשלוף נתונים עבור ${ticker}` })
+
+    const analysis = await analyzeStock(stockData, allTickers)
+
+    await pool.query(
+      'UPDATE holdings SET analysis_json = $1, analyzed_at = NOW() WHERE portfolio_id = $2 AND ticker = $3',
+      [JSON.stringify({ ...analysis, stock_data: stockData }), portfolioId, ticker]
+    )
+
+    res.json({ ticker, stock_data: stockData, analysis })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת ניתוח' })
+  }
+})
+
+app.post('/api/portfolio/screenshot', auth, screenshotLimiter, upload.single('screenshot'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'לא הועלה קובץ' })
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowedTypes.includes(req.file.mimetype)) return res.status(400).json({ error: 'סוג קובץ לא נתמך' })
+
+  const base64 = req.file.buffer.toString('base64')
+  const mediaType = req.file.mimetype
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: `Extract all stock holdings from this brokerage screenshot.
+Return a JSON array only: [{ "ticker": "AAPL", "exchange": "US", "quantity": 10, "avg_cost": 150.00 }]
+For Israeli stocks traded on TASE, use exchange "TASE".
+If avg_cost or quantity is unclear, omit the field (don't guess).
+Respond ONLY with the JSON array.` }
+        ]
+      }]
+    })
+
+    const holdings = extractJson(message.content[0].text)
+    if (!Array.isArray(holdings)) return res.status(422).json({ error: 'לא ניתן לזהות מניות בצילום המסך' })
+
+    const valid = holdings.filter(h => h.ticker && (h.quantity || h.quantity === 0))
+    if (!valid.length) return res.status(422).json({ error: 'לא נמצאו מניות בצילום המסך' })
+
+    res.json({ holdings: valid, raw_count: holdings.length })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאה בעיבוד הצילום' })
+  }
+})
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (

@@ -3,7 +3,27 @@ const request = require('supertest')
 // Mock external-service modules before requiring server
 jest.mock('web-push', () => ({ setVapidDetails: jest.fn(), sendNotification: jest.fn() }))
 jest.mock('@anthropic-ai/sdk', () => {
-  return jest.fn().mockImplementation(() => ({ messages: { create: jest.fn() } }))
+  return jest.fn().mockImplementation(() => ({
+    messages: {
+      create: jest.fn().mockImplementation(async (params) => {
+        // Screenshot parse call has no system param, analysis call has system param
+        if (!params.system) {
+          return { content: [{ text: JSON.stringify([{ ticker: 'AAPL', exchange: 'US', quantity: 15, avg_cost: 175 }]) }] }
+        }
+        return { content: [{ text: JSON.stringify({
+          valuation: 'fair',
+          valuation_note: 'Trading at market multiple',
+          moat: 'wide',
+          moat_note: 'Strong brand and ecosystem',
+          management: 'Tim Cook has delivered consistent results',
+          outlook: 'Steady growth expected. Services segment expanding.',
+          bear_case: 'China exposure is a real risk. Premium pricing under pressure.',
+          tags: { moat: 'חפיר רחב', valuation: 'הוגן', risk: 'נמוך' },
+          ecosystem: []
+        }) }] }
+      })
+    }
+  }))
 })
 
 // Mock pg Pool before requiring server
@@ -79,6 +99,16 @@ jest.mock('pg', () => {
       const holdings = holdingsStore.get(portfolioId) || []
       holdingsStore.set(portfolioId, holdings.filter(h => h.id !== holdingId && h.id !== Number(holdingId)))
       return { rows: [], rowCount: 1 }
+    }
+    // holdings: SELECT ticker FROM holdings WHERE portfolio_id (for analysis)
+    if (sql.includes('SELECT ticker FROM holdings WHERE portfolio_id')) {
+      const portfolioId = params[0]
+      const holdings = holdingsStore.get(portfolioId) || []
+      return { rows: holdings.map(h => ({ ticker: h.ticker })) }
+    }
+    // holdings: UPDATE holdings SET analysis_json
+    if (sql.includes('UPDATE holdings SET analysis_json')) {
+      return { rows: [] }
     }
 
     return { rows: [], rowCount: 0 }
@@ -194,5 +224,69 @@ describe('fetchStockData', () => {
     const data = await fetchStockData('BADTICKER', 'US')
     expect(data.price).toBeNull()
     expect(data.error).toBeDefined()
+  })
+})
+
+describe('Analysis', () => {
+  let token
+
+  beforeAll(async () => {
+    const u = { username: `analysis_${Date.now()}`, password: 'TestPass123!' }
+    const res = await request(app).post('/auth/register').send(u)
+    token = res.body.token
+    // Add a holding first
+    await request(app)
+      .post('/api/portfolio/holdings')
+      .set('Authorization', `Bearer ${token}`)
+      .send([{ ticker: 'AAPL', exchange: 'US', quantity: 10, avg_cost: 150 }])
+  })
+
+  test('POST /api/analyze/:ticker returns analysis with bear case', async () => {
+    const res = await request(app)
+      .post('/api/analyze/AAPL')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ exchange: 'US' })
+    expect(res.status).toBe(200)
+    expect(res.body.analysis.valuation).toBeDefined()
+    expect(res.body.analysis.bear_case).toBeDefined()
+    expect(res.body.analysis.tags).toBeDefined()
+    expect(res.body.analysis.ecosystem).toBeDefined()
+  })
+
+  test('POST /api/analyze/:ticker requires auth', async () => {
+    const res = await request(app).post('/api/analyze/AAPL').send({ exchange: 'US' })
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('Screenshot Parser', () => {
+  let token
+
+  beforeAll(async () => {
+    const u = { username: `screenshot_${Date.now()}`, password: 'TestPass123!' }
+    const res = await request(app).post('/auth/register').send(u)
+    token = res.body.token
+  })
+
+  test('POST /api/portfolio/screenshot parses holdings from image', async () => {
+    // Create a minimal PNG buffer (1x1 transparent PNG)
+    const pngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    )
+    const res = await request(app)
+      .post('/api/portfolio/screenshot')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('screenshot', pngBuffer, { filename: 'test.png', contentType: 'image/png' })
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.holdings)).toBe(true)
+    expect(res.body.holdings[0].ticker).toBe('AAPL')
+  })
+
+  test('POST /api/portfolio/screenshot rejects missing file', async () => {
+    const res = await request(app)
+      .post('/api/portfolio/screenshot')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
   })
 })

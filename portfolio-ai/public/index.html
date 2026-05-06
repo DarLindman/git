@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f2027">
+<title>Portfolio AI</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: linear-gradient(160deg, #0f2027, #203a43, #2c5364);
+  --surface: rgba(255,255,255,.07);
+  --surface-hover: rgba(255,255,255,.11);
+  --border: rgba(255,255,255,.1);
+  --accent: #64ffda;
+  --up: #4ade80;
+  --down: #f87171;
+  --warn: #fbbf24;
+  --text: #ffffff;
+  --text-muted: rgba(255,255,255,.45);
+  --tab-bg: rgba(7,7,20,.82);
+  --tab-border: rgba(255,255,255,.08);
+  --font: -apple-system, 'Segoe UI', sans-serif;
+  --radius: 14px;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; }
+#app { height: 100dvh; display: none; flex-direction: column; }
+.screen { display: none; flex: 1; overflow-y: auto; padding: 20px 16px 90px; }
+.screen.active { display: block; }
+#auth-wrapper { height: 100dvh; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 24px; }
+#auth-wrapper.active { display: flex; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; backdrop-filter: blur(8px); cursor: pointer; transition: background .15s; }
+.card:hover { background: var(--surface-hover); }
+.card-row { display: flex; justify-content: space-between; align-items: center; }
+.ticker { font-weight: 700; font-size: 16px; }
+.exchange-badge { font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,.07); padding: 2px 7px; border-radius: 8px; margin-right: 6px; }
+.change-up { color: var(--up); font-size: 14px; font-weight: 600; }
+.change-down { color: var(--down); font-size: 14px; font-weight: 600; }
+.change-neutral { color: var(--text-muted); font-size: 14px; }
+.card-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+.tags { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+.tag { font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 500; }
+.tag-teal { background: rgba(100,255,218,.12); color: var(--accent); }
+.tag-green { background: rgba(74,222,128,.12); color: var(--up); }
+.tag-yellow { background: rgba(251,191,36,.12); color: var(--warn); }
+.tag-red { background: rgba(248,113,113,.12); color: var(--down); }
+.tag-orange { background: rgba(251,146,60,.12); color: #fb923c; }
+.tag-purple { background: rgba(167,139,250,.12); color: #a78bfa; }
+.btn { border: none; border-radius: 12px; padding: 12px 20px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .15s; font-family: var(--font); }
+.btn:hover { opacity: .85; }
+.btn-primary { background: var(--accent); color: #0a0a1a; }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-danger { background: rgba(248,113,113,.15); color: var(--down); border: 1px solid rgba(248,113,113,.2); }
+.btn-full { width: 100%; }
+.input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s; }
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text-muted); }
+.input-group { margin-bottom: 14px; }
+.input-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block; }
+.screen-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.screen-title { font-size: 20px; font-weight: 700; }
+.total-badge { background: rgba(100,255,218,.12); border: 1px solid rgba(100,255,218,.25); color: var(--accent); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(7,7,20,.6); backdrop-filter: blur(4px); z-index: 100; align-items: flex-end; }
+.sheet-overlay.open { display: flex; }
+.sheet { width: 100%; max-height: 90dvh; overflow-y: auto; background: linear-gradient(180deg, #152533 0%, #0f1f2e 100%); border-top: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 0 16px 32px; }
+.sheet-handle { width: 36px; height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; margin: 12px auto 16px; }
+.sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.sheet-ticker { font-size: 22px; font-weight: 700; }
+.sheet-exchange { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.sheet-price-val { font-size: 20px; font-weight: 700; }
+.sheet-section { margin-bottom: 16px; }
+.sheet-section-title { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 8px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.metric-box { background: var(--surface); border-radius: 10px; padding: 8px; text-align: center; }
+.metric-val { font-size: 13px; font-weight: 700; }
+.metric-key { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+.analysis-box { background: rgba(100,255,218,.04); border: 1px solid rgba(100,255,218,.12); border-radius: 12px; padding: 12px; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.7; margin-bottom: 8px; }
+.bear-box { background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.12); border-radius: 12px; padding: 12px; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.7; }
+.eco-item { font-size: 11px; color: var(--text-muted); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.eco-item:last-child { border-bottom: none; }
+.eco-ticker { color: var(--accent); font-weight: 600; }
+.sheet-close { background: var(--surface); border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); flex-shrink: 0; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(7,7,20,.7); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal { background: #152533; border: 1px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; max-height: 90dvh; overflow-y: auto; }
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tab-bg); backdrop-filter: blur(20px); border-top: 1px solid var(--tab-border); display: flex; justify-content: space-around; padding: 10px 0 max(14px, env(safe-area-inset-bottom)); z-index: 50; }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; cursor: pointer; position: relative; padding: 2px 8px; }
+.tab-label { font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: .2px; transition: color .2s; }
+.tab.active .tab-label { color: var(--accent); font-weight: 600; }
+.tab.active svg { stroke: var(--accent) !important; }
+.tab-dot { width: 4px; height: 4px; background: var(--accent); border-radius: 50%; position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity .2s; }
+.tab.active .tab-dot { opacity: 1; }
+.notif-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+.notif-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.notif-ticker { font-weight: 700; font-size: 13px; }
+.notif-time { font-size: 10px; color: var(--text-muted); }
+.notif-headline { font-size: 13px; color: rgba(255,255,255,.85); margin-bottom: 6px; line-height: 1.4; }
+.notif-summary { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px; }
+.earnings-bullets { margin: 8px 0; padding-right: 16px; }
+.earnings-bullets li { font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 4px; line-height: 1.4; }
+.evasion-warning { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: var(--warn); margin-top: 6px; }
+.settings-section { margin-bottom: 24px; }
+.settings-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+.toggle { position: relative; width: 48px; height: 26px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,.15); border-radius: 13px; cursor: pointer; transition: .2s; }
+.toggle-slider::before { content: ''; position: absolute; width: 20px; height: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(22px); background: #0a0a1a; }
+.level-btns { display: flex; gap: 6px; }
+.level-btn { flex: 1; padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 12px; cursor: pointer; text-align: center; transition: .15s; font-family: var(--font); }
+.level-btn.active { background: rgba(100,255,218,.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.auth-logo { font-size: 28px; font-weight: 800; color: var(--accent); margin-bottom: 8px; letter-spacing: -1px; }
+.auth-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 32px; text-align: center; }
+.auth-box { width: 100%; max-width: 360px; }
+.auth-tabs { display: flex; gap: 0; margin-bottom: 24px; background: var(--surface); border-radius: 10px; padding: 3px; }
+.auth-tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 14px; cursor: pointer; color: var(--text-muted); transition: .15s; }
+.auth-tab.active { background: var(--accent); color: #0a0a1a; font-weight: 600; }
+.error-msg { color: var(--down); font-size: 13px; margin-top: 8px; min-height: 20px; }
+.empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+.empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; line-height: 1.5; }
+.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.2); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.seg-btn { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-muted); font-size: 13px; cursor: pointer; text-align: center; font-family: var(--font); transition: .15s; }
+.seg-btn.active { background: rgba(100,255,218,.12); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.mt-12 { margin-top: 12px; }
+.mt-20 { margin-top: 20px; }
+.flex-gap { display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+
+<div id="auth-wrapper">
+  <div class="auth-logo">Portfolio AI</div>
+  <div class="auth-sub">ניתוח מניות חכם · התראות בזמן אמת</div>
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login')">התחברות</div>
+      <div class="auth-tab" onclick="switchAuthTab('register')">הרשמה</div>
+    </div>
+    <div class="input-group"><label class="input-label">שם משתמש</label><input class="input" id="auth-username" type="text" placeholder="הזן שם משתמש" autocomplete="username"></div>
+    <div class="input-group"><label class="input-label">סיסמה</label><input class="input" id="auth-password" type="password" placeholder="הזן סיסמה" autocomplete="current-password"></div>
+    <div class="error-msg" id="auth-error"></div>
+    <div class="mt-12"><button class="btn btn-primary btn-full" id="auth-btn" onclick="handleAuth()">התחבר</button></div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="screen-portfolio" class="screen active">
+    <div class="screen-header">
+      <div class="screen-title" id="portfolio-title">הפורטפוליו שלי</div>
+      <div class="total-badge" id="portfolio-total">—</div>
+    </div>
+    <div id="holdings-list"></div>
+    <div class="mt-12"><button class="btn btn-secondary btn-full" onclick="openAddModal()" id="add-btn">+ הוסף מניות</button></div>
+  </div>
+
+  <div id="screen-notifications" class="screen">
+    <div class="screen-header"><div class="screen-title" data-i18n="tab_notifications">התראות</div></div>
+    <div id="notifications-list"></div>
+  </div>
+
+  <div id="screen-settings" class="screen">
+    <div class="screen-header"><div class="screen-title" data-i18n="tab_settings">הגדרות</div></div>
+    <div id="settings-content"></div>
+  </div>
+
+  <nav class="tab-bar">
+    <div class="tab active" id="tab-portfolio" onclick="switchTab('portfolio')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      <span class="tab-label" data-i18n="tab_portfolio">תיק</span>
+      <div class="tab-dot"></div>
+    </div>
+    <div class="tab" id="tab-notifications" onclick="switchTab('notifications')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="tab-label" data-i18n="tab_notifications">התראות</span>
+      <div class="tab-dot"></div>
+    </div>
+    <div class="tab" id="tab-settings" onclick="switchTab('settings')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="tab-label" data-i18n="tab_settings">הגדרות</span>
+      <div class="tab-dot"></div>
+    </div>
+  </nav>
+</div>
+
+<div class="sheet-overlay" id="analysis-sheet" onclick="handleSheetOverlayClick(event)">
+  <div class="sheet" id="analysis-sheet-content"></div>
+</div>
+
+<div class="modal-overlay" id="add-modal" onclick="handleModalOverlayClick(event,'add-modal')">
+  <div class="modal">
+    <div class="modal-title" data-i18n="add_stocks">הוסף מניות</div>
+    <div class="flex-gap" style="margin-bottom:18px">
+      <div class="seg-btn active" id="seg-screenshot" onclick="switchAddMode('screenshot')" data-i18n="upload_screenshot">העלאת צילום מסך</div>
+      <div class="seg-btn" id="seg-manual" onclick="switchAddMode('manual')" data-i18n="manual_entry">הזנה ידנית</div>
+    </div>
+    <div id="add-screenshot-mode">
+      <input type="file" id="screenshot-file" accept="image/*" style="display:none" onchange="handleScreenshotUpload(this)">
+      <button class="btn btn-secondary btn-full" onclick="document.getElementById('screenshot-file').click()" data-i18n="choose_image">בחר תמונה</button>
+      <div id="screenshot-preview" style="margin-top:12px"></div>
+    </div>
+    <div id="add-manual-mode" style="display:none">
+      <div class="input-group"><label class="input-label">טיקר (AAPL, TEVA)</label><input class="input" id="manual-ticker" type="text" placeholder="AAPL" style="text-transform:uppercase"></div>
+      <div class="input-group"><label class="input-label">בורסה</label>
+        <div class="flex-gap"><div class="seg-btn active" id="ex-us" onclick="selectExchange('US')">US</div><div class="seg-btn" id="ex-tase" onclick="selectExchange('TASE')">TASE</div></div>
+      </div>
+      <div class="input-group"><label class="input-label">כמות מניות</label><input class="input" id="manual-quantity" type="number" placeholder="10"></div>
+      <div class="input-group"><label class="input-label">מחיר כניסה ממוצע (אופציונלי)</label><input class="input" id="manual-cost" type="number" step="0.01" placeholder="150.00"></div>
+    </div>
+    <div class="error-msg" id="add-error"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('add-modal')" data-i18n="cancel">ביטול</button>
+      <button class="btn btn-primary" style="flex:1" id="add-confirm-btn" onclick="confirmAddHolding()" data-i18n="add">הוסף</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const T = {
+  he: {
+    tab_portfolio:'תיק', tab_notifications:'התראות', tab_settings:'הגדרות',
+    add_stocks:'הוסף מניות', upload_screenshot:'העלאת צילום מסך', manual_entry:'הזנה ידנית',
+    choose_image:'בחר תמונה', cancel:'ביטול', add:'הוסף',
+    settings_language:'שפה', settings_alert_level:'רמת התראות', settings_push:'התראות Push',
+    settings_password:'שינוי סיסמה', settings_logout:'התנתקות',
+    level_low:'נמוך', level_mid:'בינוני', level_high:'גבוה',
+    no_holdings:'אין מניות בתיק', no_holdings_sub:'לחץ על "הוסף מניות" כדי להתחיל',
+    no_notifications:'אין חדשות מעניינות כרגע', refresh_analysis:'רענן ניתוח',
+    financial_metrics:'מדדים פיננסיים', ai_analysis:'ניתוח AI',
+    bear_case:'למה אני טועה?', ecosystem:'Ecosystem Mapping',
+    no_analysis:'אין ניתוח עדיין', analyzing:'מנתח...',
+    push_enabled:'פעיל', push_disabled:'כבוי'
+  },
+  en: {
+    tab_portfolio:'Portfolio', tab_notifications:'Alerts', tab_settings:'Settings',
+    add_stocks:'Add Stocks', upload_screenshot:'Upload Screenshot', manual_entry:'Manual Entry',
+    choose_image:'Choose Image', cancel:'Cancel', add:'Add',
+    settings_language:'Language', settings_alert_level:'Alert Level', settings_push:'Push Notifications',
+    settings_password:'Change Password', settings_logout:'Log Out',
+    level_low:'Low', level_mid:'Medium', level_high:'High',
+    no_holdings:'No holdings yet', no_holdings_sub:'Tap "Add Stocks" to get started',
+    no_notifications:'No relevant news right now', refresh_analysis:'Refresh Analysis',
+    financial_metrics:'Financial Metrics', ai_analysis:'AI Analysis',
+    bear_case:'Why Am I Wrong?', ecosystem:'Ecosystem Mapping',
+    no_analysis:'No analysis yet', analyzing:'Analyzing...',
+    push_enabled:'Enabled', push_disabled:'Disabled'
+  }
+}
+let lang = 'he', profile = { language:'he', alert_level:2 }
+let token = localStorage.getItem('token')
+let currentTab = 'portfolio', addMode = 'screenshot', addExchange = 'US'
+let pendingHoldings = []
+
+function t(k){ return T[lang][k] || T.he[k] || k }
+
+function applyLang(l) {
+  lang = l
+  document.documentElement.lang = l
+  document.documentElement.dir = l === 'he' ? 'rtl' : 'ltr'
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n) })
+}
+
+async function api(method, path, body, isForm) {
+  const opts = { method, headers: { Authorization: `Bearer ${token}` } }
+  if (body && !isForm) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body) }
+  if (isForm) opts.body = body
+  const res = await fetch(path, opts)
+  const data = await res.json().catch(() => ({}))
+  if (res.status === 401 && path !== '/auth/login' && path !== '/auth/register') { logout(); return null }
+  return data
+}
+
+let authMode = 'login'
+function switchAuthTab(mode) {
+  authMode = mode
+  document.querySelectorAll('.auth-tab').forEach((el,i) => el.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='register')))
+  document.getElementById('auth-btn').textContent = mode === 'login' ? 'התחבר' : 'הרשמה'
+  document.getElementById('auth-error').textContent = ''
+}
+
+async function handleAuth() {
+  const username = document.getElementById('auth-username').value.trim()
+  const password = document.getElementById('auth-password').value
+  if (!username || !password) { document.getElementById('auth-error').textContent = 'יש למלא את כל השדות'; return }
+  const btn = document.getElementById('auth-btn')
+  btn.innerHTML = '<span class="spinner"></span>'
+  const data = await fetch(`/auth/${authMode}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) }).then(r=>r.json()).catch(()=>({}))
+  btn.textContent = authMode === 'login' ? 'התחבר' : 'הרשמה'
+  if (data.token) { token = data.token; localStorage.setItem('token', token); initApp() }
+  else document.getElementById('auth-error').textContent = data.error || 'שגיאה'
+}
+
+function logout() {
+  token = null; localStorage.removeItem('token')
+  document.getElementById('app').style.display = 'none'
+  document.getElementById('auth-wrapper').classList.add('active')
+}
+
+async function initApp() {
+  document.getElementById('auth-wrapper').classList.remove('active')
+  document.getElementById('app').style.display = 'flex'
+  profile = await api('GET', '/api/profile') || profile
+  applyLang(profile.language || 'he')
+  registerSW()
+  loadPortfolio()
+}
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return
+  try { const reg = await navigator.serviceWorker.register('/sw.js'); window._swReg = reg } catch(e) {}
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (token) initApp()
+  else document.getElementById('auth-wrapper').classList.add('active')
+})
+
+function switchTab(tab) {
+  currentTab = tab
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.getElementById(`screen-${tab}`).classList.add('active')
+  document.getElementById(`tab-${tab}`).classList.add('active')
+  if (tab === 'notifications') loadNotifications()
+  if (tab === 'settings') renderSettings()
+}
+
+async function loadPortfolio() {
+  const data = await api('GET', '/api/portfolio')
+  if (!data) return
+  renderHoldings(data.holdings || [])
+}
+
+function renderHoldings(holdings) {
+  const list = document.getElementById('holdings-list')
+  if (!holdings.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-title">${t('no_holdings')}</div><div class="empty-sub">${t('no_holdings_sub')}</div></div>`
+    document.getElementById('portfolio-total').textContent = '₪ 0'
+    return
+  }
+  let totalUSD = 0
+  list.innerHTML = holdings.map(h => {
+    const a = h.analysis_json || {}
+    const sd = a.stock_data || {}
+    const tags = a.tags || {}
+    const pct = sd.change_pct ? parseFloat(sd.change_pct) : null
+    const cc = pct > 0 ? 'change-up' : pct < 0 ? 'change-down' : 'change-neutral'
+    const cs = pct !== null ? `${pct>0?'+':''}${pct}%` : (h.analyzed_at ? '—' : t('no_analysis'))
+    const cur = sd.currency === 'ILS' ? '₪' : '$'
+    const price = sd.price ? `${cur}${parseFloat(sd.price).toLocaleString()}` : '—'
+    if (sd.price && h.quantity) totalUSD += parseFloat(sd.price) * parseFloat(h.quantity)
+    const moatClass = tags.moat?.includes('רחב') ? 'tag-teal' : tags.moat?.includes('צר') ? 'tag-yellow' : 'tag-red'
+    const valClass = tags.valuation === 'זול' || tags.valuation === 'cheap' ? 'tag-green' : tags.valuation === 'יקר' || tags.valuation === 'expensive' ? 'tag-red' : 'tag-yellow'
+    const riskClass = tags.risk === 'נמוך' || tags.risk === 'low' ? 'tag-teal' : tags.risk === 'גבוה' || tags.risk === 'high' ? 'tag-red' : 'tag-yellow'
+    const moatTag = tags.moat ? `<span class="tag ${moatClass}">${tags.moat}</span>` : ''
+    const valTag = tags.valuation ? `<span class="tag ${valClass}">${tags.valuation}</span>` : ''
+    const riskTag = tags.risk ? `<span class="tag ${riskClass}">${tags.risk}</span>` : ''
+    const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
+    return `<div class="card" onclick="openAnalysis('${h.ticker}','${h.exchange}')">
+      <div class="card-row">
+        <div><span class="ticker">${h.ticker}</span><span class="exchange-badge">${h.exchange}</span></div>
+        <span class="${cc}">${cs}</span>
+      </div>
+      <div class="card-sub">${price} · ${h.quantity} units${h.avg_cost ? ` · avg ${cur}${h.avg_cost}` : ''}</div>
+      <div class="tags">${moatTag}${valTag}${riskTag}${noAnalysis}</div>
+    </div>`
+  }).join('')
+  document.getElementById('portfolio-total').textContent = totalUSD > 0 ? `$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}` : '—'
+}
+
+async function openAnalysis(ticker, exchange) {
+  const sheet = document.getElementById('analysis-sheet')
+  const content = document.getElementById('analysis-sheet-content')
+  sheet.classList.add('open')
+  const data = await api('GET', '/api/portfolio')
+  const holding = data?.holdings?.find(h => h.ticker === ticker)
+  if (!holding) { content.innerHTML = '<div class="sheet-handle"></div><div style="padding:24px;text-align:center">שגיאה</div>'; return }
+  const a = holding.analysis_json
+  if (!a) {
+    content.innerHTML = `<div class="sheet-handle"></div>
+      <div style="text-align:center;padding:24px">
+        <div style="margin-bottom:12px;color:var(--text-muted)">${t('no_analysis')}</div>
+        <button class="btn btn-primary" onclick="runAnalysis('${ticker}','${exchange}')">${t('refresh_analysis')}</button>
+      </div>
+      <button class="sheet-close" style="position:absolute;top:12px;left:12px" onclick="closeSheet()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`
+    return
+  }
+  const sd = a.stock_data || {}
+  const cur = sd.currency === 'ILS' ? '₪' : '$'
+  const pct = parseFloat(sd.change_pct || 0)
+  const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${e.ticker}</span> — ${e.impact}</div>`).join('') || `<div class="eco-item" style="color:var(--text-muted)">לא נמצאו קשרים רלוונטיים</div>`
+  content.innerHTML = `<div class="sheet-handle"></div>
+    <div style="position:relative">
+      <button class="sheet-close" style="position:absolute;top:0;left:0" onclick="closeSheet()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="sheet-header">
+        <div><div class="sheet-ticker">${ticker}</div><div class="sheet-exchange">${sd.short_name||''} · ${exchange}</div></div>
+        <div>
+          <div class="sheet-price-val">${sd.price?`${cur}${parseFloat(sd.price).toLocaleString()}`:'—'}</div>
+          <div class="${pct>=0?'change-up':'change-down'}">${pct>=0?'▲':'▼'} ${Math.abs(pct)}%</div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-section">
+      <div class="sheet-section-title">${t('financial_metrics')}</div>
+      <div class="metrics-grid">
+        <div class="metric-box"><div class="metric-val">${sd.pe_ratio?parseFloat(sd.pe_ratio).toFixed(1):'—'}</div><div class="metric-key">P/E</div></div>
+        <div class="metric-box"><div class="metric-val">${sd.eps?`${cur}${parseFloat(sd.eps).toFixed(2)}`:'—'}</div><div class="metric-key">EPS</div></div>
+        <div class="metric-box"><div class="metric-val">${sd.week52_low?`${cur}${parseFloat(sd.week52_low).toFixed(0)}`:'—'}</div><div class="metric-key">52W Low</div></div>
+        <div class="metric-box"><div class="metric-val">${sd.week52_high?`${cur}${parseFloat(sd.week52_high).toFixed(0)}`:'—'}</div><div class="metric-key">52W High</div></div>
+        <div class="metric-box"><div class="metric-val">${sd.market_cap?(sd.market_cap/1e9).toFixed(0)+'B':'—'}</div><div class="metric-key">Market Cap</div></div>
+        <div class="metric-box"><div class="metric-val" style="font-size:10px">${sd.sector||'—'}</div><div class="metric-key">Sector</div></div>
+      </div>
+    </div>
+    <div class="sheet-section">
+      <div class="sheet-section-title">${t('ai_analysis')}</div>
+      <div class="analysis-box">${[a.valuation_note,a.moat_note,a.management,a.outlook].filter(Boolean).join('<br><br>')}</div>
+    </div>
+    <div class="sheet-section">
+      <div class="sheet-section-title">${t('bear_case')}</div>
+      <div class="bear-box">${a.bear_case||'—'}</div>
+    </div>
+    <div class="sheet-section">
+      <div class="sheet-section-title">${t('ecosystem')}</div>
+      ${eco}
+    </div>
+    <button class="btn btn-secondary btn-full mt-12" onclick="runAnalysis('${ticker}','${exchange}')">
+      <span id="refresh-lbl">${t('refresh_analysis')}</span>
+    </button>`
+}
+
+async function runAnalysis(ticker, exchange) {
+  const lbl = document.getElementById('refresh-lbl')
+  if (lbl) lbl.innerHTML = `<span class="spinner"></span> ${t('analyzing')}`
+  await api('POST', `/api/analyze/${ticker}`, { exchange })
+  closeSheet()
+  loadPortfolio()
+}
+
+function closeSheet() { document.getElementById('analysis-sheet').classList.remove('open') }
+function handleSheetOverlayClick(e) { if (e.target === document.getElementById('analysis-sheet')) closeSheet() }
+function handleModalOverlayClick(e, id) { if (e.target === document.getElementById(id)) closeModal(id) }
+
+function openAddModal() { document.getElementById('add-modal').classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); pendingHoldings = []; const p = document.getElementById('screenshot-preview'); if(p) p.innerHTML = '' }
+
+function switchAddMode(mode) {
+  addMode = mode
+  document.getElementById('seg-screenshot').classList.toggle('active', mode==='screenshot')
+  document.getElementById('seg-manual').classList.toggle('active', mode==='manual')
+  document.getElementById('add-screenshot-mode').style.display = mode==='screenshot'?'':'none'
+  document.getElementById('add-manual-mode').style.display = mode==='manual'?'':'none'
+}
+
+function selectExchange(ex) {
+  addExchange = ex
+  document.getElementById('ex-us').classList.toggle('active', ex==='US')
+  document.getElementById('ex-tase').classList.toggle('active', ex==='TASE')
+}
+
+async function handleScreenshotUpload(input) {
+  if (!input.files[0]) return
+  const preview = document.getElementById('screenshot-preview')
+  preview.innerHTML = '<span class="spinner"></span> מנתח...'
+  const form = new FormData(); form.append('screenshot', input.files[0])
+  const data = await api('POST', '/api/portfolio/screenshot', form, true)
+  if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${data?.error||'שגיאה'}</div>`; return }
+  pendingHoldings = data.holdings
+  preview.innerHTML = `<div style="color:var(--accent);font-size:13px;margin-top:4px">זוהו ${data.holdings.length} מניות</div>` +
+    data.holdings.map(h=>`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${h.ticker} (${h.exchange}) × ${h.quantity||'?'}</div>`).join('')
+}
+
+async function confirmAddHolding() {
+  document.getElementById('add-error').textContent = ''
+  let items = []
+  if (addMode === 'screenshot') {
+    if (!pendingHoldings.length) { document.getElementById('add-error').textContent = 'יש להעלות צילום מסך'; return }
+    items = pendingHoldings
+  } else {
+    const ticker = document.getElementById('manual-ticker').value.trim().toUpperCase()
+    const quantity = parseFloat(document.getElementById('manual-quantity').value)
+    const avg_cost = parseFloat(document.getElementById('manual-cost').value) || null
+    if (!ticker || !quantity) { document.getElementById('add-error').textContent = 'יש למלא טיקר וכמות'; return }
+    items = [{ ticker, exchange: addExchange, quantity, avg_cost }]
+  }
+  const btn = document.getElementById('add-confirm-btn')
+  btn.innerHTML = '<span class="spinner"></span>'
+  await api('POST', '/api/portfolio/holdings', items)
+  btn.textContent = t('add')
+  closeModal('add-modal')
+  loadPortfolio()
+}
+
+async function loadNotifications() {
+  const data = await api('GET', '/api/notifications')
+  const list = document.getElementById('notifications-list')
+  const notifs = data?.notifications || []
+  if (!notifs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-title">${t('no_notifications')}</div></div>`
+    return
+  }
+  const catColors = { 'רווחים':'tag-teal','הנהלה':'tag-yellow','תביעה':'tag-red','שינוי המלצה':'tag-orange','שרשרת אספקה':'tag-purple','כללי':'tag-yellow' }
+  list.innerHTML = notifs.map(n => {
+    const bullets = n.earnings_bullets ? `<ul class="earnings-bullets">${(typeof n.earnings_bullets==='string'?JSON.parse(n.earnings_bullets):n.earnings_bullets).map(b=>`<li>${b}</li>`).join('')}</ul>` : ''
+    const evasion = n.evasion_warning ? `<div class="evasion-warning">⚠ ${n.evasion_warning}</div>` : ''
+    const cc = catColors[n.category] || 'tag-yellow'
+    const time = new Date(n.sent_at).toLocaleDateString(lang==='he'?'he-IL':'en-US',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+    return `<div class="notif-item">
+      <div class="notif-header"><div class="notif-ticker">${n.ticker}</div><div class="notif-time">${time}</div></div>
+      <div class="notif-headline">${n.headline}</div>
+      ${n.summary?`<div class="notif-summary">${n.summary}</div>`:''}
+      ${bullets}${evasion}
+      <div class="tags"><span class="tag ${cc}">${n.category||'כללי'}</span></div>
+    </div>`
+  }).join('')
+}
+
+function renderSettings() {
+  document.getElementById('settings-content').innerHTML = `
+    <div class="settings-section">
+      <div class="settings-label">${t('settings_language')}</div>
+      <div class="flex-gap">
+        <div class="seg-btn ${lang==='he'?'active':''}" onclick="setLanguage('he')">עברית</div>
+        <div class="seg-btn ${lang==='en'?'active':''}" onclick="setLanguage('en')">English</div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-label">${t('settings_alert_level')}</div>
+      <div class="level-btns">
+        <div class="level-btn ${profile.alert_level===1?'active':''}" onclick="setAlertLevel(1)">${t('level_low')}</div>
+        <div class="level-btn ${profile.alert_level===2?'active':''}" onclick="setAlertLevel(2)">${t('level_mid')}</div>
+        <div class="level-btn ${profile.alert_level===3?'active':''}" onclick="setAlertLevel(3)">${t('level_high')}</div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-label">${t('settings_push')}</div>
+      <div class="settings-row">
+        <span>${t('settings_push')}</span>
+        <label class="toggle"><input type="checkbox" id="push-toggle" ${window._pushEnabled?'checked':''} onchange="togglePush(this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-label">${t('settings_password')}</div>
+      <div class="input-group"><input class="input" id="cur-pass" type="password" placeholder="${lang==='he'?'סיסמה נוכחית':'Current password'}"></div>
+      <div class="input-group"><input class="input" id="new-pass" type="password" placeholder="${lang==='he'?'סיסמה חדשה':'New password'}"></div>
+      <button class="btn btn-secondary btn-full mt-12" onclick="changePassword()">${t('settings_password')}</button>
+    </div>
+    <div class="divider"></div>
+    <button class="btn btn-danger btn-full" onclick="logout()">${t('settings_logout')}</button>`
+}
+
+async function setLanguage(l) {
+  applyLang(l); profile.language = l
+  await api('PUT', '/api/profile', { language: l })
+  renderSettings()
+}
+
+async function setAlertLevel(level) {
+  profile.alert_level = level
+  await api('PUT', '/api/profile', { alert_level: level })
+  renderSettings()
+}
+
+async function togglePush(enabled) {
+  if (!window._swReg) { return }
+  if (enabled) {
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') { document.getElementById('push-toggle').checked = false; return }
+    const vk = await api('GET', '/api/push/vapid-key')
+    const sub = await window._swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vk.public_key) })
+    await api('POST', '/api/push/subscribe', { subscription: sub.toJSON() })
+    window._pushEnabled = true
+  } else {
+    const sub = await window._swReg.pushManager.getSubscription()
+    if (sub) { await sub.unsubscribe(); await api('DELETE', '/api/push/subscribe', { endpoint: sub.endpoint }) }
+    window._pushEnabled = false
+  }
+}
+
+async function changePassword() {
+  const cur = document.getElementById('cur-pass')?.value
+  const np = document.getElementById('new-pass')?.value
+  if (!cur || !np) return
+  const res = await api('POST', '/auth/change-password', { current_password: cur, new_password: np })
+  alert(res?.ok ? (lang==='he'?'הסיסמה שונתה':'Password changed') : (res?.error||'Error'))
+}
+
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4)
+  const base64 = (b64 + pad).replace(/-/g,'+').replace(/_/g,'/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+</script>
+</body>
+</html>

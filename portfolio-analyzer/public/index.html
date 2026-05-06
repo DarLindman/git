@@ -593,8 +593,12 @@ function renderSettings() {
 
   let pushSection
   if (isIOSChrome) {
-    pushSection = `<div class="info-box accent">
-      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 הוסף למסך הבית להפעלת התראות' : '📱 Add to Home Screen to enable notifications'}</div>
+    pushSection = `<div class="info-box warn">
+      <div style="font-size:13px;font-weight:600;color:var(--warn);margin-bottom:6px">${isHe ? '⚠ התראות לא עובדות ב-Chrome' : '⚠ Notifications don\'t work in Chrome'}</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">${isHe ? 'Apple לא מאפשרת לדפדפן Chrome לשלוח התראות ב-iPhone.' : "Apple doesn't allow Chrome to send push notifications on iPhone."}</div>
+    </div>
+    <div class="info-box accent" style="margin-top:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 פתרון: הוסף למסך הבית' : '📱 Solution: Add to Home Screen'}</div>
       <div style="font-size:12px;color:var(--text-muted);line-height:1.8">${isHe ? '1. לחץ על כפתור השיתוף (□↑)<br>2. "הוסף למסך הבית"<br>3. פתח את האפליקציה מהמסך הבית<br>4. חזור להגדרות והפעל התראות' : '1. Tap the Share button (□↑)<br>2. "Add to Home Screen"<br>3. Open the app from your Home Screen<br>4. Come back to Settings and enable notifications'}</div>
     </div>`
   } else if (isIOS && !isStandalone) {

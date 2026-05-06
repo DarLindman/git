@@ -11,6 +11,26 @@ const YF_HEADERS = {
   'Accept': 'application/json',
   'Accept-Language': 'en-US,en;q=0.9'
 }
+let _yfCookie = ''
+let _yfCrumb = ''
+
+async function refreshYFAuth() {
+  if (process.env.NODE_ENV === 'test') return
+  try {
+    const r1 = await axios.get('https://finance.yahoo.com', {
+      headers: { 'User-Agent': YF_HEADERS['User-Agent'] },
+      timeout: 8000, maxRedirects: 5
+    })
+    _yfCookie = (r1.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ')
+    const r2 = await axios.get('https://query2.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { ...YF_HEADERS, Cookie: _yfCookie }, timeout: 5000
+    })
+    _yfCrumb = typeof r2.data === 'string' ? r2.data : ''
+    console.log('YF crumb refreshed:', _yfCrumb ? 'ok' : 'empty')
+  } catch (e) {
+    console.warn('YF auth refresh failed:', e.message)
+  }
+}
 const webpush = require('web-push')
 const axios = require('axios')
 const cheerio = require('cheerio')
@@ -200,44 +220,46 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
 
 async function fetchStockData(ticker, exchange) {
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
-  try {
-    const [quoteRes, profileRes] = await Promise.all([
-      axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
-        params: { symbols: symbol },
-        headers: YF_HEADERS,
-        timeout: 12000
-      }),
-      axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
-        params: { modules: 'assetProfile' },
-        headers: YF_HEADERS,
-        timeout: 8000
-      }).catch(e => { console.warn(`assetProfile failed for ${symbol}:`, e.message); return null })
-    ])
-
-    const q = quoteRes.data?.quoteResponse?.result?.[0]
-    if (!q?.regularMarketPrice) {
-      return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const headers = { ...YF_HEADERS, ...(_yfCookie ? { Cookie: _yfCookie } : {}) }
+      const crumbParam = _yfCrumb ? { crumb: _yfCrumb } : {}
+      const [quoteRes, profileRes] = await Promise.all([
+        axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
+          params: { symbols: symbol, ...crumbParam }, headers, timeout: 12000
+        }),
+        axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
+          params: { modules: 'assetProfile', ...crumbParam }, headers, timeout: 8000
+        }).catch(e => { console.warn(`assetProfile failed for ${symbol}:`, e.message); return null })
+      ])
+      const q = quoteRes.data?.quoteResponse?.result?.[0]
+      if (!q?.regularMarketPrice) {
+        return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
+      }
+      const profile = profileRes?.data?.quoteSummary?.result?.[0]?.assetProfile || {}
+      return {
+        ticker, symbol,
+        price: q.regularMarketPrice,
+        change_pct: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
+        market_cap: q.marketCap,
+        pe_ratio: q.trailingPE,
+        eps: q.epsTrailingTwelveMonths,
+        week52_high: q.fiftyTwoWeekHigh,
+        week52_low: q.fiftyTwoWeekLow,
+        sector: profile.sector || q.sector || 'N/A',
+        industry: profile.industry || q.industry || 'N/A',
+        short_name: q.shortName || q.longName || ticker,
+        currency: q.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+      }
+    } catch (err) {
+      if (err.response?.status === 401 && attempt === 0) {
+        console.warn(`YF 401 for ${symbol}, refreshing crumb and retrying...`)
+        await refreshYFAuth()
+        continue
+      }
+      console.error(`fetchStockData error for ${symbol}:`, err.message)
+      return { ticker, symbol, price: null, error: err.message }
     }
-
-    const profile = profileRes?.data?.quoteSummary?.result?.[0]?.assetProfile || {}
-    return {
-      ticker,
-      symbol,
-      price: q.regularMarketPrice,
-      change_pct: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
-      market_cap: q.marketCap,
-      pe_ratio: q.trailingPE,
-      eps: q.epsTrailingTwelveMonths,
-      week52_high: q.fiftyTwoWeekHigh,
-      week52_low: q.fiftyTwoWeekLow,
-      sector: profile.sector || q.sector || 'N/A',
-      industry: profile.industry || q.industry || 'N/A',
-      short_name: q.shortName || q.longName || ticker,
-      currency: q.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
-    }
-  } catch (err) {
-    console.error(`fetchStockData error for ${symbol}:`, err.message)
-    return { ticker, symbol, price: null, error: err.message }
   }
 }
 async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
@@ -783,6 +805,8 @@ if (require.main === module) {
   initDB().then(() => generateIcons()).then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`)
+      refreshYFAuth()
+      setInterval(refreshYFAuth, 6 * 60 * 60 * 1000) // refresh crumb every 6h
       startPolling()
     })
   }).catch(err => { console.error('Startup failed', err); process.exit(1) })

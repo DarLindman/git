@@ -477,7 +477,13 @@ async function refreshAllAnalysis() {
   const result = await api('POST', '/api/analyze/batch', { language: lang })
   btn.textContent = t('refresh_all')
   btn.disabled = false
-  if (result?.error) { alert(result.error); return }
+  if (result?.error && !result?.analyzed) { alert(result.error); return }
+  if (result?.failed?.length) {
+    const msg = lang === 'he'
+      ? `הניתוח הושלם. לא נמצאו נתונים עבור: ${result.failed.join(', ')}`
+      : `Analysis complete. No data found for: ${result.failed.join(', ')}`
+    alert(msg)
+  }
   loadPortfolio()
 }
 function handleSheetOverlayClick(e) { if (e.target === document.getElementById('analysis-sheet')) closeSheet() }

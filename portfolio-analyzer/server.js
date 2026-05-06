@@ -19,6 +19,7 @@ const fs = require('fs')
 const path = require('path')
 
 const app = express()
+app.set('trust proxy', 1) // Railway runs behind a reverse proxy
 const PORT = process.env.PORT || 3000
 
 const pool = new Pool({
@@ -318,7 +319,10 @@ Return a JSON object keyed by ticker:
 Be direct. No disclaimers. Respond ONLY with the JSON object.` }]
   })
   const result = extractJson(message.content[0].text)
-  if (!result) throw new Error('Claude returned invalid JSON for batch analysis')
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    console.error('analyzePortfolioBatch: invalid response:', message.content[0].text.slice(0, 200))
+    throw new Error('Claude returned invalid JSON for batch analysis')
+  }
   return result
 }
 
@@ -333,8 +337,9 @@ app.post('/api/analyze/batch', auth, analyzeLimiter, async (req, res) => {
     if (!holdings.length) return res.json({ ok: true, analyzed: 0 })
 
     const stockDataList = await Promise.all(holdings.map(h => fetchStockData(h.ticker, h.exchange)))
+    const failed = stockDataList.filter(sd => sd.error || !sd.price).map(sd => sd.ticker)
     const valid = stockDataList.filter(sd => !sd.error && sd.price)
-    if (!valid.length) return res.status(502).json({ error: 'Could not fetch any stock data' })
+    if (!valid.length) return res.status(502).json({ error: 'Could not fetch stock data for any holding', failed })
 
     const analyses = await analyzePortfolioBatch(valid, language)
 
@@ -346,7 +351,7 @@ app.post('/api/analyze/batch', auth, analyzeLimiter, async (req, res) => {
         [JSON.stringify({ ...analysis, stock_data: sd }), portfolioId, sd.ticker]
       )
     }
-    res.json({ ok: true, analyzed: valid.length })
+    res.json({ ok: true, analyzed: valid.length, failed })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Batch analysis failed' })

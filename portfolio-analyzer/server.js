@@ -410,12 +410,6 @@ app.get('/api/notifications', auth, async (req, res) => {
       `SELECT * FROM news_notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     )
-    // If no notifications yet, kick off a background fetch so next visit has results
-    if (!rows.length && !offset && process.env.NEWS_API_KEY) {
-      const { rows: prof } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id = $1', [req.user.id])
-      const alertLevel = parseInt(prof[0]?.profile_json?.alert_level) || 2
-      pollNewsForUser(req.user.id, alertLevel).catch(e => console.error('bg news fetch:', e.message))
-    }
     res.json({ notifications: rows })
   } catch {
     res.json({ notifications: [] })
@@ -468,11 +462,16 @@ async function sendPushToUser(userId, payload) {
   }
 }
 
-async function filterNewsWithClaude(ticker, articleTitle, articleContent, alertLevel) {
+// Batch filter: one Claude call for all articles of one ticker
+async function batchFilterNews(ticker, articles, alertLevel) {
+  if (!articles.length) return []
+  const articleList = articles.map((a, i) =>
+    `[${i}] title: ${a.title || ''}\nsnippet: ${(a.description || a.content || '').slice(0, 200)}`
+  ).join('\n---\n')
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      max_tokens: 600,
       system: [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
@@ -482,17 +481,19 @@ Level 1 = only: earnings reports, M&A, CEO/CFO departure
 Level 2 = also: analyst rating changes, lawsuits, guidance revision
 Level 3 = all mentions
 
-Article title: ${articleTitle}
-Article snippet: ${articleContent.slice(0, 500)}
+Articles:
+${articleList}
 
-Should this trigger a notification? Return JSON:
-{ "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }`
+For each article that should trigger a notification, return an entry. Ignore irrelevant articles.
+Return JSON array: [{ "index": 0, "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }]
+If none qualify, return [].`
       }]
     })
-    return extractJson(message.content[0].text)
+    const result = extractJson(message.content[0].text)
+    return Array.isArray(result) ? result : []
   } catch (err) {
-    console.error('filterNewsWithClaude error:', err.message)
-    return null
+    console.error('batchFilterNews error:', err.message)
+    return []
   }
 }
 
@@ -535,20 +536,31 @@ async function pollNewsForUser(userId, alertLevel) {
         params: { q: holding.ticker, sortBy: 'publishedAt', pageSize: 5, language: 'en', apiKey: process.env.NEWS_API_KEY },
         timeout: 10000
       })
-      const articles = newsRes.data.articles || []
-      for (const article of articles) {
+      // Filter out already-seen articles first
+      const unseen = []
+      for (const article of (newsRes.data.articles || [])) {
         if (!article.url) continue
         const { rowCount } = await pool.query(
           'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2', [userId, article.url]
         )
-        if (rowCount > 0) continue
-        await pool.query(
-          'INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, article.url]
-        )
-        const filter = await filterNewsWithClaude(holding.ticker, article.title || '', article.description || article.content || '', alertLevel)
-        if (!filter?.notify) continue
+        if (!rowCount) unseen.push(article)
+      }
+      if (!unseen.length) continue
+
+      // Mark all as seen before calling Claude
+      for (const a of unseen) {
+        await pool.query('INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, a.url])
+      }
+
+      // ONE Claude call for all unseen articles of this ticker
+      const results = await batchFilterNews(holding.ticker, unseen, alertLevel)
+
+      for (const r of results) {
+        if (!r.notify) continue
+        const article = unseen[r.index]
+        if (!article) continue
         let earningsBullets = null, evasionWarning = null
-        if (filter.is_earnings && article.content) {
+        if (r.is_earnings && article.content) {
           const summary = await summarizeEarningsCall(article.content)
           earningsBullets = summary?.bullets || null
           evasionWarning = summary?.evasion_warning || null
@@ -556,12 +568,12 @@ async function pollNewsForUser(userId, alertLevel) {
         await pool.query(
           `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [userId, holding.ticker, article.title, filter.summary, filter.category, article.url,
+          [userId, holding.ticker, article.title, r.summary, r.category, article.url,
            earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
         )
         await sendPushToUser(userId, {
-          title: `${holding.ticker} — ${filter.category}`,
-          body: filter.summary,
+          title: `${holding.ticker} — ${r.category}`,
+          body: r.summary,
           tag: `${holding.ticker}-${Date.now()}`,
           url: '/'
         })

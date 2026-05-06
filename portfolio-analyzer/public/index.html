@@ -471,19 +471,13 @@ async function deleteHolding(id, ticker) {
 }
 
 async function refreshAllAnalysis() {
-  const data = await api('GET', '/api/portfolio')
-  const holdings = data?.holdings || []
-  if (!holdings.length) return
   const btn = document.getElementById('refresh-all-btn')
-  btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')} (0/${holdings.length})`
+  btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`
   btn.disabled = true
-  for (let i = 0; i < holdings.length; i++) {
-    const h = holdings[i]
-    btn.innerHTML = `<span class="spinner"></span> ${i+1}/${holdings.length}`
-    await api('POST', `/api/analyze/${h.ticker}`, { exchange: h.exchange, language: lang })
-  }
+  const result = await api('POST', '/api/analyze/batch', { language: lang })
   btn.textContent = t('refresh_all')
   btn.disabled = false
+  if (result?.error) { alert(result.error); return }
   loadPortfolio()
 }
 function handleSheetOverlayClick(e) { if (e.target === document.getElementById('analysis-sheet')) closeSheet() }

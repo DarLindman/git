@@ -284,6 +284,75 @@ Be direct. No disclaimers. Respond ONLY with the JSON object.`
   return result
 }
 
+async function analyzePortfolioBatch(stockDataList, language = 'he') {
+  const isEn = language === 'en'
+  const allTickers = stockDataList.map(s => s.ticker)
+  const stocksText = stockDataList.map(sd =>
+    `## ${sd.ticker}\nPrice: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps || 'N/A'} | 52W: ${sd.week52_low}–${sd.week52_high} | Cap: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'} | ${sd.sector}`
+  ).join('\n')
+
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: Math.min(350 * stockDataList.length + 200, 4000),
+    system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: `Analyze these ${stockDataList.length} stocks. Respond in ${isEn ? 'English' : 'Hebrew'} for narrative fields.
+
+${stocksText}
+
+Portfolio tickers for ecosystem mapping: [${allTickers.join(', ')}]
+
+Return a JSON object keyed by ticker:
+{
+  "TICKER": {
+    "valuation": "cheap|fair|expensive",
+    "valuation_note": "one sentence",
+    "moat": "wide|narrow|none",
+    "moat_note": "one sentence",
+    "management": "one sentence",
+    "outlook": "2-3 sentences",
+    "bear_case": "2-3 sentences on real risks",
+    "tags": { "moat": "${isEn ? 'wide moat|narrow moat|no moat' : 'חפיר רחב|חפיר צר|ללא חפיר'}", "valuation": "${isEn ? 'expensive|fair|cheap' : 'יקר|הוגן|זול'}", "risk": "${isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'}" },
+    "ecosystem": [{ "ticker": "X", "impact": "one sentence" }]
+  }
+}
+Be direct. No disclaimers. Respond ONLY with the JSON object.` }]
+  })
+  const result = extractJson(message.content[0].text)
+  if (!result) throw new Error('Claude returned invalid JSON for batch analysis')
+  return result
+}
+
+app.post('/api/analyze/batch', auth, analyzeLimiter, async (req, res) => {
+  const { language = 'he' } = req.body
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    if (!portfolioId) return res.status(400).json({ error: 'Portfolio not found' })
+    const { rows: holdings } = await pool.query(
+      'SELECT id, ticker, exchange FROM holdings WHERE portfolio_id = $1 ORDER BY ticker', [portfolioId]
+    )
+    if (!holdings.length) return res.json({ ok: true, analyzed: 0 })
+
+    const stockDataList = await Promise.all(holdings.map(h => fetchStockData(h.ticker, h.exchange)))
+    const valid = stockDataList.filter(sd => !sd.error && sd.price)
+    if (!valid.length) return res.status(502).json({ error: 'Could not fetch any stock data' })
+
+    const analyses = await analyzePortfolioBatch(valid, language)
+
+    for (const sd of valid) {
+      const analysis = analyses[sd.ticker]
+      if (!analysis) continue
+      await pool.query(
+        'UPDATE holdings SET analysis_json = $1, analyzed_at = NOW() WHERE portfolio_id = $2 AND ticker = $3',
+        [JSON.stringify({ ...analysis, stock_data: sd }), portfolioId, sd.ticker]
+      )
+    }
+    res.json({ ok: true, analyzed: valid.length })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Batch analysis failed' })
+  }
+})
+
 app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
   const { ticker } = req.params
   const { exchange = 'US', language = 'he' } = req.body
@@ -462,37 +531,34 @@ async function sendPushToUser(userId, payload) {
   }
 }
 
-// Batch filter: one Claude call for all articles of one ticker
-async function batchFilterNews(ticker, articles, alertLevel) {
+// One Claude call for ALL articles across ALL tickers in the portfolio
+async function batchFilterNewsAllTickers(tickers, articles, alertLevel) {
   if (!articles.length) return []
   const articleList = articles.map((a, i) =>
-    `[${i}] title: ${a.title || ''}\nsnippet: ${(a.description || a.content || '').slice(0, 200)}`
-  ).join('\n---\n')
+    `[${i}] ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
+  ).join('\n')
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      max_tokens: 800,
       system: [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
-        content: `Ticker: ${ticker}
-Alert level: ${alertLevel}
-Level 1 = only: earnings reports, M&A, CEO/CFO departure
-Level 2 = also: analyst rating changes, lawsuits, guidance revision
-Level 3 = all mentions
+        content: `Portfolio tickers: ${tickers.join(', ')}
+Alert level: ${alertLevel} (1=earnings/M&A/CEO only, 2=+analyst/lawsuits/guidance, 3=all mentions)
 
 Articles:
 ${articleList}
 
-For each article that should trigger a notification, return an entry. Ignore irrelevant articles.
-Return JSON array: [{ "index": 0, "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }]
+For each article relevant to any portfolio ticker, return an entry. Ignore unrelated articles.
+Return JSON array: [{ "index": 0, "ticker": "AAPL", "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }]
 If none qualify, return [].`
       }]
     })
     const result = extractJson(message.content[0].text)
     return Array.isArray(result) ? result : []
   } catch (err) {
-    console.error('batchFilterNews error:', err.message)
+    console.error('batchFilterNewsAllTickers error:', err.message)
     return []
   }
 }
@@ -526,61 +592,62 @@ async function pollNewsForUser(userId, alertLevel) {
   if (!portfolioId) return
 
   const { rows: holdings } = await pool.query(
-    'SELECT ticker, exchange FROM holdings WHERE portfolio_id = $1', [portfolioId]
+    'SELECT ticker FROM holdings WHERE portfolio_id = $1', [portfolioId]
   )
   if (!holdings.length) return
+  const tickers = holdings.map(h => h.ticker)
 
-  for (const holding of holdings) {
-    try {
-      const newsRes = await axios.get('https://newsapi.org/v2/everything', {
-        params: { q: holding.ticker, sortBy: 'publishedAt', pageSize: 5, language: 'en', apiKey: process.env.NEWS_API_KEY },
-        timeout: 10000
-      })
-      // Filter out already-seen articles first
-      const unseen = []
-      for (const article of (newsRes.data.articles || [])) {
-        if (!article.url) continue
-        const { rowCount } = await pool.query(
-          'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2', [userId, article.url]
-        )
-        if (!rowCount) unseen.push(article)
-      }
-      if (!unseen.length) continue
+  try {
+    // ONE NewsAPI call for all tickers
+    const newsRes = await axios.get('https://newsapi.org/v2/everything', {
+      params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20, language: 'en', apiKey: process.env.NEWS_API_KEY },
+      timeout: 10000
+    })
 
-      // Mark all as seen before calling Claude
-      for (const a of unseen) {
-        await pool.query('INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, a.url])
-      }
-
-      // ONE Claude call for all unseen articles of this ticker
-      const results = await batchFilterNews(holding.ticker, unseen, alertLevel)
-
-      for (const r of results) {
-        if (!r.notify) continue
-        const article = unseen[r.index]
-        if (!article) continue
-        let earningsBullets = null, evasionWarning = null
-        if (r.is_earnings && article.content) {
-          const summary = await summarizeEarningsCall(article.content)
-          earningsBullets = summary?.bullets || null
-          evasionWarning = summary?.evasion_warning || null
-        }
-        await pool.query(
-          `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [userId, holding.ticker, article.title, r.summary, r.category, article.url,
-           earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
-        )
-        await sendPushToUser(userId, {
-          title: `${holding.ticker} — ${r.category}`,
-          body: r.summary,
-          tag: `${holding.ticker}-${Date.now()}`,
-          url: '/'
-        })
-      }
-    } catch (err) {
-      console.error(`pollNewsForUser error for ${holding.ticker}:`, err.message)
+    // Filter out already-seen articles
+    const unseen = []
+    for (const article of (newsRes.data.articles || [])) {
+      if (!article.url) continue
+      const { rowCount } = await pool.query(
+        'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2', [userId, article.url]
+      )
+      if (!rowCount) unseen.push(article)
     }
+    if (!unseen.length) return
+
+    // Mark all as seen
+    for (const a of unseen) {
+      await pool.query('INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, a.url])
+    }
+
+    // ONE Claude call for all articles across all tickers
+    const results = await batchFilterNewsAllTickers(tickers, unseen, alertLevel)
+
+    for (const r of results) {
+      if (!r.notify || !r.ticker) continue
+      const article = unseen[r.index]
+      if (!article) continue
+      let earningsBullets = null, evasionWarning = null
+      if (r.is_earnings && article.content) {
+        const summary = await summarizeEarningsCall(article.content)
+        earningsBullets = summary?.bullets || null
+        evasionWarning = summary?.evasion_warning || null
+      }
+      await pool.query(
+        `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [userId, r.ticker, article.title, r.summary, r.category, article.url,
+         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
+      )
+      await sendPushToUser(userId, {
+        title: `${r.ticker} — ${r.category}`,
+        body: r.summary,
+        tag: `${r.ticker}-${Date.now()}`,
+        url: '/'
+      })
+    }
+  } catch (err) {
+    console.error('pollNewsForUser error:', err.message)
   }
 }
 

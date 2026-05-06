@@ -1,7 +1,11 @@
 const request = require('supertest')
 
 // Mock external-service modules before requiring server
-jest.mock('web-push', () => ({ setVapidDetails: jest.fn(), sendNotification: jest.fn() }))
+jest.mock('web-push', () => ({
+  setVapidDetails: jest.fn(),
+  sendNotification: jest.fn().mockResolvedValue({ statusCode: 201 }),
+  generateVAPIDKeys: jest.fn().mockReturnValue({ publicKey: 'pk', privateKey: 'sk' })
+}))
 jest.mock('@anthropic-ai/sdk', () => {
   return jest.fn().mockImplementation(() => ({
     messages: {
@@ -33,6 +37,11 @@ jest.mock('pg', () => {
   // Holdings store: map from portfolioId -> array of holding objects
   const holdingsStore = new Map()
   let holdingIdCounter = 100
+  // Profile store: map from userId -> profile_json object
+  const profileStore = new Map()
+  // Push subscriptions store: map from userId -> array of { id, subscription_json }
+  const pushStore = new Map()
+  let pushIdCounter = 1000
 
   const query = jest.fn(async (sql, params) => {
     // initDB — ignore schema queries
@@ -45,11 +54,15 @@ jest.mock('pg', () => {
       users.set(username, { id, username, password_hash: hash })
       // initialise an empty holdings list for portfolioId = id (same as user id for simplicity)
       holdingsStore.set(id, [])
+      // initialise default profile
+      profileStore.set(id, { language: 'he', alert_level: 2 })
+      // initialise empty push subscriptions
+      pushStore.set(id, [])
       return { rows: [{ id, username }] }
     }
     // register: INSERT INTO portfolios
     if (sql.includes('INSERT INTO portfolios')) return { rows: [] }
-    // register: INSERT INTO user_profiles
+    // register: INSERT INTO user_profiles (initial insert without ON CONFLICT)
     if (sql.includes('INSERT INTO user_profiles') && !sql.includes('ON CONFLICT')) return { rows: [] }
     // login: SELECT from users
     if (sql.includes('SELECT') && sql.includes('FROM users') && sql.includes('WHERE username')) {
@@ -109,6 +122,57 @@ jest.mock('pg', () => {
     // holdings: UPDATE holdings SET analysis_json
     if (sql.includes('UPDATE holdings SET analysis_json')) {
       return { rows: [] }
+    }
+
+    // profile: SELECT profile_json FROM user_profiles
+    if (sql.includes('SELECT profile_json FROM user_profiles')) {
+      const userId = params[0]
+      const profile = profileStore.get(userId) || { language: 'he', alert_level: 2 }
+      return { rows: [{ profile_json: profile }] }
+    }
+    // profile: INSERT INTO user_profiles ... ON CONFLICT (profile update upsert)
+    if (sql.includes('INSERT INTO user_profiles') && sql.includes('ON CONFLICT')) {
+      const userId = params[0]
+      const updates = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1]
+      const existing = profileStore.get(userId) || { language: 'he', alert_level: 2 }
+      profileStore.set(userId, { ...existing, ...updates })
+      return { rows: [] }
+    }
+
+    // notifications: SELECT * FROM news_notifications
+    if (sql.includes('FROM news_notifications')) {
+      return { rows: [] }
+    }
+
+    // push subscriptions: INSERT INTO push_subscriptions
+    if (sql.includes('INSERT INTO push_subscriptions')) {
+      const [userId, subscriptionJson] = params
+      const subs = pushStore.get(userId) || []
+      const sub = typeof subscriptionJson === 'string' ? JSON.parse(subscriptionJson) : subscriptionJson
+      subs.push({ id: pushIdCounter++, user_id: userId, subscription_json: sub })
+      pushStore.set(userId, subs)
+      return { rows: [] }
+    }
+    // push subscriptions: DELETE FROM push_subscriptions WHERE user_id ... endpoint
+    if (sql.includes('DELETE FROM push_subscriptions') && sql.includes('endpoint')) {
+      const [userId, endpoint] = params
+      const subs = pushStore.get(userId) || []
+      pushStore.set(userId, subs.filter(s => s.subscription_json.endpoint !== endpoint))
+      return { rows: [], rowCount: 1 }
+    }
+    // push subscriptions: DELETE FROM push_subscriptions WHERE id (expired cleanup)
+    if (sql.includes('DELETE FROM push_subscriptions WHERE id')) {
+      const [subId] = params
+      for (const [uid, subs] of pushStore.entries()) {
+        pushStore.set(uid, subs.filter(s => s.id !== subId && s.id !== Number(subId)))
+      }
+      return { rows: [], rowCount: 1 }
+    }
+    // push subscriptions: SELECT id, subscription_json FROM push_subscriptions WHERE user_id
+    if (sql.includes('SELECT id, subscription_json FROM push_subscriptions')) {
+      const userId = params[0]
+      const subs = pushStore.get(userId) || []
+      return { rows: subs }
     }
 
     return { rows: [], rowCount: 0 }
@@ -288,5 +352,86 @@ describe('Screenshot Parser', () => {
       .post('/api/portfolio/screenshot')
       .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(400)
+  })
+})
+
+describe('Profile', () => {
+  let token
+
+  beforeAll(async () => {
+    const u = { username: `profile_${Date.now()}`, password: 'TestPass123!' }
+    const res = await request(app).post('/auth/register').send(u)
+    token = res.body.token
+  })
+
+  test('GET /api/profile returns default profile', async () => {
+    const res = await request(app).get('/api/profile').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.language).toBeDefined()
+    expect(res.body.alert_level).toBeDefined()
+  })
+
+  test('PUT /api/profile updates language', async () => {
+    const res = await request(app)
+      .put('/api/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ language: 'en' })
+    expect(res.status).toBe(200)
+    expect(res.body.language).toBe('en')
+  })
+
+  test('PUT /api/profile rejects invalid language', async () => {
+    const res = await request(app)
+      .put('/api/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ language: 'fr' })
+    expect(res.status).toBe(400)
+  })
+
+  test('GET /api/notifications returns empty array initially', async () => {
+    const res = await request(app).get('/api/notifications').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.notifications).toEqual([])
+  })
+})
+
+describe('Push Subscriptions', () => {
+  let token
+
+  beforeAll(async () => {
+    const u = { username: `push_${Date.now()}`, password: 'TestPass123!' }
+    const res = await request(app).post('/auth/register').send(u)
+    token = res.body.token
+  })
+
+  test('GET /api/push/vapid-key returns public key', async () => {
+    const res = await request(app).get('/api/push/vapid-key')
+    expect(res.status).toBe(200)
+    expect(res.body.public_key).toBeDefined()
+  })
+
+  test('POST /api/push/subscribe saves subscription', async () => {
+    const res = await request(app)
+      .post('/api/push/subscribe')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ subscription: { endpoint: 'https://push.example.com/test', keys: { p256dh: 'abc', auth: 'def' } } })
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+  })
+
+  test('POST /api/push/subscribe rejects missing endpoint', async () => {
+    const res = await request(app)
+      .post('/api/push/subscribe')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ subscription: {} })
+    expect(res.status).toBe(400)
+  })
+
+  test('DELETE /api/push/subscribe removes subscription', async () => {
+    const res = await request(app)
+      .delete('/api/push/subscribe')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ endpoint: 'https://push.example.com/test' })
+    expect(res.status).toBe(200)
   })
 })

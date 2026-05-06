@@ -320,6 +320,96 @@ Respond ONLY with the JSON array.` }
   }
 })
 
+app.get('/api/profile', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id = $1', [req.user.id])
+    res.json(rows[0]?.profile_json || { language: 'he', alert_level: 2 })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+app.put('/api/profile', auth, async (req, res) => {
+  const { language, alert_level } = req.body
+  const allowed_languages = ['he', 'en']
+  const allowed_levels = [1, 2, 3]
+  if (language && !allowed_languages.includes(language)) return res.status(400).json({ error: 'שפה לא תקינה' })
+  if (alert_level && !allowed_levels.includes(alert_level)) return res.status(400).json({ error: 'רמת התראה לא תקינה' })
+  try {
+    await pool.query(
+      `INSERT INTO user_profiles (user_id, profile_json) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET profile_json = user_profiles.profile_json || $2::jsonb`,
+      [req.user.id, JSON.stringify({ ...(language && { language }), ...(alert_level && { alert_level }) })]
+    )
+    const { rows } = await pool.query('SELECT profile_json FROM user_profiles WHERE user_id = $1', [req.user.id])
+    res.json(rows[0].profile_json)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+app.get('/api/notifications', auth, async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 100)
+  const offset = parseInt(req.query.offset) || 0
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM news_notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    )
+    res.json({ notifications: rows })
+  } catch {
+    res.json({ notifications: [] })
+  }
+})
+
+app.get('/api/push/vapid-key', (req, res) => {
+  res.json({ public_key: process.env.VAPID_PUBLIC_KEY || '' })
+})
+
+app.post('/api/push/subscribe', auth, async (req, res) => {
+  const { subscription } = req.body
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'subscription לא תקין' })
+  try {
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_id, subscription_json) VALUES ($1, $2)`,
+      [req.user.id, JSON.stringify(subscription)]
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+app.delete('/api/push/subscribe', auth, async (req, res) => {
+  const { endpoint } = req.body
+  try {
+    await pool.query(
+      `DELETE FROM push_subscriptions WHERE user_id = $1 AND subscription_json->>'endpoint' = $2`,
+      [req.user.id, endpoint]
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+async function sendPushToUser(userId, payload) {
+  const { rows } = await pool.query('SELECT id, subscription_json FROM push_subscriptions WHERE user_id = $1', [userId])
+  for (const row of rows) {
+    try {
+      await webpush.sendNotification(row.subscription_json, JSON.stringify(payload))
+    } catch (err) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        await pool.query(`DELETE FROM push_subscriptions WHERE id = $1`, [row.id])
+      }
+    }
+  }
+}
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (

@@ -6,19 +6,10 @@ const { Pool } = require('pg')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
 const Anthropic = require('@anthropic-ai/sdk')
-let _yf = null
-async function getYF() {
-  if (!_yf) {
-    try {
-      // eslint-disable-next-line
-      _yf = require('yahoo-finance2').default || require('yahoo-finance2')
-    } catch {
-      const m = await import('yahoo-finance2')
-      _yf = m.default || m
-    }
-    try { _yf.setGlobalConfig({ validation: { logErrors: false, logWarnings: false } }) } catch {}
-  }
-  return _yf
+const YF_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json',
+  'Accept-Language': 'en-US,en;q=0.9'
 }
 const webpush = require('web-push')
 const axios = require('axios')
@@ -209,26 +200,39 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
 async function fetchStockData(ticker, exchange) {
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
   try {
-    const yf = await getYF()
-    const moduleOpts = { validateResult: false }
-    const [quote, summary] = await Promise.all([
-      yf.quote(symbol, {}, moduleOpts),
-      yf.quoteSummary(symbol, { modules: ['summaryDetail', 'defaultKeyStatistics', 'assetProfile'] }, moduleOpts).catch(() => null)
+    const [chartRes, summaryRes] = await Promise.all([
+      axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
+        params: { interval: '1d', range: '5d' },
+        headers: YF_HEADERS,
+        timeout: 12000
+      }),
+      axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
+        params: { modules: 'summaryDetail,defaultKeyStatistics,assetProfile,price' },
+        headers: YF_HEADERS,
+        timeout: 12000
+      }).catch(() => null)
     ])
+
+    const meta = chartRes.data?.chart?.result?.[0]?.meta
+    if (!meta?.regularMarketPrice) {
+      return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
+    }
+
+    const r = summaryRes?.data?.quoteSummary?.result?.[0] || {}
     return {
       ticker,
       symbol,
-      price: quote.regularMarketPrice,
-      change_pct: quote.regularMarketChangePercent?.toFixed(2),
-      market_cap: quote.marketCap,
-      pe_ratio: quote.trailingPE || summary?.summaryDetail?.trailingPE,
-      eps: quote.epsTrailingTwelveMonths,
-      week52_high: quote.fiftyTwoWeekHigh,
-      week52_low: quote.fiftyTwoWeekLow,
-      sector: summary?.assetProfile?.sector || quote.sector || 'N/A',
-      industry: summary?.assetProfile?.industry || 'N/A',
-      short_name: quote.shortName || quote.longName || ticker,
-      currency: quote.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+      price: meta.regularMarketPrice,
+      change_pct: parseFloat((meta.regularMarketChangePercent ?? 0).toFixed(2)),
+      market_cap: r.price?.marketCap?.raw || meta.marketCap,
+      pe_ratio: r.summaryDetail?.trailingPE?.raw || r.defaultKeyStatistics?.forwardPE?.raw,
+      eps: r.defaultKeyStatistics?.trailingEps?.raw,
+      week52_high: meta.fiftyTwoWeekHigh || r.summaryDetail?.fiftyTwoWeekHigh?.raw,
+      week52_low: meta.fiftyTwoWeekLow || r.summaryDetail?.fiftyTwoWeekLow?.raw,
+      sector: r.assetProfile?.sector || 'N/A',
+      industry: r.assetProfile?.industry || 'N/A',
+      short_name: meta.shortName || meta.longName || ticker,
+      currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
     }
   } catch (err) {
     console.error(`fetchStockData error for ${symbol}:`, err.message)
@@ -511,9 +515,10 @@ async function pollNews() {
   if (!process.env.NEWS_API_KEY) return
   try {
     const { rows: usersWithSubs } = await pool.query(
-      `SELECT DISTINCT ps.user_id, COALESCE(up.profile_json->>'alert_level', '2') as alert_level
-       FROM push_subscriptions ps
-       LEFT JOIN user_profiles up ON up.user_id = ps.user_id`
+      `SELECT DISTINCT po.user_id, COALESCE(up.profile_json->>'alert_level', '2') as alert_level
+       FROM portfolios po
+       JOIN holdings h ON h.portfolio_id = po.id
+       LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
 
     for (const userRow of usersWithSubs) {

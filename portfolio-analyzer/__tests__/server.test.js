@@ -296,8 +296,17 @@ describe('Portfolio', () => {
 
 describe('fetchStockData', () => {
   const { fetchStockData } = require('../server')
+  const axios = require('axios')
+
+  const mockChartResponse = (price, changePct, currency = 'USD') => ({
+    data: { chart: { result: [{ meta: { regularMarketPrice: price, regularMarketChangePercent: changePct, fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Test Stock', currency } }] } }
+  })
+  const mockSummaryResponse = () => ({
+    data: { quoteSummary: { result: [{ summaryDetail: { trailingPE: { raw: 28.4 } }, defaultKeyStatistics: { trailingEps: { raw: 6.66 } }, assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' }, price: { marketCap: { raw: 2900000000000 } } }] } }
+  })
 
   test('returns financial data for AAPL (US)', async () => {
+    axios.get.mockResolvedValueOnce(mockChartResponse(189.42, 2.4)).mockResolvedValueOnce(mockSummaryResponse())
     const data = await fetchStockData('AAPL', 'US')
     expect(data.price).toBe(189.42)
     expect(data.pe_ratio).toBeDefined()
@@ -306,14 +315,14 @@ describe('fetchStockData', () => {
   })
 
   test('uses .TA suffix for TASE stocks', async () => {
+    axios.get.mockResolvedValueOnce(mockChartResponse(41.2, -1.1, 'ILS')).mockResolvedValueOnce(mockSummaryResponse())
     const data = await fetchStockData('TEVA', 'TASE')
     expect(data.symbol).toBe('TEVA.TA')
     expect(data.currency).toBe('ILS')
   })
 
-  test('handles yahoo-finance2 errors gracefully', async () => {
-    const { quote } = require('yahoo-finance2')
-    quote.mockRejectedValueOnce(new Error('Network error'))
+  test('returns null price when ticker not found', async () => {
+    axios.get.mockResolvedValueOnce({ data: { chart: { result: [{ meta: {} }] } } }).mockResolvedValueOnce(null)
     const data = await fetchStockData('BADTICKER', 'US')
     expect(data.price).toBeNull()
     expect(data.error).toBeDefined()
@@ -322,16 +331,22 @@ describe('fetchStockData', () => {
 
 describe('Analysis', () => {
   let token
+  const axios = require('axios')
+  const mockYFChart = (price = 189.42) => ({ data: { chart: { result: [{ meta: { regularMarketPrice: price, regularMarketChangePercent: 2.4, fiftyTwoWeekHigh: 220, fiftyTwoWeekLow: 164, shortName: 'Apple Inc.', currency: 'USD' } }] } } })
+  const mockYFSummary = () => ({ data: { quoteSummary: { result: [{ summaryDetail: { trailingPE: { raw: 28.4 } }, defaultKeyStatistics: { trailingEps: { raw: 6.66 } }, assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' }, price: { marketCap: { raw: 2900000000000 } } }] } } })
 
   beforeAll(async () => {
     const u = { username: `analysis_${Date.now()}`, password: 'TestPass123!' }
     const res = await request(app).post('/auth/register').send(u)
     token = res.body.token
-    // Add a holding first
     await request(app)
       .post('/api/portfolio/holdings')
       .set('Authorization', `Bearer ${token}`)
       .send([{ ticker: 'AAPL', exchange: 'US', quantity: 10, avg_cost: 150 }])
+  })
+
+  beforeEach(() => {
+    axios.get.mockResolvedValueOnce(mockYFChart()).mockResolvedValueOnce(mockYFSummary())
   })
 
   test('POST /api/analyze/:ticker returns analysis with bear case', async () => {

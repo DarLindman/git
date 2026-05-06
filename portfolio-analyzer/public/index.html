@@ -593,13 +593,9 @@ function renderSettings() {
 
   let pushSection
   if (isIOSChrome) {
-    pushSection = `<div class="info-box warn">
-      <div style="font-size:13px;font-weight:600;color:var(--warn);margin-bottom:6px">${isHe ? '⚠ Chrome על iPhone לא נתמך' : '⚠ Chrome on iPhone not supported'}</div>
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.6">${isHe ? 'Apple לא מאפשרת התראות ב-Chrome. כדי לקבל התראות:' : "Apple doesn't allow push in Chrome. To enable notifications:"}</div>
-    </div>
-    <div class="info-box accent" style="margin-top:8px">
-      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 כיצד לעבור ל-Safari' : '📱 How to switch to Safari'}</div>
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.8">${isHe ? '1. העתק את כתובת האתר<br>2. פתח Safari<br>3. הדבק את הכתובת<br>4. לחץ על כפתור השיתוף (□↑)<br>5. "הוסף למסך הבית"<br>6. פתח מהמסך הבית והפעל התראות' : '1. Copy the website URL<br>2. Open Safari<br>3. Paste the URL<br>4. Tap Share button (□↑)<br>5. "Add to Home Screen"<br>6. Open from Home Screen and enable notifications'}</div>
+    pushSection = `<div class="info-box accent">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px">${isHe ? '📱 הוסף למסך הבית להפעלת התראות' : '📱 Add to Home Screen to enable notifications'}</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.8">${isHe ? '1. לחץ על כפתור השיתוף (□↑)<br>2. "הוסף למסך הבית"<br>3. פתח את האפליקציה מהמסך הבית<br>4. חזור להגדרות והפעל התראות' : '1. Tap the Share button (□↑)<br>2. "Add to Home Screen"<br>3. Open the app from your Home Screen<br>4. Come back to Settings and enable notifications'}</div>
     </div>`
   } else if (isIOS && !isStandalone) {
     pushSection = `<div class="info-box accent">

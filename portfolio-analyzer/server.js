@@ -17,6 +17,17 @@ let _yfCrumb = ''
 async function refreshYFAuth() {
   if (process.env.NODE_ENV === 'test') return
   try {
+    // Attempt 1: crumb directly without cookie (works on US-region servers)
+    const direct = await axios.get('https://query2.finance.yahoo.com/v1/test/getcrumb', {
+      headers: YF_HEADERS, timeout: 5000
+    }).catch(() => null)
+    if (direct && typeof direct.data === 'string' && direct.data.length < 50 && !direct.data.startsWith('<')) {
+      _yfCrumb = direct.data
+      console.log('YF crumb obtained directly')
+      return
+    }
+    // Attempt 2: get session cookie from finance.yahoo.com, then fetch crumb
+    // (finance.yahoo.com sends >16KB cookie headers — requires --max-http-header-size=131072 in package.json)
     const r1 = await axios.get('https://finance.yahoo.com', {
       headers: { 'User-Agent': YF_HEADERS['User-Agent'] },
       timeout: 8000, maxRedirects: 5

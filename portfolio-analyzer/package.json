@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node --max-http-header-size=131072 server.js",
+    "dev": "node --max-http-header-size=131072 --watch server.js",
     "test": "jest --runInBand --forceExit",
     "generate-vapid": "node -e \"const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log(JSON.stringify(k,null,2))\""
   },

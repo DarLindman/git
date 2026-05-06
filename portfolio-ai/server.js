@@ -36,8 +36,8 @@ app.use(cors({ origin: process.env.ORIGIN || 'http://localhost:3000', credential
 app.use(express.json({ limit: '15mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
 
+module.exports = app
+
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
 }
-
-module.exports = app

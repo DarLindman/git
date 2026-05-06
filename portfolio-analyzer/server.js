@@ -201,39 +201,39 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
 async function fetchStockData(ticker, exchange) {
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
   try {
-    const [chartRes, summaryRes] = await Promise.all([
-      axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
-        params: { interval: '1d', range: '5d' },
+    const [quoteRes, profileRes] = await Promise.all([
+      axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
+        params: { symbols: symbol },
         headers: YF_HEADERS,
         timeout: 12000
       }),
       axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
-        params: { modules: 'summaryDetail,defaultKeyStatistics,assetProfile,price' },
+        params: { modules: 'assetProfile' },
         headers: YF_HEADERS,
-        timeout: 12000
-      }).catch(() => null)
+        timeout: 8000
+      }).catch(e => { console.warn(`assetProfile failed for ${symbol}:`, e.message); return null })
     ])
 
-    const meta = chartRes.data?.chart?.result?.[0]?.meta
-    if (!meta?.regularMarketPrice) {
+    const q = quoteRes.data?.quoteResponse?.result?.[0]
+    if (!q?.regularMarketPrice) {
       return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
     }
 
-    const r = summaryRes?.data?.quoteSummary?.result?.[0] || {}
+    const profile = profileRes?.data?.quoteSummary?.result?.[0]?.assetProfile || {}
     return {
       ticker,
       symbol,
-      price: meta.regularMarketPrice,
-      change_pct: parseFloat((meta.regularMarketChangePercent ?? 0).toFixed(2)),
-      market_cap: r.price?.marketCap?.raw || meta.marketCap,
-      pe_ratio: r.summaryDetail?.trailingPE?.raw || r.defaultKeyStatistics?.forwardPE?.raw,
-      eps: r.defaultKeyStatistics?.trailingEps?.raw,
-      week52_high: meta.fiftyTwoWeekHigh || r.summaryDetail?.fiftyTwoWeekHigh?.raw,
-      week52_low: meta.fiftyTwoWeekLow || r.summaryDetail?.fiftyTwoWeekLow?.raw,
-      sector: r.assetProfile?.sector || 'N/A',
-      industry: r.assetProfile?.industry || 'N/A',
-      short_name: meta.shortName || meta.longName || ticker,
-      currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+      price: q.regularMarketPrice,
+      change_pct: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
+      market_cap: q.marketCap,
+      pe_ratio: q.trailingPE,
+      eps: q.epsTrailingTwelveMonths,
+      week52_high: q.fiftyTwoWeekHigh,
+      week52_low: q.fiftyTwoWeekLow,
+      sector: profile.sector || q.sector || 'N/A',
+      industry: profile.industry || q.industry || 'N/A',
+      short_name: q.shortName || q.longName || ticker,
+      currency: q.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
     }
   } catch (err) {
     console.error(`fetchStockData error for ${symbol}:`, err.message)

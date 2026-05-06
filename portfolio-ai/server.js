@@ -6,7 +6,7 @@ const { Pool } = require('pg')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
 const Anthropic = require('@anthropic-ai/sdk')
-const yahooFinance = require('yahoo-finance2').default
+const yahooFinance = require('yahoo-finance2').default || require('yahoo-finance2')
 const webpush = require('web-push')
 const axios = require('axios')
 const cheerio = require('cheerio')
@@ -115,10 +115,91 @@ app.post('/auth/change-password', auth, async (req, res) => {
   }
 })
 
+async function getUserPortfolioId(userId) {
+  const { rows } = await pool.query('SELECT id FROM portfolios WHERE user_id = $1', [userId])
+  return rows[0]?.id
+}
+
 app.get('/api/portfolio', auth, async (req, res) => {
-  res.json({ holdings: [] })
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    if (!portfolioId) return res.json({ holdings: [] })
+    const { rows } = await pool.query(
+      'SELECT id, ticker, exchange, quantity, avg_cost, analysis_json, analyzed_at FROM holdings WHERE portfolio_id = $1 ORDER BY ticker',
+      [portfolioId]
+    )
+    res.json({ holdings: rows })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
 })
 
+app.post('/api/portfolio/holdings', auth, async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : [req.body]
+  if (!items.length) return res.status(400).json({ error: 'חסרים פרטי מניה' })
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    if (!portfolioId) return res.status(400).json({ error: 'פורטפוליו לא נמצא' })
+    for (const item of items) {
+      const { ticker, exchange = 'US', quantity, avg_cost } = item
+      if (!ticker || !quantity) continue
+      await pool.query(
+        `INSERT INTO holdings (portfolio_id, ticker, exchange, quantity, avg_cost)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (portfolio_id, ticker) DO UPDATE SET quantity = $4, avg_cost = $5`,
+        [portfolioId, ticker.toUpperCase(), exchange, quantity, avg_cost || null]
+      )
+    }
+    const { rows } = await pool.query(
+      'SELECT id, ticker, exchange, quantity, avg_cost, analysis_json, analyzed_at FROM holdings WHERE portfolio_id = $1 ORDER BY ticker',
+      [portfolioId]
+    )
+    res.status(201).json({ holdings: rows })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    await pool.query('DELETE FROM holdings WHERE id = $1 AND portfolio_id = $2', [req.params.id, portfolioId])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
+async function fetchStockData(ticker, exchange) {
+  const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
+  try {
+    const [quote, summary] = await Promise.all([
+      yahooFinance.quote(symbol),
+      yahooFinance.quoteSummary(symbol, { modules: ['summaryDetail', 'defaultKeyStatistics', 'assetProfile'] }).catch(() => null)
+    ])
+    return {
+      ticker,
+      symbol,
+      price: quote.regularMarketPrice,
+      change_pct: quote.regularMarketChangePercent?.toFixed(2),
+      market_cap: quote.marketCap,
+      pe_ratio: quote.trailingPE || summary?.summaryDetail?.trailingPE,
+      eps: quote.epsTrailingTwelveMonths,
+      week52_high: quote.fiftyTwoWeekHigh,
+      week52_low: quote.fiftyTwoWeekLow,
+      sector: summary?.assetProfile?.sector || quote.sector || 'N/A',
+      industry: summary?.assetProfile?.industry || 'N/A',
+      short_name: quote.shortName || quote.longName || ticker,
+      currency: quote.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+    }
+  } catch (err) {
+    console.error(`fetchStockData error for ${symbol}:`, err.message)
+    return { ticker, symbol, price: null, error: err.message }
+  }
+}
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -188,6 +269,7 @@ async function initDB() {
 }
 
 module.exports = app
+module.exports.fetchStockData = fetchStockData
 
 if (require.main === module) {
   initDB().then(() => {

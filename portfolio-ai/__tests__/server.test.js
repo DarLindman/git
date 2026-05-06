@@ -10,6 +10,10 @@ jest.mock('@anthropic-ai/sdk', () => {
 jest.mock('pg', () => {
   const users = new Map()
   let idCounter = 1
+  // Holdings store: map from portfolioId -> array of holding objects
+  const holdingsStore = new Map()
+  let holdingIdCounter = 100
+
   const query = jest.fn(async (sql, params) => {
     // initDB — ignore schema queries
     if (sql.includes('CREATE TABLE') || sql.includes('CREATE INDEX')) return { rows: [] }
@@ -19,6 +23,8 @@ jest.mock('pg', () => {
       if (users.has(username)) throw Object.assign(new Error('duplicate'), { code: '23505' })
       const id = idCounter++
       users.set(username, { id, username, password_hash: hash })
+      // initialise an empty holdings list for portfolioId = id (same as user id for simplicity)
+      holdingsStore.set(id, [])
       return { rows: [{ id, username }] }
     }
     // register: INSERT INTO portfolios
@@ -41,6 +47,40 @@ jest.mock('pg', () => {
     }
     // change-password: UPDATE users
     if (sql.includes('UPDATE users SET password_hash')) return { rows: [] }
+
+    // portfolio: SELECT id FROM portfolios WHERE user_id
+    if (sql.includes('SELECT id FROM portfolios WHERE user_id')) {
+      const userId = params[0]
+      // portfolioId == userId for test simplicity
+      return { rows: [{ id: userId }] }
+    }
+    // holdings: SELECT from holdings WHERE portfolio_id
+    if (sql.includes('FROM holdings WHERE portfolio_id') && sql.includes('SELECT')) {
+      const portfolioId = params[0]
+      const holdings = holdingsStore.get(portfolioId) || []
+      return { rows: [...holdings].sort((a, b) => a.ticker.localeCompare(b.ticker)) }
+    }
+    // holdings: INSERT INTO holdings
+    if (sql.includes('INSERT INTO holdings')) {
+      const [portfolioId, ticker, exchange, quantity, avg_cost] = params
+      const holdings = holdingsStore.get(portfolioId) || []
+      const existing = holdings.findIndex(h => h.ticker === ticker)
+      if (existing >= 0) {
+        holdings[existing] = { ...holdings[existing], quantity, avg_cost }
+      } else {
+        holdings.push({ id: holdingIdCounter++, portfolio_id: portfolioId, ticker, exchange, quantity, avg_cost, analysis_json: null, analyzed_at: null })
+      }
+      holdingsStore.set(portfolioId, holdings)
+      return { rows: [] }
+    }
+    // holdings: DELETE FROM holdings WHERE id
+    if (sql.includes('DELETE FROM holdings WHERE id')) {
+      const [holdingId, portfolioId] = params
+      const holdings = holdingsStore.get(portfolioId) || []
+      holdingsStore.set(portfolioId, holdings.filter(h => h.id !== holdingId && h.id !== Number(holdingId)))
+      return { rows: [], rowCount: 1 }
+    }
+
     return { rows: [], rowCount: 0 }
   })
   return { Pool: jest.fn(() => ({ query })) }
@@ -87,5 +127,72 @@ describe('Auth', () => {
   test('Protected route rejects missing token', async () => {
     const res = await request(app).get('/api/portfolio')
     expect(res.status).toBe(401)
+  })
+})
+
+describe('Portfolio', () => {
+  let token
+
+  beforeAll(async () => {
+    const u = { username: `port_${Date.now()}`, password: 'TestPass123!' }
+    const res = await request(app).post('/auth/register').send(u)
+    token = res.body.token
+  })
+
+  test('GET /api/portfolio returns empty holdings initially', async () => {
+    const res = await request(app).get('/api/portfolio').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.holdings).toEqual([])
+  })
+
+  test('POST /api/portfolio/holdings adds a holding', async () => {
+    const res = await request(app)
+      .post('/api/portfolio/holdings')
+      .set('Authorization', `Bearer ${token}`)
+      .send([{ ticker: 'AAPL', exchange: 'US', quantity: 10, avg_cost: 150 }])
+    expect(res.status).toBe(201)
+    expect(res.body.holdings.length).toBeGreaterThan(0)
+    expect(res.body.holdings[0].ticker).toBe('AAPL')
+  })
+
+  test('DELETE /api/portfolio/holdings/:id removes a holding', async () => {
+    // First add
+    const add = await request(app)
+      .post('/api/portfolio/holdings')
+      .set('Authorization', `Bearer ${token}`)
+      .send([{ ticker: 'MSFT', exchange: 'US', quantity: 5, avg_cost: 300 }])
+    const id = add.body.holdings.find(h => h.ticker === 'MSFT')?.id
+    expect(id).toBeDefined()
+    // Then delete
+    const del = await request(app)
+      .delete(`/api/portfolio/holdings/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(del.status).toBe(200)
+  })
+})
+
+describe('fetchStockData', () => {
+  const { fetchStockData } = require('../server')
+
+  test('returns financial data for AAPL (US)', async () => {
+    const data = await fetchStockData('AAPL', 'US')
+    expect(data.price).toBe(189.42)
+    expect(data.pe_ratio).toBeDefined()
+    expect(data.sector).toBeDefined()
+    expect(data.currency).toBe('USD')
+  })
+
+  test('uses .TA suffix for TASE stocks', async () => {
+    const data = await fetchStockData('TEVA', 'TASE')
+    expect(data.symbol).toBe('TEVA.TA')
+    expect(data.currency).toBe('ILS')
+  })
+
+  test('handles yahoo-finance2 errors gracefully', async () => {
+    const { quote } = require('yahoo-finance2')
+    quote.mockRejectedValueOnce(new Error('Network error'))
+    const data = await fetchStockData('BADTICKER', 'US')
+    expect(data.price).toBeNull()
+    expect(data.error).toBeDefined()
   })
 })

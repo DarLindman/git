@@ -553,6 +553,38 @@ function startPolling() {
   setInterval(pollNews, 15 * 60 * 1000)
 }
 
+async function generateIcons() {
+  try {
+    const { createCanvas } = require('@napi-rs/canvas')
+    for (const size of [192, 512]) {
+      const p = path.join(__dirname, 'public', `icon-${size}.png`)
+      if (fs.existsSync(p)) continue
+      const canvas = createCanvas(size, size)
+      const ctx = canvas.getContext('2d')
+      const grad = ctx.createLinearGradient(0, 0, size, size)
+      grad.addColorStop(0, '#0f2027')
+      grad.addColorStop(1, '#2c5364')
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      if (ctx.roundRect) {
+        ctx.roundRect(0, 0, size, size, size * 0.22)
+      } else {
+        ctx.rect(0, 0, size, size)
+      }
+      ctx.fill()
+      ctx.fillStyle = '#64ffda'
+      ctx.font = `bold ${Math.floor(size * 0.45)}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('₪', size / 2, size / 2)
+      fs.writeFileSync(p, canvas.toBuffer('image/png'))
+    }
+    console.log('Icons generated')
+  } catch (e) {
+    console.warn('Icon generation skipped:', e.message)
+  }
+}
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -626,10 +658,10 @@ module.exports.fetchStockData = fetchStockData
 module.exports.pollNews = pollNews
 
 if (require.main === module) {
-  initDB().then(() => {
+  initDB().then(() => generateIcons()).then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`)
       startPolling()
     })
-  }).catch(err => { console.error('DB init failed', err); process.exit(1) })
+  }).catch(err => { console.error('Startup failed', err); process.exit(1) })
 }

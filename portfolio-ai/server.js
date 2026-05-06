@@ -36,8 +36,9 @@ const pool = new Pool({
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@example.com'
 webpush.setVapidDetails(
-  process.env.VAPID_EMAIL || 'mailto:admin@example.com',
+  vapidEmail.startsWith('mailto:') || vapidEmail.startsWith('https://') ? vapidEmail : `mailto:${vapidEmail}`,
   process.env.VAPID_PUBLIC_KEY || '',
   process.env.VAPID_PRIVATE_KEY || ''
 )

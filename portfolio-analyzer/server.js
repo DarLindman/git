@@ -17,44 +17,49 @@ let _yfCrumb = ''
 async function refreshYFAuth() {
   if (process.env.NODE_ENV === 'test') return
   const ua = YF_HEADERS['User-Agent']
-  const crumbHeaders = (cookie) => ({
-    'User-Agent': ua,
-    'Accept': 'text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    ...(cookie ? { Cookie: cookie } : {})
-  })
-  // Attempt 1: crumb directly from query1 then query2 (works on US servers without cookie)
-  for (const base of ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com']) {
-    try {
-      const r = await axios.get(`${base}/v1/test/getcrumb`, { headers: crumbHeaders(_yfCookie), timeout: 5000 })
-      if (typeof r.data === 'string' && r.data.length > 0 && r.data.length < 50 && !r.data.startsWith('<')) {
-        _yfCrumb = r.data
-        console.log('YF crumb from', base)
-        return
-      }
-    } catch {}
+
+  const tryGetCrumb = async (cookie) => {
+    for (const base of ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com']) {
+      try {
+        const r = await axios.get(`${base}/v1/test/getcrumb`, {
+          headers: { 'User-Agent': ua, 'Accept': 'text/plain, */*', ...(cookie ? { Cookie: cookie } : {}) },
+          timeout: 5000
+        })
+        const val = typeof r.data === 'string' ? r.data.trim() : ''
+        if (val && val.length < 50 && !val.startsWith('<')) return val
+      } catch {}
+    }
+    return null
   }
-  // Attempt 2: get cookie from finance.yahoo.com with proper HTML Accept header, then crumb
-  // finance.yahoo.com sends large cookie headers — --max-http-header-size=131072 is set in package.json
+
+  // Strategy 1: try with existing cookie (or no cookie on first run)
+  const c0 = await tryGetCrumb(_yfCookie)
+  if (c0) { _yfCrumb = c0; console.log('YF crumb ok'); return }
+
+  // Strategy 2: bootstrap cookie from fc.yahoo.com (lightweight consent endpoint, no HTML overflow)
   try {
-    const r1 = await axios.get('https://finance.yahoo.com', {
-      headers: {
-        'User-Agent': ua,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9'
-      },
-      timeout: 10000, maxRedirects: 5
+    const r = await axios.get('https://fc.yahoo.com', {
+      headers: { 'User-Agent': ua, 'Accept': '*/*', 'Accept-Language': 'en-US,en;q=0.9' },
+      timeout: 5000, maxRedirects: 3
     })
-    _yfCookie = (r1.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ')
-    const r2 = await axios.get('https://query2.finance.yahoo.com/v1/test/getcrumb', {
-      headers: crumbHeaders(_yfCookie), timeout: 5000
+    const c = (r.headers['set-cookie'] || []).map(s => s.split(';')[0]).join('; ')
+    if (c) _yfCookie = c
+  } catch {}
+  const c1 = await tryGetCrumb(_yfCookie)
+  if (c1) { _yfCrumb = c1; console.log('YF crumb via fc.yahoo.com'); return }
+
+  // Strategy 3: bootstrap cookie from v8/chart (confirmed working from Railway)
+  try {
+    const r = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/AAPL', {
+      params: { interval: '1d', range: '1d' }, headers: YF_HEADERS, timeout: 8000
     })
-    _yfCrumb = typeof r2.data === 'string' ? r2.data : ''
-    if (_yfCrumb) console.log('YF crumb refreshed via finance.yahoo.com')
-    else console.warn('YF crumb empty after finance.yahoo.com flow')
-  } catch (e) {
-    console.warn('YF auth refresh failed:', e.message)
-  }
+    const c = (r.headers['set-cookie'] || []).map(s => s.split(';')[0]).join('; ')
+    if (c) _yfCookie = c
+  } catch {}
+  const c2 = await tryGetCrumb(_yfCookie)
+  if (c2) { _yfCrumb = c2; console.log('YF crumb via chart bootstrap'); return }
+
+  console.warn('YF crumb unavailable — PE/EPS/market cap will show as N/A')
 }
 const webpush = require('web-push')
 const axios = require('axios')
@@ -250,20 +255,26 @@ async function fetchStockData(ticker, exchange) {
       const headers = { ...YF_HEADERS, ...(_yfCookie ? { Cookie: _yfCookie } : {}) }
       const crumbParam = _yfCrumb ? { crumb: _yfCrumb } : {}
       // v8/chart is more permissive on auth than v7/quote
-      const [chartRes, summaryRes] = await Promise.all([
+      // search API requires no auth and returns sector/industry reliably
+      const [chartRes, summaryRes, searchRes] = await Promise.all([
         axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
           params: { interval: '1d', range: '1d', ...crumbParam }, headers, timeout: 12000
         }),
         axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
           params: { modules: 'summaryDetail,defaultKeyStatistics,price,assetProfile', ...crumbParam },
           headers, timeout: 8000
-        }).catch(e => { console.warn(`quoteSummary failed for ${symbol}:`, e.message); return null })
+        }).catch(() => null),
+        axios.get('https://query1.finance.yahoo.com/v1/finance/search', {
+          params: { q: symbol, quotesCount: 1, newsCount: 0, enableFuzzyQuery: false },
+          headers: YF_HEADERS, timeout: 5000
+        }).catch(() => null)
       ])
       const meta = chartRes.data?.chart?.result?.[0]?.meta
       if (!meta?.regularMarketPrice) {
         return { ticker, symbol, price: null, error: `Ticker "${symbol}" not found on Yahoo Finance` }
       }
       const s = summaryRes?.data?.quoteSummary?.result?.[0] || {}
+      const sq = searchRes?.data?.quotes?.find(q => q.symbol?.toUpperCase() === symbol.toUpperCase()) || {}
       const prevClose = meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice
       return {
         ticker, symbol,
@@ -274,9 +285,9 @@ async function fetchStockData(ticker, exchange) {
         eps: s.defaultKeyStatistics?.trailingEps?.raw ?? null,
         week52_high: meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null,
         week52_low: meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null,
-        sector: s.assetProfile?.sector || 'N/A',
-        industry: s.assetProfile?.industry || 'N/A',
-        short_name: meta.shortName || meta.longName || ticker,
+        sector: s.assetProfile?.sector || sq.sector || 'N/A',
+        industry: s.assetProfile?.industry || sq.industry || 'N/A',
+        short_name: meta.shortName || meta.longName || sq.shortname || ticker,
         currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
       }
     } catch (err) {

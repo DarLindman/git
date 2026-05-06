@@ -304,9 +304,12 @@ describe('fetchStockData', () => {
   const mockSummaryResponse = () => ({
     data: { quoteSummary: { result: [{ summaryDetail: { trailingPE: { raw: 28.4 } }, defaultKeyStatistics: { trailingEps: { raw: 6.66 } }, price: { marketCap: { raw: 2900000000000 } }, assetProfile: { sector: 'Technology', industry: 'Consumer Electronics' } }] } }
   })
+  const mockSearchResponse = (symbol) => ({
+    data: { quotes: [{ symbol, shortname: 'Test Stock', sector: 'Technology', industry: 'Consumer Electronics' }] }
+  })
 
   test('returns financial data for AAPL (US)', async () => {
-    axios.get.mockResolvedValueOnce(mockChartResponse(189.42, 2.4)).mockResolvedValueOnce(mockSummaryResponse())
+    axios.get.mockResolvedValueOnce(mockChartResponse(189.42, 2.4)).mockResolvedValueOnce(mockSummaryResponse()).mockResolvedValueOnce(mockSearchResponse('AAPL'))
     const data = await fetchStockData('AAPL', 'US')
     expect(data.price).toBe(189.42)
     expect(data.pe_ratio).toBeDefined()
@@ -315,14 +318,14 @@ describe('fetchStockData', () => {
   })
 
   test('uses .TA suffix for TASE stocks', async () => {
-    axios.get.mockResolvedValueOnce(mockChartResponse(41.2, -1.1, 'ILS')).mockResolvedValueOnce(mockSummaryResponse())
+    axios.get.mockResolvedValueOnce(mockChartResponse(41.2, -1.1, 'ILS')).mockResolvedValueOnce(mockSummaryResponse()).mockResolvedValueOnce(mockSearchResponse('TEVA.TA'))
     const data = await fetchStockData('TEVA', 'TASE')
     expect(data.symbol).toBe('TEVA.TA')
     expect(data.currency).toBe('ILS')
   })
 
   test('returns null price when ticker not found', async () => {
-    axios.get.mockResolvedValueOnce({ data: { chart: { result: [{ meta: {} }] } } }).mockResolvedValueOnce(null)
+    axios.get.mockResolvedValueOnce({ data: { chart: { result: [{ meta: {} }] } } }).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
     const data = await fetchStockData('BADTICKER', 'US')
     expect(data.price).toBeNull()
     expect(data.error).toBeDefined()
@@ -345,8 +348,10 @@ describe('Analysis', () => {
       .send([{ ticker: 'AAPL', exchange: 'US', quantity: 10, avg_cost: 150 }])
   })
 
+  const mockYFSearch = () => ({ data: { quotes: [{ symbol: 'AAPL', shortname: 'Apple Inc.', sector: 'Technology', industry: 'Consumer Electronics' }] } })
+
   beforeEach(() => {
-    axios.get.mockResolvedValueOnce(mockYFChart()).mockResolvedValueOnce(mockYFSummary())
+    axios.get.mockResolvedValueOnce(mockYFChart()).mockResolvedValueOnce(mockYFSummary()).mockResolvedValueOnce(mockYFSearch())
   })
 
   test('POST /api/analyze/:ticker returns analysis with bear case', async () => {

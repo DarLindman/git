@@ -703,6 +703,15 @@ Return JSON: { "bullets": ["bullet1","bullet2","bullet3","bullet4","bullet5"], "
   }
 }
 
+let _lastPollTime = null
+
+function isMarketHours() {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const day = et.getDay()   // 0=Sun, 6=Sat
+  const hour = et.getHours()
+  return day >= 1 && day <= 5 && hour >= 6 && hour < 22
+}
+
 async function pollNewsForUser(userId, alertLevel, language = 'he') {
   if (!process.env.NEWS_API_KEY) return
   const portfolioId = await getUserPortfolioId(userId)
@@ -715,31 +724,35 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
   const tickers = holdings.map(h => h.ticker)
 
   try {
+    // Only fetch articles published since the last poll (eliminates DB dedup)
+    const fromTime = _lastPollTime
+      ? _lastPollTime.toISOString()
+      : new Date(Date.now() - 16 * 60 * 1000).toISOString()
+
     const newsRes = await axios.get('https://newsapi.org/v2/everything', {
-      params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20, language: 'en', apiKey: process.env.NEWS_API_KEY },
+      params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20,
+                language: 'en', from: fromTime, apiKey: process.env.NEWS_API_KEY },
       timeout: 10000
     })
 
     const articles = (newsRes.data.articles || []).filter(a => a.url)
     if (!articles.length) return
 
-    // Dedup: skip articles already processed for this user
-    const { rows: existing } = await pool.query(
-      'SELECT article_url FROM news_notifications WHERE user_id = $1 AND article_url = ANY($2)',
-      [userId, articles.map(a => a.url)]
-    )
-    const existingUrls = new Set(existing.map(r => r.article_url))
-    const fresh = articles.filter(a => !existingUrls.has(a.url))
-    if (!fresh.length) return
+    // Pre-filter: only pass articles that mention a ticker in title/description
+    const relevant = articles.filter(a => {
+      const text = `${a.title || ''} ${a.description || ''}`.toUpperCase()
+      return tickers.some(t => text.includes(t.toUpperCase()))
+    })
+    if (!relevant.length) return
 
-    const results = await batchFilterNewsAllTickers(tickers, fresh, alertLevel, language)
+    const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)
 
     for (const r of results) {
-      if (!r.ticker) continue
-      const article = fresh[r.index]
+      if (!r.notify || !r.ticker) continue
+      const article = relevant[r.index]
       if (!article) continue
       let earningsBullets = null, evasionWarning = null
-      if (r.notify && r.is_earnings && article.content) {
+      if (r.is_earnings && article.content) {
         const summary = await summarizeEarningsCall(article.content, language)
         earningsBullets = summary?.bullets || null
         evasionWarning = summary?.evasion_warning || null
@@ -748,11 +761,9 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
         `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, importance, article_url, earnings_bullets, evasion_warning, notified)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          ON CONFLICT (user_id, article_url) DO NOTHING`,
-        [userId, r.ticker, article.title, r.notify ? r.summary : null,
-         r.category, r.importance || 2, article.url,
-         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, !!r.notify]
+        [userId, r.ticker, article.title, r.summary, r.category, r.importance || 2,
+         article.url, earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, true]
       )
-      if (!r.notify) continue
       const impLabel = language === 'en'
         ? ['','CRITICAL','HIGH','MEDIUM'][r.importance || 2]
         : ['','קריטי','גבוה','בינוני'][r.importance || 2]
@@ -779,14 +790,20 @@ async function pollNews() {
        LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
     for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2, u.language || 'he')
+    _lastPollTime = new Date()
   } catch (err) {
     console.error('pollNews top-level error:', err.message)
   }
 }
 
 function startPolling() {
-  console.log('Background news polling started (every 15 min)')
-  setInterval(pollNews, 15 * 60 * 1000)
+  const run = async () => {
+    await pollNews()
+    const interval = isMarketHours() ? 15 * 60 * 1000 : 60 * 60 * 1000
+    setTimeout(run, interval)
+  }
+  console.log('Background news polling started (15 min market hours / 60 min off-hours)')
+  run()
 }
 
 async function generateIcons() {
@@ -854,13 +871,6 @@ async function initDB() {
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       subscription_json JSONB NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS news_seen (
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      article_url TEXT NOT NULL,
-      seen_at TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (user_id, article_url)
     );
 
     CREATE TABLE IF NOT EXISTS user_profiles (

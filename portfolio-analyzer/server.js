@@ -290,7 +290,7 @@ async function fetchStockDataFinnhub(ticker) {
       industry: p.finnhubIndustry || 'N/A',
       short_name: p.name || ticker,
       currency: p.currency || 'USD',
-      revenue_growth: m.revenueGrowthQuarterlyYoy != null ? parseFloat((m.revenueGrowthQuarterlyYoy * 100).toFixed(1)) : null,
+      revenue_growth: m.revenueGrowthQuarterlyYoy != null ? parseFloat(m.revenueGrowthQuarterlyYoy.toFixed(1)) : null,
       net_margin: m.netMarginTTM != null ? parseFloat((m.netMarginTTM * 100).toFixed(1)) : null
     }
   } catch (e) {

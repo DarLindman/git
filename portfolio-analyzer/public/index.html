@@ -468,7 +468,7 @@ async function openAnalysis(ticker, exchange) {
     sd.week52_high != null ? `<div class="metric-box"><div class="metric-val">${cur}${parseFloat(sd.week52_high).toFixed(0)}</div><div class="metric-key">52W High</div></div>` : ''
   ].join('')
   const extraMetrics = [
-    sd.revenue_growth != null ? `<div class="metric-box"><div class="metric-val">${sd.revenue_growth > 0 ? '+' : ''}${sd.revenue_growth}%</div><div class="metric-key">Rev Growth</div></div>` : '',
+    sd.revenue_growth != null ? `<div class="metric-box"><div class="metric-val">${sd.revenue_growth > 0 ? '+' : ''}${sd.revenue_growth}%</div><div class="metric-key">Rev Grw Q YoY</div></div>` : '',
     sd.net_margin != null ? `<div class="metric-box"><div class="metric-val">${sd.net_margin}%</div><div class="metric-key">Net Margin</div></div>` : ''
   ].join('')
   content.innerHTML = `<div class="sheet-handle"></div>

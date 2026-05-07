@@ -350,8 +350,8 @@ async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
   const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
   const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
   const ecosystemInstruction = allPortfolioTickers.length
-    ? `ecosystem: if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], add entries. If none, return [].`
-    : 'ecosystem: return [].'
+    ? `For "ecosystem": if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include {"ticker":"X","impact":"one sentence"} for each. Otherwise keep [].`
+    : 'Keep "ecosystem" as [].'
 
   const prompt = `You are a seasoned portfolio manager writing a candid investment note for a friend.
 
@@ -378,8 +378,8 @@ ${ecosystemInstruction}`
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1800,
       system: [{ type: 'text', text: 'You are a candid portfolio manager. Always respond with valid JSON only. Never include text outside the JSON object.', cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: prompt }]
     })
@@ -427,9 +427,10 @@ Return a JSON object keyed by ticker:
     "risks": "Specific bear case with real stakes",
     "catalyst": "1-2 concrete upcoming events to watch",
     "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
-    "ecosystem": []
+    "ecosystem": [{"ticker":"X","impact":"one sentence describing the relationship"}]
   }
 }
+Use {"ticker":"X","impact":"..."} format for ecosystem. If no real relationship exists, keep [].
 Respond ONLY with the JSON object.` }]
   })
   const result = extractJson(message.content[0].text)

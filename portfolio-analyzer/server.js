@@ -248,6 +248,30 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
   }
 })
 
+app.get('/api/search', auth, async (req, res) => {
+  const q = (req.query.q || '').trim()
+  if (q.length < 1) return res.json({ results: [] })
+  try {
+    const r = await axios.get('https://query1.finance.yahoo.com/v1/finance/search', {
+      params: { q, quotesCount: 8, newsCount: 0, enableFuzzyQuery: true, listsCount: 0 },
+      headers: YF_HEADERS, timeout: 5000
+    })
+    const results = (r.data?.quotes || [])
+      .filter(item => item.symbol && ['EQUITY', 'ETF'].includes(item.quoteType))
+      .slice(0, 6)
+      .map(item => ({
+        symbol: item.symbol.replace(/\.TA$/, ''),
+        name: item.shortname || item.longname || item.symbol,
+        exchange: item.symbol.endsWith('.TA') ? 'TASE' : 'US',
+        type: item.quoteType
+      }))
+    res.json({ results })
+  } catch (e) {
+    console.warn('Ticker search error:', e.message)
+    res.json({ results: [] })
+  }
+})
+
 app.patch('/api/portfolio/holdings/:id', auth, async (req, res) => {
   try {
     const portfolioId = await getUserPortfolioId(req.user.id)
@@ -372,8 +396,10 @@ async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
     ? Math.round((stockData.price - stockData.week52_low) / (stockData.week52_high - stockData.week52_low) * 100)
     : null
   const mktCapFmt = stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'
-  const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
-  const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
+  const verdictTag = isEn ? 'buy|sell|hold' : 'קנה|מכור|החזק'
+  const characterTag = isEn
+    ? (isEtf ? 'index|sector|thematic|bonds' : 'growth|value|momentum|defensive|speculative|turnaround')
+    : (isEtf ? 'מדד|ענף|תמטי|אגח' : 'צמיחה|ערך|מומנטום|דפנסיבי|ספקולטיבי|התאוששות')
 
   const prompt = isEtf
     ? `You are a seasoned portfolio manager reviewing an ETF position for a friend.
@@ -389,12 +415,12 @@ Have a real opinion on whether this is the right fund for exposure to its area.
 
 Return ONLY this JSON:
 {
-  "verdict": "buy|watch|hold|avoid",
+  "verdict": "buy|sell|hold",
   "summary": "2-3 sentences. What this ETF tracks, current positioning, and bottom line.",
   "thesis": "Why this is (or isn't) a good way to get exposure to its target. Mention expense ratio and top holdings if you know them.",
   "risks": "Concentration risk, sector-specific risks, expense drag vs alternatives, or macro risks specific to what this fund holds.",
   "catalyst": "What trends or events would boost or hurt this ETF in the near term.",
-  "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
+  "tags": { "verdict": "${verdictTag}", "character": "${characterTag}" },
   "ecosystem": []
 }
 Keep "ecosystem" as [].`
@@ -411,12 +437,12 @@ Don't write "strong moat" or "experienced management". Write what actually makes
 
 Return ONLY this JSON:
 {
-  "verdict": "buy|watch|hold|avoid",
+  "verdict": "buy|sell|hold",
   "summary": "2-3 sentences. Lead with the bottom line. Use actual numbers. Sound like a person, not a report.",
   "thesis": "What specifically must go right for this investment to work. Be concrete.",
   "risks": "The real bear case. Specific scenarios and stakes — not generic competition or regulation.",
   "catalyst": "1-2 concrete upcoming events or data points that will prove or disprove the thesis.",
-  "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
+  "tags": { "verdict": "${verdictTag}", "character": "${characterTag}" },
   "ecosystem": []
 }
 ${allPortfolioTickers.length ? `For "ecosystem": if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include {"ticker":"X","impact":"one sentence"} for each. Otherwise keep [].` : 'Keep "ecosystem" as [].'}`
@@ -439,8 +465,8 @@ ${allPortfolioTickers.length ? `For "ecosystem": if ${stockData.ticker} has a re
 async function analyzePortfolioBatch(stockDataList, language = 'he') {
   const isEn = language === 'en'
   const allTickers = stockDataList.map(s => s.ticker)
-  const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
-  const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
+  const verdictTag = isEn ? 'buy|sell|hold' : 'קנה|מכור|החזק'
+  const characterTag = isEn ? 'growth|value|momentum|defensive|speculative|turnaround|index|sector|thematic|bonds' : 'צמיחה|ערך|מומנטום|דפנסיבי|ספקולטיבי|התאוששות|מדד|ענף|תמטי|אגח'
   const stocksText = stockDataList.map(sd => {
     const pct = sd.week52_high && sd.week52_low && sd.week52_high !== sd.week52_low
       ? Math.round((sd.price - sd.week52_low) / (sd.week52_high - sd.week52_low) * 100) + '% of 52W'
@@ -479,7 +505,7 @@ Return a JSON object keyed by ticker:
     "thesis": "What must go right for this to work (for ETFs: why this fund for this exposure)",
     "risks": "Specific bear case with real stakes",
     "catalyst": "1-2 concrete upcoming events to watch",
-    "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
+    "tags": { "verdict": "${verdictTag}", "character": "${characterTag}" },
     "ecosystem": [{"ticker":"X","impact":"one sentence describing the relationship"}]
   }
 }

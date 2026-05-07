@@ -18,12 +18,12 @@ jest.mock('@anthropic-ai/sdk', () => {
           return { content: [{ text: JSON.stringify([{ ticker: 'AAPL', exchange: 'US', quantity: 15, avg_cost: 175 }]) }] }
         }
         return { content: [{ text: JSON.stringify({
-          verdict: 'watch',
+          verdict: 'hold',
           summary: 'Apple trades at 28x earnings with services growing 15% annually. The hardware cycle is maturing but the installed base remains sticky.',
           thesis: 'Services revenue needs to keep growing 12-15% annually to justify the current multiple.',
           risks: 'China revenue is 20% of sales and faces real regulatory risk. A meaningful slowdown in upgrade cycles would compress earnings.',
           catalyst: 'Q4 earnings in November will reveal whether Services growth held up and if China sales recovered.',
-          tags: { verdict: 'עקוב', risk: 'בינוני' },
+          tags: { verdict: 'החזק', character: 'צמיחה' },
           ecosystem: []
         }) }] }
       })

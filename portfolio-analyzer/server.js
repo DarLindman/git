@@ -410,7 +410,7 @@ Price: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: Math.min(500 * stockDataList.length + 300, 4000),
+    max_tokens: Math.min(900 * stockDataList.length + 400, 8000),
     system: [{ type: 'text', text: 'You are a candid portfolio manager. Always respond with valid JSON only. Never include text outside the JSON object.', cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: `Write a candid investment note for each stock. Respond in ${isEn ? 'English' : 'Hebrew'} for all text fields. Use actual numbers. Have real opinions.
 
@@ -777,8 +777,8 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
       // Store every relevant article (notified or not) so it is not re-evaluated next cycle
       await pool.query(
         `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, importance, article_url, earnings_bullets, evasion_warning, notified)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         ON CONFLICT (user_id, article_url) DO NOTHING`,
+         SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+         WHERE NOT EXISTS (SELECT 1 FROM news_notifications WHERE user_id=$1 AND article_url=$7)`,
         [userId, r?.ticker || tickers[0], article.title, shouldNotify ? r.summary : null,
          r?.category, r?.importance || 2, article.url,
          earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, shouldNotify]
@@ -923,7 +923,20 @@ async function initDB() {
     ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS importance INTEGER DEFAULT 2;
     ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT true;
   `)
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url ON news_notifications(user_id, article_url) WHERE article_url IS NOT NULL`).catch(() => {})
+  // Remove duplicate (user_id, article_url) rows before creating unique index
+  await pool.query(`
+    DELETE FROM news_notifications
+    WHERE id NOT IN (
+      SELECT MAX(id) FROM news_notifications
+      WHERE article_url IS NOT NULL
+      GROUP BY user_id, article_url
+    ) AND article_url IS NOT NULL
+  `).catch(e => console.warn('Dedup cleanup:', e.message))
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url
+    ON news_notifications(user_id, article_url)
+    WHERE article_url IS NOT NULL
+  `).catch(e => console.warn('Unique index:', e.message))
   console.log('DB initialized')
 }
 

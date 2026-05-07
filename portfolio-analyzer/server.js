@@ -584,7 +584,7 @@ app.get('/api/notifications', auth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM news_notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
+      `SELECT * FROM news_notifications WHERE user_id = $1 AND notified = true ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     )
     res.json({ notifications: rows })
@@ -639,27 +639,32 @@ async function sendPushToUser(userId, payload) {
   }
 }
 
-// One Claude call for ALL articles across ALL tickers in the portfolio
-async function batchFilterNewsAllTickers(tickers, articles, alertLevel) {
+async function batchFilterNewsAllTickers(tickers, articles, alertLevel, language = 'he') {
   if (!articles.length) return []
+  const isEn = language === 'en'
   const articleList = articles.map((a, i) =>
     `[${i}] ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
   ).join('\n')
+  const categories = isEn
+    ? 'earnings|management|lawsuit|analyst|supply_chain|general'
+    : 'רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי'
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
+      max_tokens: 1000,
       system: [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
         content: `Portfolio tickers: ${tickers.join(', ')}
 Alert level: ${alertLevel} (1=earnings/M&A/CEO only, 2=+analyst/lawsuits/guidance, 3=all mentions)
+Write summaries in: ${isEn ? 'English' : 'Hebrew'}
 
 Articles:
 ${articleList}
 
-For each article relevant to any portfolio ticker, return an entry. Ignore unrelated articles.
-Return JSON array: [{ "index": 0, "ticker": "AAPL", "notify": true, "category": "רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי", "summary": "two Hebrew sentences", "is_earnings": false }]
+For each article relevant to any portfolio ticker return an entry. Ignore unrelated articles.
+Return JSON array: [{"index":0,"ticker":"AAPL","notify":true,"category":"${categories}","importance":2,"summary":"${isEn ? 'Two concise sentences.' : 'שני משפטים תמציתיים.'}","is_earnings":false}]
+importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)
 If none qualify, return [].`
       }]
     })
@@ -671,7 +676,8 @@ If none qualify, return [].`
   }
 }
 
-async function summarizeEarningsCall(articleText) {
+async function summarizeEarningsCall(articleText, language = 'he') {
+  const isEn = language === 'en'
   try {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -679,12 +685,12 @@ async function summarizeEarningsCall(articleText) {
       system: [{ type: 'text', text: 'You are a skeptical financial analyst. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
-        content: `Summarize this earnings call article in exactly 5 Hebrew bullet points for a skeptical investor.
+        content: `Summarize this earnings call in exactly 5 ${isEn ? 'English' : 'Hebrew'} bullet points for a skeptical investor.
 Flag if management seemed evasive on: growth, margins, competition, or guidance.
 
 Article: ${articleText.slice(0, 3000)}
 
-Return JSON: { "bullets": ["bullet1", "bullet2", "bullet3", "bullet4", "bullet5"], "evasion_warning": null }`
+Return JSON: { "bullets": ["bullet1","bullet2","bullet3","bullet4","bullet5"], "evasion_warning": null }`
       }]
     })
     return extractJson(message.content[0].text)
@@ -694,7 +700,7 @@ Return JSON: { "bullets": ["bullet1", "bullet2", "bullet3", "bullet4", "bullet5"
   }
 }
 
-async function pollNewsForUser(userId, alertLevel) {
+async function pollNewsForUser(userId, alertLevel, language = 'he') {
   if (!process.env.NEWS_API_KEY) return
   const portfolioId = await getUserPortfolioId(userId)
   if (!portfolioId) return
@@ -706,51 +712,51 @@ async function pollNewsForUser(userId, alertLevel) {
   const tickers = holdings.map(h => h.ticker)
 
   try {
-    // ONE NewsAPI call for all tickers
     const newsRes = await axios.get('https://newsapi.org/v2/everything', {
       params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20, language: 'en', apiKey: process.env.NEWS_API_KEY },
       timeout: 10000
     })
 
-    // Filter out already-seen articles
-    const unseen = []
-    for (const article of (newsRes.data.articles || [])) {
-      if (!article.url) continue
-      const { rowCount } = await pool.query(
-        'SELECT 1 FROM news_seen WHERE user_id = $1 AND article_url = $2', [userId, article.url]
-      )
-      if (!rowCount) unseen.push(article)
-    }
-    if (!unseen.length) return
+    const articles = (newsRes.data.articles || []).filter(a => a.url)
+    if (!articles.length) return
 
-    // Mark all as seen
-    for (const a of unseen) {
-      await pool.query('INSERT INTO news_seen (user_id, article_url) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, a.url])
-    }
+    // Dedup: skip articles already processed for this user
+    const { rows: existing } = await pool.query(
+      'SELECT article_url FROM news_notifications WHERE user_id = $1 AND article_url = ANY($2)',
+      [userId, articles.map(a => a.url)]
+    )
+    const existingUrls = new Set(existing.map(r => r.article_url))
+    const fresh = articles.filter(a => !existingUrls.has(a.url))
+    if (!fresh.length) return
 
-    // ONE Claude call for all articles across all tickers
-    const results = await batchFilterNewsAllTickers(tickers, unseen, alertLevel)
+    const results = await batchFilterNewsAllTickers(tickers, fresh, alertLevel, language)
 
     for (const r of results) {
-      if (!r.notify || !r.ticker) continue
-      const article = unseen[r.index]
+      if (!r.ticker) continue
+      const article = fresh[r.index]
       if (!article) continue
       let earningsBullets = null, evasionWarning = null
-      if (r.is_earnings && article.content) {
-        const summary = await summarizeEarningsCall(article.content)
+      if (r.notify && r.is_earnings && article.content) {
+        const summary = await summarizeEarningsCall(article.content, language)
         earningsBullets = summary?.bullets || null
         evasionWarning = summary?.evasion_warning || null
       }
       await pool.query(
-        `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, article_url, earnings_bullets, evasion_warning)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [userId, r.ticker, article.title, r.summary, r.category, article.url,
-         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning]
+        `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, importance, article_url, earnings_bullets, evasion_warning, notified)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (user_id, article_url) DO NOTHING`,
+        [userId, r.ticker, article.title, r.notify ? r.summary : null,
+         r.category, r.importance || 2, article.url,
+         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, !!r.notify]
       )
+      if (!r.notify) continue
+      const impLabel = language === 'en'
+        ? ['','CRITICAL','HIGH','MEDIUM'][r.importance || 2]
+        : ['','קריטי','גבוה','בינוני'][r.importance || 2]
       await sendPushToUser(userId, {
-        title: `${r.ticker} — ${r.category}`,
+        title: `${r.ticker} — ${r.category} [${impLabel}]`,
         body: r.summary,
-        tag: `${r.ticker}-${Date.now()}`,
+        tag: `${r.ticker}-${article.url}`,
         url: '/'
       })
     }
@@ -763,11 +769,13 @@ async function pollNews() {
   if (!process.env.NEWS_API_KEY) return
   try {
     const { rows: users } = await pool.query(
-      `SELECT DISTINCT po.user_id, COALESCE(up.profile_json->>'alert_level', '2') as alert_level
+      `SELECT DISTINCT po.user_id,
+         COALESCE(up.profile_json->>'alert_level', '2') as alert_level,
+         COALESCE(up.profile_json->>'language', 'he') as language
        FROM portfolios po JOIN holdings h ON h.portfolio_id = po.id
        LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
-    for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2)
+    for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2, u.language || 'he')
   } catch (err) {
     console.error('pollNews top-level error:', err.message)
   }
@@ -861,20 +869,28 @@ async function initDB() {
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       ticker TEXT NOT NULL,
-      headline TEXT NOT NULL,
+      headline TEXT,
       summary TEXT,
       category TEXT,
+      importance INTEGER DEFAULT 2,
       article_url TEXT,
       earnings_bullets JSONB,
       evasion_warning TEXT,
+      notified BOOLEAN DEFAULT true,
       sent_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS idx_holdings_portfolio ON holdings(portfolio_id);
-    CREATE INDEX IF NOT EXISTS idx_news_seen_user ON news_seen(user_id);
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_notif_user ON news_notifications(user_id, sent_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url ON news_notifications(user_id, article_url) WHERE article_url IS NOT NULL;
   `)
+  // Migrate existing table: add new columns if they don't exist yet
+  await pool.query(`
+    ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS importance INTEGER DEFAULT 2;
+    ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT true;
+  `)
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url ON news_notifications(user_id, article_url) WHERE article_url IS NOT NULL`).catch(() => {})
   console.log('DB initialized')
 }
 

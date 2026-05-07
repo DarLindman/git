@@ -283,7 +283,7 @@ async function fetchStockDataFinnhub(ticker) {
       change_pct: parseFloat((q.dp ?? 0).toFixed(2)),
       market_cap: p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null,
       pe_ratio: m.peBasicExclExtraTTM || null,
-      eps: m.epsInclExtraOrderTTM || null,
+      eps: m.epsBasicExclExtraTTM || m.epsNormalizedAnnual || null,
       week52_high: m['52WeekHigh'] || null,
       week52_low: m['52WeekLow'] || null,
       sector: p.finnhubIndustry || 'N/A',

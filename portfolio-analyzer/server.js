@@ -372,16 +372,19 @@ For ecosystem: if ${stockData.ticker} has a real supply-chain, revenue, or compe
 
 Be direct. No disclaimers. Respond ONLY with the JSON object.`
 
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 800,
-    system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: prompt }]
-  })
-
-  const result = extractJson(message.content[0].text)
-  if (!result) throw new Error('Claude returned invalid JSON')
-  return result
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1200,
+      system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only. Never include explanations outside the JSON object.', cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: prompt }]
+    })
+    const raw = message.content[0]?.text || ''
+    const result = extractJson(raw)
+    if (result) return result
+    console.error(`analyzeStock attempt ${attempt + 1} failed. stop_reason=${message.stop_reason} raw=${raw.slice(0, 300)}`)
+  }
+  throw new Error('Claude returned invalid JSON after 2 attempts')
 }
 
 async function analyzePortfolioBatch(stockDataList, language = 'he') {
@@ -479,8 +482,8 @@ app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
 
     res.json({ ticker, stock_data: stockData, analysis })
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'שגיאת ניתוח' })
+    console.error('analyzeStock error:', err.message)
+    res.status(500).json({ error: 'שגיאת ניתוח: ' + err.message })
   }
 })
 

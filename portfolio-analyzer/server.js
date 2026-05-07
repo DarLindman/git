@@ -775,10 +775,12 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     const fresh = articles.filter(a => !existingUrls.has(a.url))
     if (!fresh.length) return
 
-    // Title-only filter: ticker must appear in the headline (reduces false positives)
-    const relevant = fresh.filter(a =>
-      tickers.some(t => (a.title || '').toUpperCase().includes(t.toUpperCase()))
-    )
+    // Pre-filter: ticker must appear somewhere in title or description
+    // (Claude handles false positives via alert level — ticker symbols don't appear in headlines)
+    const relevant = fresh.filter(a => {
+      const text = ((a.title || '') + ' ' + (a.description || '')).toUpperCase()
+      return tickers.some(t => text.includes(t.toUpperCase()))
+    })
     if (!relevant.length) return
 
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)

@@ -292,34 +292,40 @@ app.patch('/api/portfolio/holdings/:id', auth, async (req, res) => {
 async function fetchStockDataFinnhub(ticker) {
   const apiKey = process.env.FINNHUB_API_KEY
   try {
-    const [quoteRes, profileRes, metricRes, yfChartRes] = await Promise.all([
+    const [quoteRes, profileRes, metricRes, yfChartRes, yfSummaryRes] = await Promise.all([
       axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: ticker, metric: 'all', token: apiKey }, timeout: 8000 }),
-      // YF chart for reliable 52W data and ETF detection (Finnhub metric 52W is unreliable for ADRs)
+      // YF chart: reliable 52W data + ETF detection (Finnhub metric unreliable for ADRs)
       axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
         params: { interval: '1d', range: '1d' }, headers: YF_HEADERS, timeout: 8000
+      }).catch(() => null),
+      // YF quoteSummary: reliable market cap + PE for US-listed shares (may be blocked on Railway, falls back to Finnhub)
+      axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
+        params: { modules: 'summaryDetail,defaultKeyStatistics,price' }, headers: YF_HEADERS, timeout: 8000
       }).catch(() => null)
     ])
     const q = quoteRes.data
     const p = profileRes.data
     const m = metricRes.data?.metric || {}
     const yfMeta = yfChartRes?.data?.chart?.result?.[0]?.meta
+    const yfs = yfSummaryRes?.data?.quoteSummary?.result?.[0] || {}
     if (!q?.c) return null
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
     return {
       ticker, symbol: ticker,
       price: q.c,
       change_pct: parseFloat((q.dp ?? 0).toFixed(2)),
-      market_cap: p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null,
-      pe_ratio: m.peBasicExclExtraTTM || null,
-      eps: m.epsBasicExclExtraTTM || m.epsNormalizedAnnual || null,
-      // Prefer YF chart 52W — more reliable than Finnhub metric for ADRs/international tickers
+      // Prefer YF for market cap and PE — Finnhub fundamental data uses home-exchange values for ADRs
+      market_cap: yfs.price?.marketCap?.raw ?? (p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null),
+      pe_ratio: yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null,
+      eps: yfs.defaultKeyStatistics?.trailingEps?.raw ?? m.epsBasicExclExtraTTM ?? m.epsNormalizedAnnual ?? null,
+      // YF chart 52W — reliable for ADRs
       week52_high: yfMeta?.fiftyTwoWeekHigh ?? m['52WeekHigh'] ?? null,
       week52_low: yfMeta?.fiftyTwoWeekLow ?? m['52WeekLow'] ?? null,
       sector: p.finnhubIndustry || 'N/A',
       industry: p.finnhubIndustry || 'N/A',
-      short_name: p.name || (yfMeta?.shortName) || ticker,
+      short_name: p.name || yfMeta?.shortName || ticker,
       currency: p.currency || yfMeta?.currency || 'USD',
       instrument_type: isEtf ? 'ETF' : 'Stock',
       revenue_growth: m.revenueGrowthQuarterlyYoy != null ? parseFloat(m.revenueGrowthQuarterlyYoy.toFixed(1)) : null,

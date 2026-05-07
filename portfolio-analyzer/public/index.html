@@ -253,12 +253,26 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
         <div class="flex-gap"><div class="seg-btn active" id="ex-us" onclick="selectExchange('US')">US</div><div class="seg-btn" id="ex-tase" onclick="selectExchange('TASE')">TASE</div></div>
       </div>
       <div class="input-group"><label class="input-label">כמות מניות</label><input class="input" id="manual-quantity" type="number" placeholder="10"></div>
-      <div class="input-group"><label class="input-label">מחיר כניסה ממוצע (אופציונלי)</label><input class="input" id="manual-cost" type="number" step="0.01" placeholder="150.00"></div>
     </div>
     <div class="error-msg" id="add-error"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" style="flex:1" onclick="closeModal('add-modal')" data-i18n="cancel">ביטול</button>
       <button class="btn btn-primary" style="flex:1" id="add-confirm-btn" onclick="confirmAddHolding()" data-i18n="add">הוסף</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edit-qty-modal" onclick="handleModalOverlayClick(event,'edit-qty-modal')">
+  <div class="modal">
+    <div class="modal-title" id="edit-qty-title"></div>
+    <div class="input-group">
+      <label class="input-label" data-i18n="shares">מניות</label>
+      <input class="input" id="edit-qty-input" type="number" min="0.0001" step="any" placeholder="10">
+    </div>
+    <div class="error-msg" id="edit-qty-error"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('edit-qty-modal')" data-i18n="cancel">ביטול</button>
+      <button class="btn btn-primary" style="flex:1" id="edit-qty-confirm-btn" onclick="saveEditQuantity()" data-i18n="save">שמור</button>
     </div>
   </div>
 </div>
@@ -280,7 +294,8 @@ const T = {
     verdict:'המלצה', thesis:'התזה', risks:'סיכונים', catalyst:'מה לעקוב',
     bear_case:'למה אני טועה?', ecosystem:'Ecosystem Mapping',
     no_analysis:'ללא ניתוח — לחץ לניתוח', analyzing:'מנתח...',
-    remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?'
+    remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?',
+    shares:'מניות', edit_qty:'ערוך', save:'שמור', error_qty:'כמות לא תקינה'
   },
   en: {
     tab_portfolio:'Portfolio', tab_notifications:'Alerts', tab_settings:'Settings',
@@ -297,7 +312,8 @@ const T = {
     verdict:'Verdict', thesis:'The Thesis', risks:'Key Risks', catalyst:'Watch For',
     bear_case:'Why Am I Wrong?', ecosystem:'Ecosystem Mapping',
     no_analysis:'No analysis — tap to analyze', analyzing:'Analyzing...',
-    remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?'
+    remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?',
+    shares:'shares', edit_qty:'Edit', save:'Save', error_qty:'Invalid quantity'
   }
 }
 let lang = 'he', profile = { language:'he', alert_level:2 }
@@ -416,10 +432,11 @@ function renderHoldings(holdings) {
         <div><span class="ticker">${h.ticker}</span><span class="exchange-badge">${h.exchange}</span></div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="${cc}">${cs}</span>
+          <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="event.stopPropagation();editHolding(${h.id},'${h.ticker}',${h.quantity})">${t('edit_qty')}</button>
           <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="event.stopPropagation();deleteHolding(${h.id},'${h.ticker}')">${t('remove')}</button>
         </div>
       </div>
-      <div class="card-sub">${price} · ${h.quantity} מניות${h.avg_cost ? ` · ממוצע: ${cur}${h.avg_cost}` : ''}</div>
+      <div class="card-sub">${price} · ${h.quantity} ${t('shares')}</div>
       <div class="tags">${verdictTag}${riskTag}${noAnalysis}</div>
     </div>`
   }).join('')
@@ -515,6 +532,29 @@ async function runAnalysis(ticker, exchange) {
 
 function closeSheet() { document.getElementById('analysis-sheet').classList.remove('open') }
 
+let editHoldingId = null
+
+function editHolding(id, ticker, qty) {
+  editHoldingId = id
+  document.getElementById('edit-qty-title').textContent = ticker
+  document.getElementById('edit-qty-input').value = qty
+  document.getElementById('edit-qty-error').textContent = ''
+  document.getElementById('edit-qty-modal').classList.add('open')
+}
+
+async function saveEditQuantity() {
+  const qty = parseFloat(document.getElementById('edit-qty-input').value)
+  if (!qty || qty <= 0) { document.getElementById('edit-qty-error').textContent = t('error_qty'); return }
+  const btn = document.getElementById('edit-qty-confirm-btn')
+  btn.innerHTML = '<span class="spinner"></span>'
+  btn.disabled = true
+  const res = await api('PATCH', `/api/portfolio/holdings/${editHoldingId}`, { quantity: qty })
+  btn.textContent = t('save')
+  btn.disabled = false
+  if (res?.ok) { closeModal('edit-qty-modal'); loadPortfolio() }
+  else document.getElementById('edit-qty-error').textContent = res?.error || 'שגיאה'
+}
+
 async function deleteHolding(id, ticker) {
   if (!confirm(t('remove_confirm').replace('{ticker}', ticker))) return
   await api('DELETE', `/api/portfolio/holdings/${id}`)
@@ -578,9 +618,8 @@ async function confirmAddHolding() {
   } else {
     const ticker = document.getElementById('manual-ticker').value.trim().toUpperCase()
     const quantity = parseFloat(document.getElementById('manual-quantity').value)
-    const avg_cost = parseFloat(document.getElementById('manual-cost').value) || null
     if (!ticker || !quantity) { document.getElementById('add-error').textContent = 'יש למלא טיקר וכמות'; return }
-    items = [{ ticker, exchange: addExchange, quantity, avg_cost }]
+    items = [{ ticker, exchange: addExchange, quantity }]
   }
   const btn = document.getElementById('add-confirm-btn')
   btn.innerHTML = '<span class="spinner"></span>'

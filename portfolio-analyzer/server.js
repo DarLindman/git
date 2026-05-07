@@ -248,6 +248,23 @@ app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
   }
 })
 
+app.patch('/api/portfolio/holdings/:id', auth, async (req, res) => {
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    const quantity = parseFloat(req.body.quantity)
+    if (!quantity || quantity <= 0) return res.status(400).json({ error: 'כמות לא תקינה' })
+    const result = await pool.query(
+      'UPDATE holdings SET quantity = $1 WHERE id = $2 AND portfolio_id = $3',
+      [quantity, req.params.id, portfolioId]
+    )
+    if (result.rowCount === 0) return res.status(404).json({ error: 'לא נמצא' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
 async function fetchStockDataFinnhub(ticker) {
   const apiKey = process.env.FINNHUB_API_KEY
   try {
@@ -315,16 +332,21 @@ async function fetchStockData(ticker, exchange) {
       }
       const s = summaryRes?.data?.quoteSummary?.result?.[0] || {}
       const sq = searchRes?.data?.quotes?.find(q => q.symbol?.toUpperCase() === symbol.toUpperCase()) || {}
-      const prevClose = meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice
+      const rawPrice = meta.regularMarketPrice
+      const rawPrevClose = meta.chartPreviousClose || meta.previousClose || rawPrice
+      // TASE (Yahoo Finance) returns prices in agorot (1 ILS = 100 agorot)
+      const div = exchange === 'TASE' ? 100 : 1
+      const raw52h = meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null
+      const raw52l = meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
       return {
         ticker, symbol,
-        price: meta.regularMarketPrice,
-        change_pct: parseFloat(((meta.regularMarketPrice - prevClose) / prevClose * 100).toFixed(2)),
+        price: rawPrice / div,
+        change_pct: parseFloat(((rawPrice - rawPrevClose) / rawPrevClose * 100).toFixed(2)),
         market_cap: s.price?.marketCap?.raw ?? null,
         pe_ratio: s.summaryDetail?.trailingPE?.raw ?? null,
         eps: s.defaultKeyStatistics?.trailingEps?.raw ?? null,
-        week52_high: meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null,
-        week52_low: meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null,
+        week52_high: raw52h != null ? raw52h / div : null,
+        week52_low: raw52l != null ? raw52l / div : null,
         sector: s.assetProfile?.sector || sq.sector || 'N/A',
         industry: s.assetProfile?.industry || sq.industry || 'N/A',
         short_name: meta.shortName || meta.longName || sq.shortname || ticker,

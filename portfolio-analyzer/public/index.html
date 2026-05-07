@@ -78,8 +78,19 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
 .metric-box { background: var(--surface); border-radius: 10px; padding: 8px; text-align: center; }
 .metric-val { font-size: 13px; font-weight: 700; }
 .metric-key { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
-.analysis-box { background: rgba(100,255,218,.04); border: 1px solid rgba(100,255,218,.12); border-radius: 12px; padding: 12px; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.7; margin-bottom: 8px; }
-.bear-box { background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.12); border-radius: 12px; padding: 12px; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.7; }
+.verdict-badge { display:inline-flex; align-items:center; padding:7px 16px; border-radius:10px; font-size:15px; font-weight:700; margin-bottom:16px; letter-spacing:.2px; }
+.verdict-buy { background:rgba(74,222,128,.15); color:var(--up); border:1px solid rgba(74,222,128,.3); }
+.verdict-watch { background:rgba(100,255,218,.12); color:var(--accent); border:1px solid rgba(100,255,218,.25); }
+.verdict-hold { background:rgba(251,191,36,.12); color:var(--warn); border:1px solid rgba(251,191,36,.25); }
+.verdict-avoid { background:rgba(248,113,113,.15); color:var(--down); border:1px solid rgba(248,113,113,.3); }
+.analysis-section { background: var(--surface); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.analysis-section-title { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+.analysis-section-body { font-size: 13px; color: rgba(255,255,255,.82); line-height: 1.7; }
+.range-bar-wrap { margin: 10px 0 4px; }
+.range-bar-track { height: 4px; background: rgba(255,255,255,.1); border-radius: 2px; position: relative; margin-bottom: 4px; }
+.range-bar-fill { height: 4px; background: var(--accent); border-radius: 2px; opacity: .5; }
+.range-bar-dot { width: 10px; height: 10px; background: var(--accent); border-radius: 50%; position: absolute; top: -3px; transform: translateX(-50%); }
+.range-bar-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted); }
 .eco-item { font-size: 11px; color: var(--text-muted); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
 .eco-item:last-child { border-bottom: none; }
 .eco-ticker { color: var(--accent); font-weight: 600; }
@@ -266,6 +277,7 @@ const T = {
     no_notifications:'אין חדשות עדיין — מחפש...', refresh_analysis:'רענן ניתוח',
     refresh_all:'רענן הכל', refreshing_all:'מרענן...',
     financial_metrics:'מדדים פיננסיים', ai_analysis:'ניתוח AI',
+    verdict:'המלצה', thesis:'התזה', risks:'סיכונים', catalyst:'מה לעקוב',
     bear_case:'למה אני טועה?', ecosystem:'Ecosystem Mapping',
     no_analysis:'ללא ניתוח — לחץ לניתוח', analyzing:'מנתח...',
     remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?'
@@ -282,6 +294,7 @@ const T = {
     no_notifications:'No news yet — fetching...', refresh_analysis:'Refresh Analysis',
     refresh_all:'Refresh All', refreshing_all:'Refreshing...',
     financial_metrics:'Financial Metrics', ai_analysis:'AI Analysis',
+    verdict:'Verdict', thesis:'The Thesis', risks:'Key Risks', catalyst:'Watch For',
     bear_case:'Why Am I Wrong?', ecosystem:'Ecosystem Mapping',
     no_analysis:'No analysis — tap to analyze', analyzing:'Analyzing...',
     remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?'
@@ -393,11 +406,9 @@ function renderHoldings(holdings) {
     const cur = sd.currency === 'ILS' ? '₪' : '$'
     const price = sd.price ? `${cur}${parseFloat(sd.price).toLocaleString()}` : '—'
     if (sd.price && h.quantity) totalUSD += parseFloat(sd.price) * parseFloat(h.quantity)
-    const moatClass = tags.moat?.includes('רחב') ? 'tag-teal' : tags.moat?.includes('צר') ? 'tag-yellow' : 'tag-red'
-    const valClass = tags.valuation === 'זול' || tags.valuation === 'cheap' ? 'tag-green' : tags.valuation === 'יקר' || tags.valuation === 'expensive' ? 'tag-red' : 'tag-yellow'
+    const VERDICT_TAG_COLOR = { 'קנה':'tag-green','buy':'tag-green','עקוב':'tag-teal','watch':'tag-teal','החזק':'tag-yellow','hold':'tag-yellow','הימנע':'tag-red','avoid':'tag-red' }
     const riskClass = tags.risk === 'נמוך' || tags.risk === 'low' ? 'tag-teal' : tags.risk === 'גבוה' || tags.risk === 'high' ? 'tag-red' : 'tag-yellow'
-    const moatTag = tags.moat ? `<span class="tag ${moatClass}">${tags.moat}</span>` : ''
-    const valTag = tags.valuation ? `<span class="tag ${valClass}">${tags.valuation}</span>` : ''
+    const verdictTag = tags.verdict ? `<span class="tag ${VERDICT_TAG_COLOR[tags.verdict]||'tag-yellow'}">${tags.verdict}</span>` : ''
     const riskTag = tags.risk ? `<span class="tag ${riskClass}">${tags.risk}</span>` : ''
     const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
     return `<div class="card" onclick="openAnalysis('${h.ticker}','${h.exchange}')">
@@ -409,7 +420,7 @@ function renderHoldings(holdings) {
         </div>
       </div>
       <div class="card-sub">${price} · ${h.quantity} מניות${h.avg_cost ? ` · ממוצע: ${cur}${h.avg_cost}` : ''}</div>
-      <div class="tags">${moatTag}${valTag}${riskTag}${noAnalysis}</div>
+      <div class="tags">${verdictTag}${riskTag}${noAnalysis}</div>
     </div>`
   }).join('')
   document.getElementById('portfolio-total').textContent = totalUSD > 0 ? `$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}` : '—'
@@ -437,7 +448,23 @@ async function openAnalysis(ticker, exchange) {
   const sd = a.stock_data || {}
   const cur = sd.currency === 'ILS' ? '₪' : '$'
   const pct = parseFloat(sd.change_pct || 0)
-  const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${e.ticker}</span> — ${e.impact}</div>`).join('') || `<div class="eco-item" style="color:var(--text-muted)">לא נמצאו קשרים רלוונטיים</div>`
+  const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${e.ticker}</span> — ${e.impact}</div>`).join('')
+  const VERDICT_BADGE = { 'קנה':'verdict-buy','buy':'verdict-buy','עקוב':'verdict-watch','watch':'verdict-watch','החזק':'verdict-hold','hold':'verdict-hold','הימנע':'verdict-avoid','avoid':'verdict-avoid' }
+  const verdictBadge = a.verdict ? `<div class="verdict-badge ${VERDICT_BADGE[a.verdict]||'verdict-hold'}">${a.tags?.verdict || a.verdict}</div>` : ''
+  const rangeBar = sd.week52_low && sd.week52_high && sd.price && sd.week52_high !== sd.week52_low ? (() => {
+    const pctRange = Math.min(100, Math.max(0, Math.round((sd.price - sd.week52_low) / (sd.week52_high - sd.week52_low) * 100)))
+    return `<div class="range-bar-wrap">
+      <div class="range-bar-track">
+        <div class="range-bar-fill" style="width:${pctRange}%"></div>
+        <div class="range-bar-dot" style="left:${pctRange}%"></div>
+      </div>
+      <div class="range-bar-labels"><span>${cur}${parseFloat(sd.week52_low).toFixed(0)}</span><span>52W</span><span>${cur}${parseFloat(sd.week52_high).toFixed(0)}</span></div>
+    </div>`
+  })() : ''
+  const extraMetrics = [
+    sd.revenue_growth != null ? `<div class="metric-box"><div class="metric-val">${sd.revenue_growth > 0 ? '+' : ''}${sd.revenue_growth}%</div><div class="metric-key">Rev Growth</div></div>` : '',
+    sd.net_margin != null ? `<div class="metric-box"><div class="metric-val">${sd.net_margin}%</div><div class="metric-key">Net Margin</div></div>` : ''
+  ].join('')
   content.innerHTML = `<div class="sheet-handle"></div>
     <div style="position:relative">
       <button class="sheet-close" style="position:absolute;top:0;left:0" onclick="closeSheet()">
@@ -451,29 +478,23 @@ async function openAnalysis(ticker, exchange) {
         </div>
       </div>
     </div>
+    ${verdictBadge}
+    ${a.summary ? `<div class="sheet-section"><div class="sheet-section-title">${t('ai_analysis')}</div><div class="analysis-section"><div class="analysis-section-body">${a.summary}</div></div></div>` : ''}
+    ${a.thesis ? `<div class="sheet-section"><div class="sheet-section-title">${t('thesis')}</div><div class="analysis-section"><div class="analysis-section-body">${a.thesis}</div></div></div>` : ''}
+    ${a.risks ? `<div class="sheet-section"><div class="sheet-section-title">${t('risks')}</div><div class="analysis-section" style="border-right:3px solid rgba(248,113,113,.4)"><div class="analysis-section-body">${a.risks}</div></div></div>` : ''}
+    ${a.catalyst ? `<div class="sheet-section"><div class="sheet-section-title">${t('catalyst')}</div><div class="analysis-section" style="border-right:3px solid rgba(100,255,218,.3)"><div class="analysis-section-body">${a.catalyst}</div></div></div>` : ''}
     <div class="sheet-section">
       <div class="sheet-section-title">${t('financial_metrics')}</div>
       <div class="metrics-grid">
         <div class="metric-box"><div class="metric-val">${sd.pe_ratio?parseFloat(sd.pe_ratio).toFixed(1):'—'}</div><div class="metric-key">P/E</div></div>
         <div class="metric-box"><div class="metric-val">${sd.eps?`${cur}${parseFloat(sd.eps).toFixed(2)}`:'—'}</div><div class="metric-key">EPS</div></div>
-        <div class="metric-box"><div class="metric-val">${sd.week52_low?`${cur}${parseFloat(sd.week52_low).toFixed(0)}`:'—'}</div><div class="metric-key">52W Low</div></div>
-        <div class="metric-box"><div class="metric-val">${sd.week52_high?`${cur}${parseFloat(sd.week52_high).toFixed(0)}`:'—'}</div><div class="metric-key">52W High</div></div>
-        <div class="metric-box"><div class="metric-val">${sd.market_cap?(sd.market_cap/1e9).toFixed(0)+'B':'—'}</div><div class="metric-key">Market Cap</div></div>
+        <div class="metric-box"><div class="metric-val">${sd.market_cap?(sd.market_cap/1e9).toFixed(0)+'B':'—'}</div><div class="metric-key">Mkt Cap</div></div>
+        ${extraMetrics}
         <div class="metric-box"><div class="metric-val" style="font-size:10px">${sd.sector||'—'}</div><div class="metric-key">Sector</div></div>
       </div>
+      ${rangeBar}
     </div>
-    <div class="sheet-section">
-      <div class="sheet-section-title">${t('ai_analysis')}</div>
-      <div class="analysis-box">${[a.valuation_note,a.moat_note,a.management,a.outlook].filter(Boolean).join('<br><br>')}</div>
-    </div>
-    <div class="sheet-section">
-      <div class="sheet-section-title">${t('bear_case')}</div>
-      <div class="bear-box">${a.bear_case||'—'}</div>
-    </div>
-    <div class="sheet-section">
-      <div class="sheet-section-title">${t('ecosystem')}</div>
-      ${eco}
-    </div>
+    ${eco ? `<div class="sheet-section"><div class="sheet-section-title">${t('ecosystem')}</div>${eco}</div>` : ''}
     <button class="btn btn-secondary btn-full mt-12" onclick="runAnalysis('${ticker}','${exchange}')">
       <span id="refresh-lbl">${t('refresh_analysis')}</span>
     </button>`

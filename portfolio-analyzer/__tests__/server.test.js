@@ -18,14 +18,12 @@ jest.mock('@anthropic-ai/sdk', () => {
           return { content: [{ text: JSON.stringify([{ ticker: 'AAPL', exchange: 'US', quantity: 15, avg_cost: 175 }]) }] }
         }
         return { content: [{ text: JSON.stringify({
-          valuation: 'fair',
-          valuation_note: 'Trading at market multiple',
-          moat: 'wide',
-          moat_note: 'Strong brand and ecosystem',
-          management: 'Tim Cook has delivered consistent results',
-          outlook: 'Steady growth expected. Services segment expanding.',
-          bear_case: 'China exposure is a real risk. Premium pricing under pressure.',
-          tags: { moat: 'חפיר רחב', valuation: 'הוגן', risk: 'נמוך' },
+          verdict: 'watch',
+          summary: 'Apple trades at 28x earnings with services growing 15% annually. The hardware cycle is maturing but the installed base remains sticky.',
+          thesis: 'Services revenue needs to keep growing 12-15% annually to justify the current multiple.',
+          risks: 'China revenue is 20% of sales and faces real regulatory risk. A meaningful slowdown in upgrade cycles would compress earnings.',
+          catalyst: 'Q4 earnings in November will reveal whether Services growth held up and if China sales recovered.',
+          tags: { verdict: 'עקוב', risk: 'בינוני' },
           ecosystem: []
         }) }] }
       })
@@ -360,8 +358,9 @@ describe('Analysis', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ exchange: 'US' })
     expect(res.status).toBe(200)
-    expect(res.body.analysis.valuation).toBeDefined()
-    expect(res.body.analysis.bear_case).toBeDefined()
+    expect(res.body.analysis.verdict).toBeDefined()
+    expect(res.body.analysis.summary).toBeDefined()
+    expect(res.body.analysis.risks).toBeDefined()
     expect(res.body.analysis.tags).toBeDefined()
     expect(res.body.analysis.ecosystem).toBeDefined()
   })

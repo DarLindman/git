@@ -272,7 +272,9 @@ async function fetchStockDataFinnhub(ticker) {
       sector: p.finnhubIndustry || 'N/A',
       industry: p.finnhubIndustry || 'N/A',
       short_name: p.name || ticker,
-      currency: p.currency || 'USD'
+      currency: p.currency || 'USD',
+      revenue_growth: m.revenueGrowthTTMYoy != null ? parseFloat((m.revenueGrowthTTMYoy * 100).toFixed(1)) : null,
+      net_margin: m.netMarginTTM != null ? parseFloat((m.netMarginTTM * 100).toFixed(1)) : null
     }
   } catch (e) {
     console.warn(`Finnhub failed for ${ticker}:`, e.message)
@@ -341,42 +343,44 @@ async function fetchStockData(ticker, exchange) {
 }
 async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
   const isEn = language === 'en'
-  const prompt = `You are a skeptical financial analyst. Here is financial data for ${stockData.ticker}:
+  const pctOfRange = stockData.week52_high && stockData.week52_low && stockData.week52_high !== stockData.week52_low
+    ? Math.round((stockData.price - stockData.week52_low) / (stockData.week52_high - stockData.week52_low) * 100)
+    : null
+  const mktCapFmt = stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'
+  const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
+  const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
+  const ecosystemInstruction = allPortfolioTickers.length
+    ? `ecosystem: if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], add entries. If none, return [].`
+    : 'ecosystem: return [].'
 
-Price: ${stockData.price} ${stockData.currency}
-P/E: ${stockData.pe_ratio || 'N/A'}
-EPS: ${stockData.eps || 'N/A'}
-52W High: ${stockData.week52_high} | 52W Low: ${stockData.week52_low}
-Market Cap: ${stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'}
-Sector: ${stockData.sector} | Industry: ${stockData.industry}
+  const prompt = `You are a seasoned portfolio manager writing a candid investment note for a friend.
 
-Respond in ${isEn ? 'English' : 'Hebrew'} for all narrative fields.
-Provide a JSON response with this exact structure:
+${stockData.ticker} | ${stockData.short_name || stockData.ticker}
+Price: ${stockData.price} ${stockData.currency} | Today: ${stockData.change_pct > 0 ? '+' : ''}${stockData.change_pct}%
+P/E: ${stockData.pe_ratio || 'N/A'} | EPS: ${stockData.eps || 'N/A'}
+52W: ${stockData.week52_low} – ${stockData.week52_high}${pctOfRange != null ? ` | At ${pctOfRange}% of 52W range` : ''}
+Market cap: ${mktCapFmt} | Sector: ${stockData.sector}${stockData.industry && stockData.industry !== stockData.sector ? ` / ${stockData.industry}` : ''}${stockData.revenue_growth != null ? `\nRevenue growth (YoY): ${stockData.revenue_growth}%` : ''}${stockData.net_margin != null ? `\nNet margin: ${stockData.net_margin}%` : ''}
+
+Write in ${isEn ? 'English' : 'Hebrew'}. Be specific — use the numbers above. Have a real view and defend it.
+Don't write "strong moat" or "experienced management". Write what actually makes this defensible or vulnerable, and whether the current price reflects it.
+
+Return ONLY this JSON:
 {
-  "valuation": "cheap|fair|expensive",
-  "valuation_note": "one sentence explaining vs sector peers",
-  "moat": "wide|narrow|none",
-  "moat_note": "one sentence explaining moat source",
-  "management": "one sentence on management quality",
-  "outlook": "2-3 sentences on 12-24 month outlook",
-  "bear_case": "2-3 sentences arguing why this analysis could be wrong — real risks, red flags, threats",
-  "tags": {
-    "moat": "${isEn ? 'wide moat|narrow moat|no moat' : 'חפיר רחב|חפיר צר|ללא חפיר'}",
-    "valuation": "${isEn ? 'expensive|fair|cheap' : 'יקר|הוגן|זול'}",
-    "risk": "${isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'}"
-  },
+  "verdict": "buy|watch|hold|avoid",
+  "summary": "2-3 sentences. Lead with the bottom line. Use actual numbers. Sound like a person, not a report.",
+  "thesis": "What specifically must go right for this investment to work. Be concrete.",
+  "risks": "The real bear case. Specific scenarios and stakes — not generic competition or regulation.",
+  "catalyst": "1-2 concrete upcoming events or data points that will prove or disprove the thesis.",
+  "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
   "ecosystem": []
 }
-
-For ecosystem: if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include { "ticker": "X", "impact": "one sentence" } for each. If none, return [].
-
-Be direct. No disclaimers. Respond ONLY with the JSON object.`
+${ecosystemInstruction}`
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
-      system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only. Never include explanations outside the JSON object.', cache_control: { type: 'ephemeral' } }],
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      system: [{ type: 'text', text: 'You are a candid portfolio manager. Always respond with valid JSON only. Never include text outside the JSON object.', cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: prompt }]
     })
     const raw = message.content[0]?.text || ''
@@ -390,15 +394,25 @@ Be direct. No disclaimers. Respond ONLY with the JSON object.`
 async function analyzePortfolioBatch(stockDataList, language = 'he') {
   const isEn = language === 'en'
   const allTickers = stockDataList.map(s => s.ticker)
-  const stocksText = stockDataList.map(sd =>
-    `## ${sd.ticker}\nPrice: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps || 'N/A'} | 52W: ${sd.week52_low}–${sd.week52_high} | Cap: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'} | ${sd.sector}`
-  ).join('\n')
+  const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
+  const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
+  const stocksText = stockDataList.map(sd => {
+    const pct = sd.week52_high && sd.week52_low && sd.week52_high !== sd.week52_low
+      ? Math.round((sd.price - sd.week52_low) / (sd.week52_high - sd.week52_low) * 100) + '% of 52W'
+      : ''
+    const extras = [
+      sd.revenue_growth != null ? `RevGrowth:${sd.revenue_growth}%` : '',
+      sd.net_margin != null ? `NetMargin:${sd.net_margin}%` : ''
+    ].filter(Boolean).join(' | ')
+    return `## ${sd.ticker} (${sd.short_name || sd.ticker})
+Price: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps || 'N/A'} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | Cap: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'} | ${sd.sector}${extras ? '\n' + extras : ''}`
+  }).join('\n\n')
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: Math.min(350 * stockDataList.length + 200, 4000),
-    system: [{ type: 'text', text: 'You are a skeptical financial analyst. Always respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Analyze these ${stockDataList.length} stocks. Respond in ${isEn ? 'English' : 'Hebrew'} for narrative fields.
+    max_tokens: Math.min(500 * stockDataList.length + 300, 4000),
+    system: [{ type: 'text', text: 'You are a candid portfolio manager. Always respond with valid JSON only. Never include text outside the JSON object.', cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: `Write a candid investment note for each stock. Respond in ${isEn ? 'English' : 'Hebrew'} for all text fields. Use actual numbers. Have real opinions.
 
 ${stocksText}
 
@@ -407,18 +421,16 @@ Portfolio tickers for ecosystem mapping: [${allTickers.join(', ')}]
 Return a JSON object keyed by ticker:
 {
   "TICKER": {
-    "valuation": "cheap|fair|expensive",
-    "valuation_note": "one sentence",
-    "moat": "wide|narrow|none",
-    "moat_note": "one sentence",
-    "management": "one sentence",
-    "outlook": "2-3 sentences",
-    "bear_case": "2-3 sentences on real risks",
-    "tags": { "moat": "${isEn ? 'wide moat|narrow moat|no moat' : 'חפיר רחב|חפיר צר|ללא חפיר'}", "valuation": "${isEn ? 'expensive|fair|cheap' : 'יקר|הוגן|זול'}", "risk": "${isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'}" },
-    "ecosystem": [{ "ticker": "X", "impact": "one sentence" }]
+    "verdict": "buy|watch|hold|avoid",
+    "summary": "2-3 sentences, bottom line first, use actual numbers",
+    "thesis": "What must go right for this to work",
+    "risks": "Specific bear case with real stakes",
+    "catalyst": "1-2 concrete upcoming events to watch",
+    "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
+    "ecosystem": []
   }
 }
-Be direct. No disclaimers. Respond ONLY with the JSON object.` }]
+Respond ONLY with the JSON object.` }]
   })
   const result = extractJson(message.content[0].text)
   if (!result || typeof result !== 'object' || Array.isArray(result)) {

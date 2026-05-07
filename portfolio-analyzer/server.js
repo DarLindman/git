@@ -290,6 +290,7 @@ async function fetchStockDataFinnhub(ticker) {
       industry: p.finnhubIndustry || 'N/A',
       short_name: p.name || ticker,
       currency: p.currency || 'USD',
+      instrument_type: p.type === 'ETF' ? 'ETF' : 'Stock',
       revenue_growth: m.revenueGrowthQuarterlyYoy != null ? parseFloat(m.revenueGrowthQuarterlyYoy.toFixed(1)) : null,
       net_margin: m.netMarginTTM != null ? parseFloat((m.netMarginTTM * 100).toFixed(1)) : null
     }
@@ -350,7 +351,8 @@ async function fetchStockData(ticker, exchange) {
         sector: s.assetProfile?.sector || sq.sector || 'N/A',
         industry: s.assetProfile?.industry || sq.industry || 'N/A',
         short_name: meta.shortName || meta.longName || sq.shortname || ticker,
-        currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD')
+        currency: meta.currency || (exchange === 'TASE' ? 'ILS' : 'USD'),
+        instrument_type: meta.quoteType === 'ETF' ? 'ETF' : 'Stock'
       }
     } catch (err) {
       if (err.response?.status === 401 && attempt === 0) {
@@ -365,23 +367,44 @@ async function fetchStockData(ticker, exchange) {
 }
 async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
   const isEn = language === 'en'
+  const isEtf = stockData.instrument_type === 'ETF'
   const pctOfRange = stockData.week52_high && stockData.week52_low && stockData.week52_high !== stockData.week52_low
     ? Math.round((stockData.price - stockData.week52_low) / (stockData.week52_high - stockData.week52_low) * 100)
     : null
   const mktCapFmt = stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'
   const verdictTag = isEn ? 'buy|watch|hold|avoid' : 'קנה|עקוב|החזק|הימנע'
   const riskTag = isEn ? 'high|medium|low' : 'גבוה|בינוני|נמוך'
-  const ecosystemInstruction = allPortfolioTickers.length
-    ? `For "ecosystem": if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include {"ticker":"X","impact":"one sentence"} for each. Otherwise keep [].`
-    : 'Keep "ecosystem" as [].'
 
-  const prompt = `You are a seasoned portfolio manager writing a candid investment note for a friend.
+  const prompt = isEtf
+    ? `You are a seasoned portfolio manager reviewing an ETF position for a friend.
+
+ETF: ${stockData.ticker} | ${stockData.short_name || stockData.ticker}
+Price: ${stockData.price} ${stockData.currency} | Today: ${stockData.change_pct > 0 ? '+' : ''}${stockData.change_pct}%
+52W: ${stockData.week52_low} – ${stockData.week52_high}${pctOfRange != null ? ` | At ${pctOfRange}% of 52W range` : ''}
+AUM: ${mktCapFmt}
+
+Write in ${isEn ? 'English' : 'Hebrew'}. Use your knowledge of this ETF — what it tracks, its major holdings, expense ratio, and how it compares to alternatives.
+Do NOT write about EPS, P/E, or earnings — this is an ETF, not a single stock.
+Have a real opinion on whether this is the right fund for exposure to its area.
+
+Return ONLY this JSON:
+{
+  "verdict": "buy|watch|hold|avoid",
+  "summary": "2-3 sentences. What this ETF tracks, current positioning, and bottom line.",
+  "thesis": "Why this is (or isn't) a good way to get exposure to its target. Mention expense ratio and top holdings if you know them.",
+  "risks": "Concentration risk, sector-specific risks, expense drag vs alternatives, or macro risks specific to what this fund holds.",
+  "catalyst": "What trends or events would boost or hurt this ETF in the near term.",
+  "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
+  "ecosystem": []
+}
+Keep "ecosystem" as [].`
+    : `You are a seasoned portfolio manager writing a candid investment note for a friend.
 
 ${stockData.ticker} | ${stockData.short_name || stockData.ticker}
 Price: ${stockData.price} ${stockData.currency} | Today: ${stockData.change_pct > 0 ? '+' : ''}${stockData.change_pct}%
 P/E: ${stockData.pe_ratio || 'N/A'} | EPS: ${stockData.eps || 'N/A'}
 52W: ${stockData.week52_low} – ${stockData.week52_high}${pctOfRange != null ? ` | At ${pctOfRange}% of 52W range` : ''}
-Market cap: ${mktCapFmt} | Sector: ${stockData.sector}${stockData.industry && stockData.industry !== stockData.sector ? ` / ${stockData.industry}` : ''}${stockData.revenue_growth != null ? `\nRevenue growth (YoY): ${stockData.revenue_growth}%` : ''}${stockData.net_margin != null ? `\nNet margin: ${stockData.net_margin}%` : ''}
+Market cap: ${mktCapFmt} | Sector: ${stockData.sector}${stockData.industry && stockData.industry !== stockData.sector ? ` / ${stockData.industry}` : ''}${stockData.revenue_growth != null ? `\nRevenue growth (QoQ YoY): ${stockData.revenue_growth}%` : ''}${stockData.net_margin != null ? `\nNet margin: ${stockData.net_margin}%` : ''}
 
 Write in ${isEn ? 'English' : 'Hebrew'}. Be specific — use the numbers above. Have a real view and defend it.
 Don't write "strong moat" or "experienced management". Write what actually makes this defensible or vulnerable, and whether the current price reflects it.
@@ -396,7 +419,7 @@ Return ONLY this JSON:
   "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
   "ecosystem": []
 }
-${ecosystemInstruction}`
+${allPortfolioTickers.length ? `For "ecosystem": if ${stockData.ticker} has a real supply-chain, revenue, or competitive relationship with any of [${allPortfolioTickers.join(', ')}], include {"ticker":"X","impact":"one sentence"} for each. Otherwise keep [].` : 'Keep "ecosystem" as [].'}`
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const message = await anthropic.messages.create({
@@ -422,6 +445,11 @@ async function analyzePortfolioBatch(stockDataList, language = 'he') {
     const pct = sd.week52_high && sd.week52_low && sd.week52_high !== sd.week52_low
       ? Math.round((sd.price - sd.week52_low) / (sd.week52_high - sd.week52_low) * 100) + '% of 52W'
       : ''
+    const isEtf = sd.instrument_type === 'ETF'
+    if (isEtf) {
+      return `## ${sd.ticker} [ETF] (${sd.short_name || sd.ticker})
+Price: ${sd.price} ${sd.currency} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | AUM: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'}`
+    }
     const extras = [
       sd.revenue_growth != null ? `RevGrowth:${sd.revenue_growth}%` : '',
       sd.net_margin != null ? `NetMargin:${sd.net_margin}%` : ''
@@ -434,7 +462,10 @@ Price: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps
     model: 'claude-haiku-4-5-20251001',
     max_tokens: Math.min(900 * stockDataList.length + 400, 8000),
     system: [{ type: 'text', text: 'You are a candid portfolio manager. Always respond with valid JSON only. Never include text outside the JSON object.', cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Write a candid investment note for each stock. Respond in ${isEn ? 'English' : 'Hebrew'} for all text fields. Use actual numbers. Have real opinions.
+    messages: [{ role: 'user', content: `Write a candid investment note for each item. Respond in ${isEn ? 'English' : 'Hebrew'} for all text fields. Use actual numbers. Have real opinions.
+
+Items marked [ETF]: analyze as an ETF/fund — what it tracks, expense ratio, major holdings, risks specific to that exposure. Do NOT write about EPS or earnings.
+Items without [ETF]: analyze as individual stocks — fundamentals, competitive position, valuation.
 
 ${stocksText}
 
@@ -445,14 +476,14 @@ Return a JSON object keyed by ticker:
   "TICKER": {
     "verdict": "buy|watch|hold|avoid",
     "summary": "2-3 sentences, bottom line first, use actual numbers",
-    "thesis": "What must go right for this to work",
+    "thesis": "What must go right for this to work (for ETFs: why this fund for this exposure)",
     "risks": "Specific bear case with real stakes",
     "catalyst": "1-2 concrete upcoming events to watch",
     "tags": { "verdict": "${verdictTag}", "risk": "${riskTag}" },
     "ecosystem": [{"ticker":"X","impact":"one sentence describing the relationship"}]
   }
 }
-Use {"ticker":"X","impact":"..."} format for ecosystem. If no real relationship exists, keep [].
+Use {"ticker":"X","impact":"..."} format for ecosystem. ETFs: keep ecosystem []. Stocks: include only real supply-chain or revenue relationships.
 Respond ONLY with the JSON object.` }]
   })
   const result = extractJson(message.content[0].text)

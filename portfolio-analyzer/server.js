@@ -703,8 +703,6 @@ Return JSON: { "bullets": ["bullet1","bullet2","bullet3","bullet4","bullet5"], "
   }
 }
 
-let _lastPollTime = null
-
 function isMarketHours() {
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
   const day = et.getDay()   // 0=Sun, 6=Sat
@@ -724,46 +722,56 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
   const tickers = holdings.map(h => h.ticker)
 
   try {
-    // Only fetch articles published since the last poll (eliminates DB dedup)
-    const fromTime = _lastPollTime
-      ? _lastPollTime.toISOString()
-      : new Date(Date.now() - 16 * 60 * 1000).toISOString()
-
     const newsRes = await axios.get('https://newsapi.org/v2/everything', {
       params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20,
-                language: 'en', from: fromTime, apiKey: process.env.NEWS_API_KEY },
+                language: 'en', apiKey: process.env.NEWS_API_KEY },
       timeout: 10000
     })
 
     const articles = (newsRes.data.articles || []).filter(a => a.url)
     if (!articles.length) return
 
-    // Pre-filter: only pass articles that mention a ticker in title/description
-    const relevant = articles.filter(a => {
-      const text = `${a.title || ''} ${a.description || ''}`.toUpperCase()
-      return tickers.some(t => text.includes(t.toUpperCase()))
-    })
+    // Dedup: skip articles already processed for this user
+    const { rows: existing } = await pool.query(
+      'SELECT article_url FROM news_notifications WHERE user_id = $1 AND article_url = ANY($2)',
+      [userId, articles.map(a => a.url)]
+    )
+    const existingUrls = new Set(existing.map(r => r.article_url))
+    const fresh = articles.filter(a => !existingUrls.has(a.url))
+    if (!fresh.length) return
+
+    // Title-only filter: ticker must appear in the headline (reduces false positives)
+    const relevant = fresh.filter(a =>
+      tickers.some(t => (a.title || '').toUpperCase().includes(t.toUpperCase()))
+    )
     if (!relevant.length) return
 
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)
+    const resultsByIndex = new Map(results.map(r => [r.index, r]))
 
-    for (const r of results) {
-      if (!r.notify || !r.ticker) continue
-      const article = relevant[r.index]
-      if (!article) continue
+    for (let i = 0; i < relevant.length; i++) {
+      const article = relevant[i]
+      const r = resultsByIndex.get(i)
+      const shouldNotify = r?.notify === true
+
       let earningsBullets = null, evasionWarning = null
-      if (r.is_earnings && article.content) {
+      if (shouldNotify && r.is_earnings && article.content) {
         const summary = await summarizeEarningsCall(article.content, language)
         earningsBullets = summary?.bullets || null
         evasionWarning = summary?.evasion_warning || null
       }
+
+      // Store every relevant article (notified or not) so it is not re-evaluated next cycle
       await pool.query(
         `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, importance, article_url, earnings_bullets, evasion_warning, notified)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          ON CONFLICT (user_id, article_url) DO NOTHING`,
-        [userId, r.ticker, article.title, r.summary, r.category, r.importance || 2,
-         article.url, earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, true]
+        [userId, r?.ticker || tickers[0], article.title, shouldNotify ? r.summary : null,
+         r?.category, r?.importance || 2, article.url,
+         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, shouldNotify]
       )
+
+      if (!shouldNotify) continue
       const impLabel = language === 'en'
         ? ['','CRITICAL','HIGH','MEDIUM'][r.importance || 2]
         : ['','קריטי','גבוה','בינוני'][r.importance || 2]
@@ -790,7 +798,6 @@ async function pollNews() {
        LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
     for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2, u.language || 'he')
-    _lastPollTime = new Date()
   } catch (err) {
     console.error('pollNews top-level error:', err.message)
   }

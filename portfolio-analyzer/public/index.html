@@ -495,7 +495,7 @@ async function openAnalysis(ticker, exchange) {
   const VERDICT_BADGE = { 'קנה':'verdict-buy','buy':'verdict-buy','מכור':'verdict-avoid','sell':'verdict-avoid','החזק':'verdict-hold','hold':'verdict-hold','עקוב':'verdict-watch','watch':'verdict-watch','הימנע':'verdict-avoid','avoid':'verdict-avoid' }
   const verdictBadge = a.verdict ? `<div class="verdict-badge ${VERDICT_BADGE[a.verdict]||'verdict-hold'}">${a.tags?.verdict || a.verdict}</div>` : ''
   const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
-  const isEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || ETF_CHARS.has(a.tags?.character)
+  const isEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || ETF_CHARS.has(a.tags?.character) || /\bETF\b/i.test(a.summary || '')
   const week52boxes = [
     sd.week52_low != null ? `<div class="metric-box"><div class="metric-val">${cur}${parseFloat(sd.week52_low).toFixed(0)}</div><div class="metric-key">52W Low</div></div>` : '',
     sd.week52_high != null ? `<div class="metric-box"><div class="metric-val">${cur}${parseFloat(sd.week52_high).toFixed(0)}</div><div class="metric-key">52W High</div></div>` : ''

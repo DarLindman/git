@@ -311,16 +311,26 @@ async function fetchStockDataFinnhub(ticker) {
     const m = metricRes.data?.metric || {}
     const yfMeta = yfChartRes?.data?.chart?.result?.[0]?.meta
     const yfs = yfSummaryRes?.data?.quoteSummary?.result?.[0] || {}
-    if (!q?.c) return null
+    if (!q?.c && !yfMeta?.regularMarketPrice) return null
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
+    // Prefer YF chart price for ADRs — Finnhub quote can return home-exchange prices
+    const price = yfMeta?.regularMarketPrice ?? q.c
+    const prevClose = yfMeta?.chartPreviousClose || yfMeta?.previousClose || q.pc || price
+    const change_pct = parseFloat(((price - prevClose) / prevClose * 100).toFixed(2))
+    const pe_ratio = yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null
+    // Validate EPS against price/PE: ADRs often get home-share EPS in local currency (e.g. TSM gets NT$ EPS)
+    const rawEps = yfs.defaultKeyStatistics?.trailingEps?.raw ?? m.epsBasicExclExtraTTM ?? m.epsNormalizedAnnual ?? null
+    const derivedEps = pe_ratio && price ? parseFloat((price / pe_ratio).toFixed(2)) : null
+    const epsRatio = rawEps != null && derivedEps != null ? Math.abs(rawEps / derivedEps) : null
+    const eps = epsRatio != null && (epsRatio > 3 || epsRatio < 0.33) ? derivedEps : (rawEps ?? derivedEps)
     return {
       ticker, symbol: ticker,
-      price: q.c,
-      change_pct: parseFloat((q.dp ?? 0).toFixed(2)),
-      // Prefer YF for market cap and PE — Finnhub fundamental data uses home-exchange values for ADRs
+      price,
+      change_pct,
+      // Prefer YF for market cap — Finnhub fundamental data uses home-exchange values for ADRs
       market_cap: yfs.price?.marketCap?.raw ?? (p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null),
-      pe_ratio: yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null,
-      eps: yfs.defaultKeyStatistics?.trailingEps?.raw ?? m.epsBasicExclExtraTTM ?? m.epsNormalizedAnnual ?? null,
+      pe_ratio,
+      eps,
       // YF chart 52W — reliable for ADRs
       week52_high: yfMeta?.fiftyTwoWeekHigh ?? m['52WeekHigh'] ?? null,
       week52_low: yfMeta?.fiftyTwoWeekLow ?? m['52WeekLow'] ?? null,

@@ -300,9 +300,10 @@ async function fetchStockDataFinnhub(ticker) {
       axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
         params: { interval: '1d', range: '1d' }, headers: YF_HEADERS, timeout: 8000
       }).catch(() => null),
-      // YF quoteSummary: reliable market cap + PE for US-listed shares (may be blocked on Railway, falls back to Finnhub)
-      axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
-        params: { modules: 'summaryDetail,defaultKeyStatistics,price' }, headers: YF_HEADERS, timeout: 8000
+      // YF quoteSummary via query1 (same host as v8/chart, works from Railway unlike query2)
+      axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
+        params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile' },
+        headers: YF_HEADERS, timeout: 8000
       }).catch(() => null)
     ])
     const q = quoteRes.data
@@ -323,13 +324,17 @@ async function fetchStockDataFinnhub(ticker) {
       // YF chart 52W — reliable for ADRs
       week52_high: yfMeta?.fiftyTwoWeekHigh ?? m['52WeekHigh'] ?? null,
       week52_low: yfMeta?.fiftyTwoWeekLow ?? m['52WeekLow'] ?? null,
-      sector: p.finnhubIndustry || 'N/A',
-      industry: p.finnhubIndustry || 'N/A',
+      sector: yfs.assetProfile?.sector || p.finnhubIndustry || 'N/A',
+      industry: yfs.assetProfile?.industry || p.finnhubIndustry || 'N/A',
       short_name: p.name || yfMeta?.shortName || ticker,
       currency: p.currency || yfMeta?.currency || 'USD',
       instrument_type: isEtf ? 'ETF' : 'Stock',
-      revenue_growth: m.revenueGrowthQuarterlyYoy != null ? parseFloat(m.revenueGrowthQuarterlyYoy.toFixed(1)) : null,
-      net_margin: m.netMarginTTM != null ? parseFloat((m.netMarginTTM * 100).toFixed(1)) : null
+      revenue_growth: yfs.financialData?.revenueGrowth?.raw != null
+        ? parseFloat((yfs.financialData.revenueGrowth.raw * 100).toFixed(1))
+        : (m.revenueGrowthQuarterlyYoy != null ? parseFloat(m.revenueGrowthQuarterlyYoy.toFixed(1)) : null),
+      net_margin: yfs.financialData?.profitMargins?.raw != null
+        ? parseFloat((yfs.financialData.profitMargins.raw * 100).toFixed(1))
+        : (m.netMarginTTM != null ? parseFloat((m.netMarginTTM * 100).toFixed(1)) : null)
     }
   } catch (e) {
     console.warn(`Finnhub failed for ${ticker}:`, e.message)

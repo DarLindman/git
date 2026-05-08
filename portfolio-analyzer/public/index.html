@@ -446,7 +446,8 @@ function renderHoldings(holdings) {
     const charLabel = tags.character || tags.risk
     const charClass = tags.character ? (CHAR_TAG_COLOR[tags.character]||'tag-teal') : (tags.risk === 'נמוך'||tags.risk==='low'?'tag-teal':tags.risk==='גבוה'||tags.risk==='high'?'tag-red':'tag-yellow')
     const charTag = charLabel ? `<span class="tag ${charClass}">${charLabel}</span>` : ''
-    const etfTag = sd.instrument_type === 'ETF' ? `<span class="tag tag-purple">ETF</span>` : ''
+    const isCardEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח']).has(tags.character) || /\bETF\b/i.test(a.summary || '')
+    const etfTag = isCardEtf ? `<span class="tag tag-purple">ETF</span>` : ''
     const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
     return `<div class="card" data-holding-id="${h.id}" onclick="openAnalysis('${h.ticker}','${h.exchange}')">
       <div class="card-row">

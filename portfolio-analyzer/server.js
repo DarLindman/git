@@ -624,33 +624,23 @@ app.post('/api/portfolio/screenshot', auth, screenshotLimiter, upload.single('sc
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
           { type: 'text', text: `Extract all stock holdings from this brokerage screenshot.
-Return a JSON array only: [{ "ticker": "AAPL", "exchange": "US", "quantity": 10, "avg_cost": 150.00 }]
+Return a JSON array only: [{ "ticker": "AAPL", "exchange": "US", "quantity": 10 }]
 
-For Israeli stocks (TASE), use exchange "TASE" and the English ticker symbol:
-- טבע / Teva → TEVA
-- כיל / ICL → ICL
-- בזן → BZAN
-- בנק הפועלים → POLI
-- בנק לאומי → LUMI
-- בנק מזרחי / מזרחי טפחות → MZTF
-- בנק דיסקונט → DSCT
-- הבינלאומי → FIBI
-- מגדל ביטוח → MGDL
-- הראל → HARL
-- מנורה → MNRA
-- אזרגס → AZRG
-- שפיר הנדסה → SPEN
-- אלביט → ESLT
-- רדקום → RDCM
-- נייס → NICE
-- אמדוקס → DOX
-- צ'ק פוינט → CHKP
-- אינפיניאן / Infinieon → find the English ticker
-- For any other Israeli company, use the English TASE ticker symbol if known, otherwise use the Hebrew name as the ticker.
+EXCHANGE RULES (critical — read carefully):
+- Use "US" for: ALL stocks and ETFs with English names, all US/international ETFs (IVV, QQQ, SMH, QTUM, MCHI, etc.), any stock traded in USD, and anything you are uncertain about.
+- Use "TASE" ONLY when the company name is written in Hebrew OR it is a well-known Israeli-only company on the Tel Aviv Stock Exchange.
+- If an English-named stock appears with a USD price → always "US", even if the ticker could sound Israeli.
+- Do NOT use "TASE" for: IREN (Iris Energy, NASDAQ crypto mining), any ETF, any company with an English name.
 
-For US/international stocks, use the standard ticker (AAPL, MSFT, NVDA, etc.) and exchange "US".
-If avg_cost or quantity is unclear, omit the field (don't guess).
-Respond ONLY with the JSON array.` }
+Israeli TASE stocks — use the English ticker:
+- טבע → TEVA | כיל → ICL | בזן → BZAN | צ'ק פוינט → CHKP | נייס → NICE
+- בנק הפועלים → POLI | בנק לאומי → LUMI | בנק מזרחי → MZTF | דיסקונט → DSCT
+- הבינלאומי → FIBI | מגדל → MGDL | הראל → HARL | מנורה → MNRA
+- אלביט → ESLT | אמדוקס → DOX | רדקום → RDCM | אזרגס → AZRG | שפיר → SPEN
+- For any other Hebrew-name company, use its known English TASE ticker.
+
+If quantity is unclear, omit the field. Do not guess or add avg_cost.
+Respond ONLY with the JSON array, nothing else.` }
         ]
       }]
     })

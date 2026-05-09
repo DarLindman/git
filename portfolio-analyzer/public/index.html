@@ -303,7 +303,8 @@ const T = {
     no_analysis:'ללא ניתוח — לחץ לניתוח', analyzing:'מנתח...',
     remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?',
     shares:'מניות', edit_qty:'ערוך', save:'שמור', error_qty:'כמות לא תקינה',
-    ticker_label:'טיקר / שם חברה', quantity_label:'כמות מניות'
+    ticker_label:'טיקר / שם חברה', quantity_label:'כמות מניות',
+    screenshot_found:'זוהו {count} מניות', screenshot_error:'שגיאה בזיהוי'
   },
   en: {
     tab_portfolio:'Portfolio', tab_notifications:'Alerts', tab_settings:'Settings',
@@ -322,7 +323,8 @@ const T = {
     no_analysis:'No analysis — tap to analyze', analyzing:'Analyzing...',
     remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?',
     shares:'shares', edit_qty:'Edit', save:'Save', error_qty:'Invalid quantity',
-    ticker_label:'Ticker / Company Name', quantity_label:'Shares'
+    ticker_label:'Ticker / Company Name', quantity_label:'Shares',
+    screenshot_found:'{count} holdings identified', screenshot_error:'Recognition error'
   }
 }
 let lang = 'he', profile = { language:'he', alert_level:2 }
@@ -696,12 +698,12 @@ function dragEnd(e) {
 async function handleScreenshotUpload(input) {
   if (!input.files[0]) return
   const preview = document.getElementById('screenshot-preview')
-  preview.innerHTML = '<span class="spinner"></span> מנתח...'
+  preview.innerHTML = `<span class="spinner"></span> ${t('analyzing')}`
   const form = new FormData(); form.append('screenshot', input.files[0])
   const data = await api('POST', '/api/portfolio/screenshot', form, true)
-  if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${data?.error||'שגיאה'}</div>`; return }
+  if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${data?.error||t('screenshot_error')}</div>`; return }
   pendingHoldings = data.holdings
-  preview.innerHTML = `<div style="color:var(--accent);font-size:13px;margin-top:4px">זוהו ${data.holdings.length} מניות</div>` +
+  preview.innerHTML = `<div style="color:var(--accent);font-size:13px;margin-top:4px">${t('screenshot_found').replace('{count}', data.holdings.length)}</div>` +
     data.holdings.map(h=>`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${h.ticker} (${h.exchange}) × ${h.quantity||'?'}</div>`).join('')
 }
 

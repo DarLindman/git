@@ -623,23 +623,33 @@ app.post('/api/portfolio/screenshot', auth, screenshotLimiter, upload.single('sc
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: `Extract all stock holdings from this brokerage screenshot.
+          { type: 'text', text: `Extract ALL stock and ETF holdings from this brokerage screenshot — do not skip any row.
 Return a JSON array only: [{ "ticker": "AAPL", "exchange": "US", "quantity": 10 }]
 
-EXCHANGE RULES (critical — read carefully):
-- Use "US" for: ALL stocks and ETFs with English names, all US/international ETFs (IVV, QQQ, SMH, QTUM, MCHI, etc.), any stock traded in USD, and anything you are uncertain about.
-- Use "TASE" ONLY when the company name is written in Hebrew OR it is a well-known Israeli-only company on the Tel Aviv Stock Exchange.
-- If an English-named stock appears with a USD price → always "US", even if the ticker could sound Israeli.
-- Do NOT use "TASE" for: IREN (Iris Energy, NASDAQ crypto mining), any ETF, any company with an English name.
+EXCHANGE DETECTION RULES:
 
-Israeli TASE stocks — use the English ticker:
+Use "TASE" (Tel Aviv Stock Exchange) when ANY of these is true:
+1. The company name contains Hebrew characters (e.g. אפקון החזקות, תכלית, קסם, מור)
+2. The ticker/symbol shown contains Hebrew characters (e.g. אפחה, אנ.ס, 12סו)
+3. It is a known Israeli company (banks, insurance, Israeli tech, Israeli ETFs)
+4. The price is in thousands (e.g. 46,800 / 26,190 / 4,287) — Israeli prices are in agorot (100 agorot = 1 shekel), so high numbers = TASE
+
+Use "US" for everything else — US/international stocks and ETFs with English names and normal USD prices (hundreds, not thousands).
+
+IMPORTANT: Never skip a holding just because it has Hebrew text. Hebrew = TASE, include it.
+IMPORTANT: IREN (Iris Energy, NASDAQ) is US. ETFs like IVV, QQQ, SMH, QTUM, MCHI = US.
+
+For TASE holdings, use the English TASE ticker symbol:
+- אפקון החזקות / אפחה → AFCA
+- תכלית TTF → TTF | קסם → QSEM
 - טבע → TEVA | כיל → ICL | בזן → BZAN | צ'ק פוינט → CHKP | נייס → NICE
 - בנק הפועלים → POLI | בנק לאומי → LUMI | בנק מזרחי → MZTF | דיסקונט → DSCT
 - הבינלאומי → FIBI | מגדל → MGDL | הראל → HARL | מנורה → MNRA
 - אלביט → ESLT | אמדוקס → DOX | רדקום → RDCM | אזרגס → AZRG | שפיר → SPEN
-- For any other Hebrew-name company, use its known English TASE ticker.
+- INVESCO S&P 500 (with Hebrew ticker) → IS&P5 | INVESCO NASDAQ (with Hebrew ticker) → INQQ
+- For any other TASE holding with unknown English ticker, use the Hebrew name as the ticker.
 
-If quantity is unclear, omit the field. Do not guess or add avg_cost.
+If quantity is unclear, omit the field. Do not add avg_cost.
 Respond ONLY with the JSON array, nothing else.` }
         ]
       }]

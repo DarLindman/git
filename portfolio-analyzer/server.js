@@ -640,7 +640,7 @@ IMPORTANT: Never skip a holding just because it has Hebrew text. Hebrew = TASE, 
 IMPORTANT: IREN (Iris Energy, NASDAQ) is US. ETFs like IVV, QQQ, SMH, QTUM, MCHI = US.
 
 For TASE holdings, use the English TASE ticker symbol:
-- אפקון החזקות / אפחה → AFCA
+- אפקון החזקות / אפחה / אפהח → AFHL
 - תכלית TTF → TTF | קסם → QSEM
 - טבע → TEVA | כיל → ICL | בזן → BZAN | צ'ק פוינט → CHKP | נייס → NICE
 - בנק הפועלים → POLI | בנק לאומי → LUMI | בנק מזרחי → MZTF | דיסקונט → DSCT
@@ -661,7 +661,22 @@ Respond ONLY with the JSON array, nothing else.` }
     const valid = holdings.filter(h => h.ticker && (h.quantity || h.quantity === 0))
     if (!valid.length) return res.status(422).json({ error: 'לא נמצאו מניות בצילום המסך' })
 
-    res.json({ holdings: valid, raw_count: holdings.length })
+    // Resolve Hebrew/unknown TASE tickers to their English symbol via YF search
+    const resolved = await Promise.all(valid.map(async h => {
+      const hasHebrew = /[֐-׿]/.test(h.ticker)
+      if (h.exchange !== 'TASE' || !hasHebrew) return h
+      try {
+        const sr = await axios.get('https://query1.finance.yahoo.com/v1/finance/search', {
+          params: { q: h.ticker, quotesCount: 5, newsCount: 0, enableFuzzyQuery: true },
+          headers: YF_HEADERS, timeout: 5000
+        })
+        const match = (sr.data?.quotes || []).find(q => q.symbol?.endsWith('.TA'))
+        if (match) return { ...h, ticker: match.symbol.replace(/\.TA$/, '') }
+      } catch (e) { /* keep original on error */ }
+      return h
+    }))
+
+    res.json({ holdings: resolved, raw_count: holdings.length })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'שגיאה בעיבוד הצילום' })

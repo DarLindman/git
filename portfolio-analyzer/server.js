@@ -384,16 +384,22 @@ async function fetchStockDataFinnhub(ticker) {
       // values for ADRs (NT$ for TSM, EUR for ASML). Sanity-check: if value implies P/S > 200×
       // revenue or >$20T it's almost certainly a local-currency bleed-through, discard it.
       market_cap: (() => {
-        // 1. YF direct (most reliable for ADRs)
+        // 1. YF direct (price / financialData / summaryDetail modules)
         const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? yfs.summaryDetail?.marketCap?.raw ?? null
         if (raw != null && raw < 20e12) return raw
-        // 2. Compute from shares × price (works for ADRs — uses US-listed shares & USD price)
-        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw ?? null
-        if (shares && price) return Math.round(shares * price)
-        // 3. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
+        // 2. YF chart meta sometimes carries marketCap
+        const chartCap = yfMeta?.marketCap ?? null
+        if (chartCap != null && chartCap < 20e12) return chartCap
+        // 3. Compute from shares × price (US-listed shares + USD price)
+        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw
+          ?? yfs.price?.sharesOutstanding?.raw ?? null
+        if (shares && price) { const c = Math.round(shares * price); if (c < 20e12) return c }
+        // 4. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
         const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
-        if (fh != null && fh > 20e12) return null
-        return fh
+        if (fh != null && fh < 20e12) return fh
+        // log what we have so we can debug ADR issues
+        console.log(`market_cap null for ${ticker}: yfs.price.mktCap=${yfs.price?.marketCap?.raw} shares=${shares} fh=${fh}`)
+        return null
       })(),
       pe_ratio,
       eps,

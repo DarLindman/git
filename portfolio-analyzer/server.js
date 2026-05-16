@@ -740,7 +740,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, headline, LEFT(summary, 350) AS summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 20', [req.user.id])
+      pool.query('SELECT id, headline, translations FROM news_notifications WHERE user_id = $1 AND headline IS NOT NULL AND headline != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
     ])
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
@@ -785,38 +785,32 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     // ── News ─────────────────────────────────────────────────────────────
     // Single batch Claude call with tool use → guaranteed JSON, no per-item concurrency issues.
-    console.log(`translate/batch: ${newsRows.length} news items, ${holdings.length} holdings → ${targetLang}`)
+    console.log(`translate/batch: ${newsRows.length} news headlines, ${holdings.length} holdings → ${targetLang}`)
 
-    // Separate cached items from items needing translation
+    // Batch translates HEADLINES only — fast (50 items ~4s).
+    // Summaries are translated on-demand via POST /api/translate/news/:id/summary.
     const cacheHits = []
     const toTranslate = []
     for (const n of newsRows) {
       const cache = n.translations || {}
-      // Detect poisoned cache: cached "translation" is identical to the current DB text
-      // — means a previous failed run saved the source text under the target language key.
-      if (cache[language] && typeof cache[language] === 'object' && cache[language].s === n.summary) {
-        console.log(`translate/batch: clearing poisoned cache for news id=${n.id}`)
-        delete cache[language]
-      }
-      if (cache[language]) {
-        const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
-        cacheHits.push({ n, cache, c })
+      if (cache[language]?.h) {
+        cacheHits.push({ n, cache })
       } else {
         toTranslate.push({ n, cache })
       }
     }
     console.log(`translate/batch: ${cacheHits.length} cache hits, ${toTranslate.length} need translation`)
 
-    // Apply cache hits (no Claude call needed)
-    const cacheOps = cacheHits.map(({ n, cache, c }) =>
+    // Cache hits: restore translated headline to DB
+    const cacheOps = cacheHits.map(({ n, cache }) =>
       pool.query(
-        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-        [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
+        'UPDATE news_notifications SET headline = $1, translations = $2 WHERE id = $3 AND user_id = $4',
+        [cache[language].h, JSON.stringify(cache), n.id, req.user.id]
       ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
     )
 
-    // Translate uncached items: split into chunks of 20, run all chunks in parallel
-    const CHUNK_SIZE = 20
+    // Translate headlines in parallel chunks of 25
+    const CHUNK_SIZE = 25
     const hint = language === 'he'
       ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
       : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
@@ -825,19 +819,19 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     for (let i = 0; i < toTranslate.length; i += CHUNK_SIZE) chunks.push(toTranslate.slice(i, i + CHUNK_SIZE))
 
     const chunkResults = await Promise.all(chunks.map(async (chunk, ci) => {
-      const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
+      const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '' }))
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 8000,
+        max_tokens: 2000,
         messages: [{
           role: 'user',
-          content: `${hint}\nReturn ONLY a valid JSON array. Each element must have "id" (same number as input), "h" (translated headline), "s" (translated summary). No markdown, no explanation.\n\nInput: ${JSON.stringify(batchInput)}`
+          content: `${hint}\nReturn ONLY a JSON array. Each element: {"id": <same id>, "h": <translated headline>}. No markdown.\n\nInput: ${JSON.stringify(batchInput)}`
         }]
       }).catch(e => { console.error(`Claude news chunk ${ci+1} error:`, e.message); return null })
 
       if (batchMsg?.stop_reason === 'max_tokens') console.warn(`translate/batch: chunk ${ci+1} hit max_tokens`)
       const translated = extractJson(batchMsg?.content?.[0]?.text || '')
-      console.log(`translate/batch: chunk ${ci+1}/${chunks.length} → ${Array.isArray(translated) ? translated.length : 0}/${chunk.length} translated`)
+      console.log(`translate/batch: chunk ${ci+1}/${chunks.length} → ${Array.isArray(translated) ? translated.length : 0}/${chunk.length}`)
       return Array.isArray(translated) ? translated : []
     }))
 
@@ -846,12 +840,12 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const translateOps = toTranslate.map(({ n, cache }) => {
       const t = byId[n.id]
-      if (!t?.s) return
-      if (from_language && !cache[from_language]) cache[from_language] = { s: n.summary, h: n.headline }
-      cache[language] = { s: t.s, h: t.h || null }
+      if (!t?.h) return
+      if (from_language && !cache[from_language]) cache[from_language] = { h: n.headline }
+      cache[language] = { h: t.h }
       return pool.query(
-        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-        [t.s, t.h || null, JSON.stringify(cache), n.id, req.user.id]
+        'UPDATE news_notifications SET headline = $1, translations = $2 WHERE id = $3 AND user_id = $4',
+        [t.h, JSON.stringify(cache), n.id, req.user.id]
       ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
     })
 
@@ -860,6 +854,46 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
   } catch (err) {
     console.error('translate/batch error:', err.message)
     res.status(500).json({ error: 'Translation failed' })
+  }
+})
+
+// On-demand summary translation — called when user opens a notification detail
+app.post('/api/translate/news/:id/summary', auth, async (req, res) => {
+  const { language = 'he' } = req.body
+  const notifId = parseInt(req.params.id)
+  if (!notifId) return res.status(400).json({ error: 'invalid id' })
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, summary, translations FROM news_notifications WHERE id = $1 AND user_id = $2',
+      [notifId, req.user.id]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'not found' })
+    const n = rows[0]
+    if (!n.summary) return res.json({ summary: null })
+
+    const cache = n.translations || {}
+    if (cache[language]?.s) return res.json({ summary: cache[language].s })
+
+    const targetLang = language === 'he' ? 'Hebrew' : 'English'
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: `Translate to ${targetLang}. Keep company names, tickers, numbers unchanged. Return only the translated text:\n\n${n.summary.substring(0, 500)}` }]
+    }).catch(e => { console.error('summary translate error:', e.message); return null })
+
+    const summary = msg?.content?.[0]?.text?.trim() || null
+    if (summary) {
+      if (!cache[language]) cache[language] = {}
+      cache[language].s = summary
+      await pool.query(
+        'UPDATE news_notifications SET translations = $1 WHERE id = $2 AND user_id = $3',
+        [JSON.stringify(cache), notifId, req.user.id]
+      ).catch(() => {})
+    }
+    res.json({ summary: summary || n.summary })
+  } catch (err) {
+    console.error('summary translate error:', err.message)
+    res.status(500).json({ error: 'translation failed' })
   }
 })
 

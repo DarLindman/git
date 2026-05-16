@@ -765,7 +765,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
         const msg = await anthropic.messages.create({
           model: 'claude-haiku-4-5-20251001', max_tokens: 800, system,
           messages: [{ role: 'user', content: holdingTranslatePrompt(targetLang, { summary: a.summary, thesis: a.thesis, risks: a.risks, catalyst: a.catalyst }) }]
-        }).catch(() => null)
+        }).catch(e => { console.error('Claude holding translate error:', e.message); return null })
         result = msg ? extractJson(msg.content[0].text) : null
         if (result) cache[language] = result
       }
@@ -788,47 +788,53 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     const plainSys = [{ type: 'text', text: `Translate to ${targetLang}. Return ONLY the translated text, nothing else.`, cache_control: { type: 'ephemeral' } }]
     const hint = language === 'he' ? 'Use natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.\n\n' : 'Keep company names, ticker symbols, and numbers unchanged.\n\n'
 
+    console.log(`translate/batch: ${newsRows.length} news items, ${holdings.length} holdings → ${targetLang}`)
+
     const newsOps = newsRows.map(async n => {
-      const cache = n.translations || {}
+      try {
+        const cache = n.translations || {}
 
-      // Save current texts before overwriting so we can restore on reverse switch
-      if (from_language && !cache[from_language]) {
-        cache[from_language] = { s: n.summary, h: n.headline }
-      }
+        // Save current texts before overwriting so we can restore on reverse switch
+        if (from_language && !cache[from_language]) {
+          cache[from_language] = { s: n.summary, h: n.headline }
+        }
 
-      // Serve from cache
-      if (cache[language]) {
-        const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
-        return pool.query(
+        // Serve from cache
+        if (cache[language]) {
+          const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
+          return await pool.query(
+            'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+            [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
+          ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
+        }
+
+        // Two parallel plain-text calls — headline and summary independently
+        const [hMsg, sMsg] = await Promise.all([
+          anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 200, system: plainSys,
+            messages: [{ role: 'user', content: hint + (n.headline || '') }]
+          }).catch(e => { console.error('Claude news headline translate error id=%d:', n.id, e.message); return null }),
+          anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 350, system: plainSys,
+            messages: [{ role: 'user', content: hint + n.summary }]
+          }).catch(e => { console.error('Claude news summary translate error id=%d:', n.id, e.message); return null })
+        ])
+
+        const h = hMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
+        const s = sMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
+        if (!s) { console.warn('news translate: empty summary result id=%d', n.id); return }
+
+        cache[language] = { s, h }
+        return await pool.query(
           'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-          [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
-        )
+          [s, h, JSON.stringify(cache), n.id, req.user.id]
+        ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
+      } catch (e) {
+        console.error('news translate unexpected error id=%d:', n.id, e.message)
       }
-
-      // Two parallel plain-text calls — headline and summary independently
-      const [hMsg, sMsg] = await Promise.all([
-        anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001', max_tokens: 200, system: plainSys,
-          messages: [{ role: 'user', content: hint + n.headline }]
-        }).catch(() => null),
-        anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001', max_tokens: 350, system: plainSys,
-          messages: [{ role: 'user', content: hint + n.summary }]
-        }).catch(() => null)
-      ])
-
-      const h = hMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
-      const s = sMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
-      if (!s) return
-
-      cache[language] = { s, h }
-      return pool.query(
-        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-        [s, h, JSON.stringify(cache), n.id, req.user.id]
-      )
     })
 
-    await Promise.all([...holdingOps, ...newsOps])
+    await Promise.allSettled([...holdingOps, ...newsOps])
     res.json({ ok: true })
   } catch (err) {
     console.error('translate/batch error:', err.message)

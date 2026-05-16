@@ -951,15 +951,15 @@ async function setLanguage(l) {
   await api('PUT', '/api/profile', { language: l })
   renderSettings()
   const hasAnalyzed = currentHoldings.some(h => h.analyzed_at)
+  const btn = document.getElementById('refresh-all-btn')
+  if (hasAnalyzed && btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
+  await api('POST', '/api/translate/batch', { language: l, from_language: prevLang })
+  if (hasAnalyzed && btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
   if (hasAnalyzed) {
-    const btn = document.getElementById('refresh-all-btn')
-    if (btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
-    await api('POST', '/api/translate/batch', { language: l, from_language: prevLang })
-    if (btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
     await loadPortfolio()
-    loadNotifications()
     if (_openSheetTicker) openAnalysis(_openSheetTicker, _openSheetExchange)
   }
+  await loadNotifications()
 }
 
 async function setAlertLevel(level) {

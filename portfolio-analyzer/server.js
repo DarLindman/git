@@ -811,56 +811,41 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
     )
 
-    // One batch call for all uncached items using tool use (guarantees JSON)
+    // One batch call for all uncached items — assistant prefill forces JSON array output
     let translateOps = []
     if (toTranslate.length > 0) {
       const hint = language === 'he'
         ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
         : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
+      const batchInput = toTranslate.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: Math.min(4096, Math.max(500, toTranslate.length * 200)),
-        tools: [{
-          name: 'save_translations',
-          description: 'Save translated news items',
-          input_schema: {
-            type: 'object',
-            properties: {
-              items: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id:       { type: 'integer' },
-                    headline: { type: 'string' },
-                    summary:  { type: 'string' }
-                  },
-                  required: ['id', 'headline', 'summary']
-                }
-              }
-            },
-            required: ['items']
-          }
-        }],
-        tool_choice: { type: 'tool', name: 'save_translations' },
-        messages: [{
-          role: 'user',
-          content: `${hint}\n\n${JSON.stringify(toTranslate.map(({ n }) => ({ id: n.id, headline: n.headline || '', summary: n.summary })))}`
-        }]
+        max_tokens: Math.min(4096, Math.max(1000, toTranslate.length * 400)),
+        system: 'Translation API. Respond ONLY with a valid JSON array. No markdown, no explanation.',
+        messages: [
+          {
+            role: 'user',
+            content: `${hint}\nReturn a JSON array with the same "id" values and translated "h" (headline) and "s" (summary) fields.\n\n${JSON.stringify(batchInput)}`
+          },
+          { role: 'assistant', content: '[' }
+        ]
       }).catch(e => { console.error('Claude batch news translate error:', e.message); return null })
 
-      const toolUse = batchMsg?.content?.find(b => b.type === 'tool_use')
-      const translated = toolUse?.input?.items || []
-      console.log(`translate/batch: Claude translated ${translated.length}/${toTranslate.length} news items`)
+      // Prepend the '[' we used as prefill to reconstruct the full array
+      const rawText = '[' + (batchMsg?.content?.[0]?.text || '')
+      const translated = extractJson(rawText)
+      console.log(`translate/batch: Claude translated ${Array.isArray(translated) ? translated.length : 0}/${toTranslate.length} news items (raw len=${rawText.length})`)
 
-      const byId = Object.fromEntries(translated.map(t => [t.id, t]))
+      const byId = {}
+      if (Array.isArray(translated)) for (const t of translated) if (t?.id) byId[t.id] = t
+
       translateOps = toTranslate.map(({ n, cache }) => {
         const t = byId[n.id]
-        if (!t?.summary) { console.warn('no translation returned for news id=%d', n.id); return }
-        cache[language] = { s: t.summary, h: t.headline || null }
+        if (!t?.s) { console.warn('no translation returned for news id=%d', n.id); return }
+        cache[language] = { s: t.s, h: t.h || null }
         return pool.query(
           'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-          [t.summary, t.headline || null, JSON.stringify(cache), n.id, req.user.id]
+          [t.s, t.h || null, JSON.stringify(cache), n.id, req.user.id]
         ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
       })
     }

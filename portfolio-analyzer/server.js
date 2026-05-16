@@ -784,57 +784,88 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     })
 
     // ── News ─────────────────────────────────────────────────────────────
-    // Two plain-text calls per item (headline + summary) in parallel — no JSON parsing.
-    const plainSys = [{ type: 'text', text: `Translate to ${targetLang}. Return ONLY the translated text, nothing else.`, cache_control: { type: 'ephemeral' } }]
-    const hint = language === 'he' ? 'Use natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.\n\n' : 'Keep company names, ticker symbols, and numbers unchanged.\n\n'
-
+    // Single batch Claude call with tool use → guaranteed JSON, no per-item concurrency issues.
     console.log(`translate/batch: ${newsRows.length} news items, ${holdings.length} holdings → ${targetLang}`)
 
-    const newsOps = newsRows.map(async n => {
-      try {
-        const cache = n.translations || {}
-
-        // Save current texts before overwriting so we can restore on reverse switch
-        if (from_language && !cache[from_language]) {
-          cache[from_language] = { s: n.summary, h: n.headline }
-        }
-
-        // Serve from cache
-        if (cache[language]) {
-          const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
-          return await pool.query(
-            'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-            [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
-          ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
-        }
-
-        // Two parallel plain-text calls — headline and summary independently
-        const [hMsg, sMsg] = await Promise.all([
-          anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 200, system: plainSys,
-            messages: [{ role: 'user', content: hint + (n.headline || '') }]
-          }).catch(e => { console.error('Claude news headline translate error id=%d:', n.id, e.message); return null }),
-          anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001', max_tokens: 350, system: plainSys,
-            messages: [{ role: 'user', content: hint + n.summary }]
-          }).catch(e => { console.error('Claude news summary translate error id=%d:', n.id, e.message); return null })
-        ])
-
-        const h = hMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
-        const s = sMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
-        if (!s) { console.warn('news translate: empty summary result id=%d', n.id); return }
-
-        cache[language] = { s, h }
-        return await pool.query(
-          'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-          [s, h, JSON.stringify(cache), n.id, req.user.id]
-        ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
-      } catch (e) {
-        console.error('news translate unexpected error id=%d:', n.id, e.message)
+    // Separate cached items from items needing translation
+    const cacheHits = []
+    const toTranslate = []
+    for (const n of newsRows) {
+      const cache = n.translations || {}
+      if (from_language && !cache[from_language]) {
+        cache[from_language] = { s: n.summary, h: n.headline }
       }
-    })
+      if (cache[language]) {
+        const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
+        cacheHits.push({ n, cache, c })
+      } else {
+        toTranslate.push({ n, cache })
+      }
+    }
 
-    await Promise.allSettled([...holdingOps, ...newsOps])
+    // Apply cache hits (no Claude call needed)
+    const cacheOps = cacheHits.map(({ n, cache, c }) =>
+      pool.query(
+        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+        [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
+      ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
+    )
+
+    // One batch call for all uncached items using tool use (guarantees JSON)
+    let translateOps = []
+    if (toTranslate.length > 0) {
+      const hint = language === 'he'
+        ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
+        : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
+      const batchMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: Math.min(4096, Math.max(500, toTranslate.length * 200)),
+        tools: [{
+          name: 'save_translations',
+          description: 'Save translated news items',
+          input_schema: {
+            type: 'object',
+            properties: {
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id:       { type: 'integer' },
+                    headline: { type: 'string' },
+                    summary:  { type: 'string' }
+                  },
+                  required: ['id', 'headline', 'summary']
+                }
+              }
+            },
+            required: ['items']
+          }
+        }],
+        tool_choice: { type: 'tool', name: 'save_translations' },
+        messages: [{
+          role: 'user',
+          content: `${hint}\n\n${JSON.stringify(toTranslate.map(({ n }) => ({ id: n.id, headline: n.headline || '', summary: n.summary })))}`
+        }]
+      }).catch(e => { console.error('Claude batch news translate error:', e.message); return null })
+
+      const toolUse = batchMsg?.content?.find(b => b.type === 'tool_use')
+      const translated = toolUse?.input?.items || []
+      console.log(`translate/batch: Claude translated ${translated.length}/${toTranslate.length} news items`)
+
+      const byId = Object.fromEntries(translated.map(t => [t.id, t]))
+      translateOps = toTranslate.map(({ n, cache }) => {
+        const t = byId[n.id]
+        if (!t?.summary) { console.warn('no translation returned for news id=%d', n.id); return }
+        cache[language] = { s: t.summary, h: t.headline || null }
+        return pool.query(
+          'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+          [t.summary, t.headline || null, JSON.stringify(cache), n.id, req.user.id]
+        ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
+      })
+    }
+
+    await Promise.allSettled([...holdingOps, ...cacheOps, ...translateOps])
     res.json({ ok: true })
   } catch (err) {
     console.error('translate/batch error:', err.message)

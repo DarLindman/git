@@ -1132,11 +1132,14 @@ async function fetchYFNewsArticles(holdings) {
         const url = $el.find('link').text().trim() || $el.find('guid').text().trim()
         if (!url || seenUrls.has(url)) return
         seenUrls.add(url)
+        const pubDateStr = $el.find('pubDate').text().trim()
+        const pubDate = pubDateStr ? new Date(pubDateStr) : null
         articles.push({
           title: $el.find('title').text().trim(),
           description: $el.find('description').text().replace(/<[^>]*>/g, '').trim(),
           url,
           ticker: h.ticker,
+          publishedAt: pubDate && !isNaN(pubDate) ? pubDate.toISOString() : null,
           source: { name: 'Yahoo Finance' }
         })
       })
@@ -1171,11 +1174,14 @@ async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers 
 
     // Merge and dedup by URL
     const seen = new Set()
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000
     const articles = [...newsApiArticles, ...yfArticles].filter(a => {
       if (!a.url || seen.has(a.url)) return false
+      // Skip articles older than 48 hours to avoid flooding from old RSS items
+      if (a.publishedAt && new Date(a.publishedAt).getTime() < cutoff) return false
       seen.add(a.url); return true
     })
-    if (!articles.length) { console.log(`pollNewsForUser user=${userId}: 0 articles after merge`); return }
+    if (!articles.length) { console.log(`pollNewsForUser user=${userId}: 0 articles after merge/age filter`); return }
 
     // Dedup: skip articles already processed for this user
     const { rows: existing } = await pool.query(

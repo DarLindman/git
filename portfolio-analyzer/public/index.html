@@ -480,7 +480,7 @@ function renderHoldings(holdings) {
           <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="delete" data-id="${h.id}" onclick="event.stopPropagation();deleteHolding(this.dataset.id,this.closest('.card').dataset.ticker)">${t('remove')}</button>
         </div>
       </div>
-      <div class="card-sub">${price} · ${h.quantity} ${t('shares')}</div>
+      <div class="card-sub">${price} · ${h.quantity} ${t('shares')}${h.analyzed_at ? ` · ${notifAge(h.analyzed_at)}` : ''}</div>
       <div class="tags">${etfTag}${verdictTag}${charTag}${noAnalysis}</div>
     </div>`
   }).join('')

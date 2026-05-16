@@ -249,15 +249,19 @@ app.post('/api/portfolio/holdings', auth, async (req, res) => {
     res.status(201).json({ holdings: rows })
 
     // If any new tickers were added, run a background news poll immediately
-    const addedNew = items.some(item => item.ticker && !existingTickers.has(item.ticker.toUpperCase()))
-    if (addedNew) {
+    const addedTickers = items.map(i => i.ticker?.toUpperCase()).filter(t => t && !existingTickers.has(t))
+    console.log(`holdings POST: existingTickers=[${[...existingTickers].join(',')}] addedTickers=[${addedTickers.join(',')}]`)
+    if (addedTickers.length > 0) {
+      console.log(`bg news poll: triggering for user=${req.user.id} new tickers=${addedTickers.join(',')}`)
       pool.query(`SELECT COALESCE(profile_json->>'alert_level','2') AS al, COALESCE(profile_json->>'language','he') AS lang FROM user_profiles WHERE user_id = $1`, [req.user.id])
         .then(({ rows: p }) => {
           const alertLevel = parseInt(p[0]?.al) || 2
           const language = p[0]?.lang || 'he'
+          console.log(`bg news poll: starting pollNewsForUser user=${req.user.id} alertLevel=${alertLevel} lang=${language}`)
           return pollNewsForUser(req.user.id, alertLevel, language)
         })
-        .catch(e => console.error('bg news poll after holding add:', e.message))
+        .then(() => console.log(`bg news poll: done for user=${req.user.id}`))
+        .catch(e => console.error('bg news poll error:', e.message))
     }
   } catch (err) {
     console.error(err)
@@ -1141,6 +1145,7 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
       fetchNewsAPIArticles(tickers),
       fetchYFNewsArticles(holdings)
     ])
+    console.log(`pollNewsForUser user=${userId}: newsApi=${newsApiArticles.length} yf=${yfArticles.length}`)
 
     // Merge and dedup by URL
     const seen = new Set()
@@ -1148,7 +1153,7 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
       if (!a.url || seen.has(a.url)) return false
       seen.add(a.url); return true
     })
-    if (!articles.length) return
+    if (!articles.length) { console.log(`pollNewsForUser user=${userId}: 0 articles after merge`); return }
 
     // Dedup: skip articles already processed for this user
     const { rows: existing } = await pool.query(
@@ -1157,6 +1162,7 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     )
     const existingUrls = new Set(existing.map(r => r.article_url))
     const fresh = articles.filter(a => !existingUrls.has(a.url))
+    console.log(`pollNewsForUser user=${userId}: ${articles.length} articles, ${fresh.length} fresh (${existingUrls.size} already seen)`)
     if (!fresh.length) return
 
     // Pre-filter: ticker must appear somewhere in title or description
@@ -1165,6 +1171,7 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
       const text = ((a.title || '') + ' ' + (a.description || '')).toUpperCase()
       return tickersUpper.some(t => text.includes(t))
     })
+    console.log(`pollNewsForUser user=${userId}: ${relevant.length} relevant after ticker filter`)
     if (!relevant.length) return
 
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)

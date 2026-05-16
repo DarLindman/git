@@ -97,9 +97,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const isTest = process.env.NODE_ENV === 'test'
 const noopLimiter = (req, res, next) => next()
 const authLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 1000, max: 10 })
-// auth middleware runs before these, so req.user.id is available — limit per user not per shared Railway IP
-const analyzeLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 20, keyGenerator: req => String(req.user?.id || req.ip) })
-const screenshotLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 10, keyGenerator: req => String(req.user?.id || req.ip) })
+// auth middleware runs before these, so req.user.id is always set — limit per user not per shared Railway IP
+const _userKeyGen = req => {
+  if (!req.user?.id) throw new Error('rate limiter must run after auth middleware')
+  return String(req.user.id)
+}
+const analyzeLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 20, keyGenerator: _userKeyGen })
+const screenshotLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 10, keyGenerator: _userKeyGen })
 
 function auth(req, res, next) {
   const header = req.headers.authorization
@@ -298,6 +302,11 @@ app.patch('/api/portfolio/holdings/:id', auth, async (req, res) => {
 
 const _stockCache = new Map()
 const STOCK_CACHE_TTL = 5 * 60 * 1000
+// Evict expired entries every TTL cycle to prevent unbounded memory growth
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of _stockCache) if (now - v.ts > STOCK_CACHE_TTL) _stockCache.delete(k)
+}, STOCK_CACHE_TTL).unref()
 
 async function fetchStockData(ticker, exchange) {
   const key = `${ticker}:${exchange}`
@@ -958,7 +967,9 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     for (let i = 0; i < relevant.length; i++) {
       const article = relevant[i]
       const r = resultsByIndex.get(i)
-      const shouldNotify = r?.notify === true
+      // Skip articles Claude did not classify — no ticker to assign them to
+      if (!r) continue
+      const shouldNotify = r.notify === true
 
       let earningsBullets = null, evasionWarning = null
       if (shouldNotify && r.is_earnings && article.content) {
@@ -968,8 +979,8 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
       }
 
       insertRows.push([
-        userId, r?.ticker || tickers[0], article.title,
-        shouldNotify ? r.summary : null, r?.category, r?.importance || 2,
+        userId, r.ticker, article.title,
+        shouldNotify ? r.summary : null, r.category, r.importance || 2,
         article.url, earningsBullets ? JSON.stringify(earningsBullets) : null,
         evasionWarning, shouldNotify
       ])

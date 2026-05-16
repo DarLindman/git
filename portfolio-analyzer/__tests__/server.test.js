@@ -503,20 +503,20 @@ describe('Background Polling', () => {
     })
   })
 
-  test('pollNews does nothing when NEWS_API_KEY is not set', async () => {
+  test('pollNews runs without NEWS_API_KEY (YF RSS still active) and completes without error', async () => {
     const originalKey = process.env.NEWS_API_KEY
     delete process.env.NEWS_API_KEY
-    await expect(pollNews()).resolves.toBeUndefined()
+    // Should complete without throwing — YF RSS runs even without NewsAPI key
+    await expect(pollNews()).resolves.not.toThrow()
     process.env.NEWS_API_KEY = originalKey
   })
 
   test('pollNews processes articles and sends push when NEWS_API_KEY set', async () => {
     process.env.NEWS_API_KEY = 'test-key'
-    // Update Anthropic mock to return notify:true for news filter
     const Anthropic = require('@anthropic-ai/sdk')
     const instance = new Anthropic()
     instance.messages.create.mockResolvedValueOnce({
-      content: [{ text: JSON.stringify({ notify: true, category: 'רווחים', summary: 'Apple records earnings beat.', is_earnings: false }) }]
+      content: [{ text: JSON.stringify([{ index: 0, ticker: 'AAPL', notify: true, category: 'רווחים', importance: 2, summary: 'Apple records earnings beat.', is_earnings: false }]) }]
     })
     await pollNews()
     delete process.env.NEWS_API_KEY

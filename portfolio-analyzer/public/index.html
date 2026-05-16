@@ -774,14 +774,14 @@ async function loadNotifications() {
     const cc = CAT_COLOR[n.category] || 'tag-yellow'
     return `<div class="notif-card" onclick="openNotifSheet(${i})">
       <div class="notif-card-left">
-        <span class="notif-ticker">${n.ticker}</span>
-        <span class="imp-badge ${IMP_CLASS[imp]}">${impLabel}</span>
+        <span class="notif-ticker">${escapeHtml(n.ticker)}</span>
+        <span class="imp-badge ${IMP_CLASS[imp]}">${escapeHtml(impLabel)}</span>
       </div>
       <div class="notif-card-body">
-        <div class="notif-card-headline">${n.headline || ''}</div>
+        <div class="notif-card-headline">${escapeHtml(n.headline || '')}</div>
         <div class="notif-card-meta">
-          <span class="tag ${cc}" style="font-size:10px;padding:2px 6px">${n.category || ''}</span>
-          <span class="notif-time">${notifAge(n.sent_at)}</span>
+          <span class="tag ${cc}" style="font-size:10px;padding:2px 6px">${escapeHtml(n.category || '')}</span>
+          <span class="notif-time">${escapeHtml(notifAge(n.sent_at))}</span>
         </div>
       </div>
     </div>`

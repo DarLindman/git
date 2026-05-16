@@ -845,25 +845,70 @@ function isMarketHours() {
   return day >= 1 && day <= 5 && hour >= 6 && hour < 22
 }
 
+async function fetchNewsAPIArticles(tickers) {
+  if (!process.env.NEWS_API_KEY) return []
+  try {
+    const res = await axios.get('https://newsapi.org/v2/everything', {
+      params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20,
+                language: 'en', apiKey: process.env.NEWS_API_KEY },
+      timeout: 10000
+    })
+    return (res.data?.articles || []).filter(a => a.url)
+  } catch (e) { return [] }
+}
+
+async function fetchYFNewsArticles(holdings) {
+  const articles = [], seenUrls = new Set()
+  await Promise.all(holdings.map(async h => {
+    const sym = h.exchange === 'TASE' ? `${h.ticker}.TA` : h.ticker
+    try {
+      const res = await axios.get('https://feeds.finance.yahoo.com/rss/2.0/headline', {
+        params: { s: sym, region: 'US', lang: 'en-US' },
+        headers: { 'User-Agent': YF_HEADERS['User-Agent'], 'Accept': 'application/rss+xml,application/xml' },
+        timeout: 6000
+      })
+      if (!res?.data) return
+      const $ = cheerio.load(res.data, { xmlMode: true })
+      $('item').each((_, el) => {
+        const $el = $(el)
+        const url = $el.find('link').text().trim() || $el.find('guid').text().trim()
+        if (!url || seenUrls.has(url)) return
+        seenUrls.add(url)
+        articles.push({
+          title: $el.find('title').text().trim(),
+          description: $el.find('description').text().replace(/<[^>]*>/g, '').trim(),
+          url,
+          source: { name: 'Yahoo Finance' }
+        })
+      })
+    } catch (e) { /* skip ticker if unavailable */ }
+  }))
+  return articles
+}
+
 async function pollNewsForUser(userId, alertLevel, language = 'he') {
-  if (!process.env.NEWS_API_KEY) return
   const portfolioId = await getUserPortfolioId(userId)
   if (!portfolioId) return
 
   const { rows: holdings } = await pool.query(
-    'SELECT ticker FROM holdings WHERE portfolio_id = $1', [portfolioId]
+    'SELECT ticker, exchange FROM holdings WHERE portfolio_id = $1', [portfolioId]
   )
   if (!holdings.length) return
   const tickers = holdings.map(h => h.ticker)
 
   try {
-    const newsRes = await axios.get('https://newsapi.org/v2/everything', {
-      params: { q: tickers.join(' OR '), sortBy: 'publishedAt', pageSize: 20,
-                language: 'en', apiKey: process.env.NEWS_API_KEY },
-      timeout: 10000
-    })
+    // Fetch NewsAPI + Yahoo Finance RSS in parallel
+    const [newsApiArticles, yfArticles] = await Promise.all([
+      fetchNewsAPIArticles(tickers),
+      fetchYFNewsArticles(holdings)
+    ])
 
-    const articles = (newsRes.data.articles || []).filter(a => a.url)
+    // Merge and dedup by URL
+    const seen = new Set()
+    const articles = [...newsApiArticles, ...yfArticles].filter(a => {
+      if (!a.url || seen.has(a.url)) return false
+      seen.add(a.url); return true
+    })
     if (!articles.length) return
 
     // Dedup: skip articles already processed for this user
@@ -876,7 +921,6 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     if (!fresh.length) return
 
     // Pre-filter: ticker must appear somewhere in title or description
-    // (Claude handles false positives via alert level — ticker symbols don't appear in headlines)
     const relevant = fresh.filter(a => {
       const text = ((a.title || '') + ' ' + (a.description || '')).toUpperCase()
       return tickers.some(t => text.includes(t.toUpperCase()))

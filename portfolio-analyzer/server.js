@@ -221,6 +221,11 @@ app.post('/api/portfolio/holdings', auth, async (req, res) => {
   try {
     const portfolioId = await getUserPortfolioId(req.user.id)
     if (!portfolioId) return res.status(400).json({ error: 'פורטפוליו לא נמצא' })
+
+    // Snapshot existing tickers before insert to detect genuinely new ones
+    const { rows: existing } = await pool.query('SELECT ticker FROM holdings WHERE portfolio_id = $1', [portfolioId])
+    const existingTickers = new Set(existing.map(r => r.ticker))
+
     for (const item of items) {
       const { ticker, exchange = 'US', quantity, avg_cost } = item
       if (!ticker || !quantity) continue
@@ -242,6 +247,18 @@ app.post('/api/portfolio/holdings', auth, async (req, res) => {
       [portfolioId]
     )
     res.status(201).json({ holdings: rows })
+
+    // If any new tickers were added, run a background news poll immediately
+    const addedNew = items.some(item => item.ticker && !existingTickers.has(item.ticker.toUpperCase()))
+    if (addedNew) {
+      pool.query(`SELECT COALESCE(profile_json->>'alert_level','2') AS al, COALESCE(profile_json->>'language','he') AS lang FROM user_profiles WHERE user_id = $1`, [req.user.id])
+        .then(({ rows: p }) => {
+          const alertLevel = parseInt(p[0]?.al) || 2
+          const language = p[0]?.lang || 'he'
+          return pollNewsForUser(req.user.id, alertLevel, language)
+        })
+        .catch(e => console.error('bg news poll after holding add:', e.message))
+    }
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'שגיאת שרת' })

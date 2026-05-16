@@ -767,6 +767,9 @@ async function confirmAddHolding() {
     api('POST', `/api/analyze/${ticker}`, { exchange, language: lang })
       .finally(() => { _analyzingTickers.delete(ticker); loadPortfolio() })
   )
+  // Refresh notifications after a short delay — server runs a background news poll
+  // for new tickers, so fresh articles should arrive within ~10s
+  if (newTickers.length) setTimeout(loadNotifications, 10000)
 }
 
 const IMP_LABEL = { he: ['','קריטי','גבוה','בינוני'], en: ['','Critical','High','Medium'] }

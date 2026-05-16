@@ -97,8 +97,9 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const isTest = process.env.NODE_ENV === 'test'
 const noopLimiter = (req, res, next) => next()
 const authLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 1000, max: 10 })
-const analyzeLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 20 })
-const screenshotLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 10 })
+// auth middleware runs before these, so req.user.id is available — limit per user not per shared Railway IP
+const analyzeLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 20, keyGenerator: req => String(req.user?.id || req.ip) })
+const screenshotLimiter = isTest ? noopLimiter : rateLimit({ windowMs: 60 * 60 * 1000, max: 10, keyGenerator: req => String(req.user?.id || req.ip) })
 
 function auth(req, res, next) {
   const header = req.headers.authorization
@@ -295,6 +296,18 @@ app.patch('/api/portfolio/holdings/:id', auth, async (req, res) => {
   }
 })
 
+const _stockCache = new Map()
+const STOCK_CACHE_TTL = 5 * 60 * 1000
+
+async function fetchStockData(ticker, exchange) {
+  const key = `${ticker}:${exchange}`
+  const cached = _stockCache.get(key)
+  if (cached && Date.now() - cached.ts < STOCK_CACHE_TTL) return cached.data
+  const data = await _fetchStockDataImpl(ticker, exchange)
+  if (data && !data.error && data.price) _stockCache.set(key, { data, ts: Date.now() })
+  return data
+}
+
 async function fetchStockDataFinnhub(ticker) {
   const apiKey = process.env.FINNHUB_API_KEY
   try {
@@ -358,8 +371,7 @@ async function fetchStockDataFinnhub(ticker) {
   }
 }
 
-async function fetchStockData(ticker, exchange) {
-  // Use Finnhub for non-TASE stocks when FINNHUB_API_KEY is set (bypasses Yahoo auth restrictions)
+async function _fetchStockDataImpl(ticker, exchange) {
   if (process.env.FINNHUB_API_KEY && exchange !== 'TASE') {
     const data = await fetchStockDataFinnhub(ticker)
     if (data) return data
@@ -645,15 +657,8 @@ Use "US" for everything else — US/international stocks and ETFs with English n
 IMPORTANT: Never skip a holding just because it has Hebrew text. Hebrew = TASE, include it.
 IMPORTANT: IREN (Iris Energy, NASDAQ) is US. ETFs like IVV, QQQ, SMH, QTUM, MCHI = US.
 
-For TASE holdings, use the English TASE ticker symbol:
-- אפקון החזקות / אפחה / אפהח → AFHL
-- תכלית TTF → TTF | קסם → QSEM
-- טבע → TEVA | כיל → ICL | בזן → BZAN | צ'ק פוינט → CHKP | נייס → NICE
-- בנק הפועלים → POLI | בנק לאומי → LUMI | בנק מזרחי → MZTF | דיסקונט → DSCT
-- הבינלאומי → FIBI | מגדל → MGDL | הראל → HARL | מנורה → MNRA
-- אלביט → ESLT | אמדוקס → DOX | רדקום → RDCM | אזרגס → AZRG | שפיר → SPEN
-- INVESCO S&P 500 (with Hebrew ticker) → IS&P5 | INVESCO NASDAQ (with Hebrew ticker) → INQQ
-- For any other TASE holding with unknown English ticker, use the Hebrew name as the ticker.
+For TASE holdings: if the English ticker is clearly visible in the screenshot use it (e.g. TEVA, ICL, CHKP).
+If only Hebrew text is shown for the ticker/symbol, use that Hebrew text as the ticker value — it will be resolved automatically.
 
 If quantity is unclear, omit the field. Do not add avg_cost.
 Respond ONLY with the JSON array, nothing else.` }
@@ -686,6 +691,15 @@ Respond ONLY with the JSON array, nothing else.` }
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'שגיאה בעיבוד הצילום' })
+  }
+})
+
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    res.json({ ok: true, uptime: Math.floor(process.uptime()) })
+  } catch {
+    res.status(503).json({ ok: false, error: 'Database unavailable' })
   }
 })
 
@@ -746,7 +760,9 @@ app.post('/api/push/subscribe', auth, async (req, res) => {
   if (!subscription?.endpoint) return res.status(400).json({ error: 'subscription לא תקין' })
   try {
     await pool.query(
-      `INSERT INTO push_subscriptions (user_id, subscription_json) VALUES ($1, $2)`,
+      `INSERT INTO push_subscriptions (user_id, subscription_json) VALUES ($1, $2)
+       ON CONFLICT (user_id, (subscription_json->>'endpoint'))
+       DO UPDATE SET subscription_json = EXCLUDED.subscription_json`,
       [req.user.id, JSON.stringify(subscription)]
     )
     res.json({ ok: true })
@@ -936,6 +952,9 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)
     const resultsByIndex = new Map(results.map(r => [r.index, r]))
 
+    const insertRows = []
+    const pushQueue = []
+
     for (let i = 0; i < relevant.length; i++) {
       const article = relevant[i]
       const r = resultsByIndex.get(i)
@@ -948,17 +967,30 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
         evasionWarning = summary?.evasion_warning || null
       }
 
-      // Store every relevant article (notified or not) so it is not re-evaluated next cycle
+      insertRows.push([
+        userId, r?.ticker || tickers[0], article.title,
+        shouldNotify ? r.summary : null, r?.category, r?.importance || 2,
+        article.url, earningsBullets ? JSON.stringify(earningsBullets) : null,
+        evasionWarning, shouldNotify
+      ])
+
+      if (shouldNotify) pushQueue.push({ r, article })
+    }
+
+    if (insertRows.length > 0) {
+      const cols = 10
+      const placeholders = insertRows.map((_, i) =>
+        `(${Array.from({ length: cols }, (_, j) => `$${i * cols + j + 1}`).join(',')})`
+      ).join(',')
       await pool.query(
         `INSERT INTO news_notifications (user_id, ticker, headline, summary, category, importance, article_url, earnings_bullets, evasion_warning, notified)
-         SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
-         WHERE NOT EXISTS (SELECT 1 FROM news_notifications WHERE user_id=$1 AND article_url=$7)`,
-        [userId, r?.ticker || tickers[0], article.title, shouldNotify ? r.summary : null,
-         r?.category, r?.importance || 2, article.url,
-         earningsBullets ? JSON.stringify(earningsBullets) : null, evasionWarning, shouldNotify]
+         VALUES ${placeholders}
+         ON CONFLICT (user_id, article_url) WHERE article_url IS NOT NULL DO NOTHING`,
+        insertRows.flat()
       )
+    }
 
-      if (!shouldNotify) continue
+    for (const { r, article } of pushQueue) {
       const impLabel = language === 'en'
         ? ['','CRITICAL','HIGH','MEDIUM'][r.importance || 2]
         : ['','קריטי','גבוה','בינוני'][r.importance || 2]
@@ -1088,6 +1120,7 @@ async function initDB() {
 
     CREATE INDEX IF NOT EXISTS idx_holdings_portfolio ON holdings(portfolio_id);
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_push_user_endpoint ON push_subscriptions(user_id, (subscription_json->>'endpoint'));
     CREATE INDEX IF NOT EXISTS idx_notif_user ON news_notifications(user_id, sent_at DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url ON news_notifications(user_id, article_url) WHERE article_url IS NOT NULL;
   `)

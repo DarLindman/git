@@ -396,7 +396,12 @@ async function initApp() {
 
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return
-  try { const reg = await navigator.serviceWorker.register('/sw.js'); window._swReg = reg } catch(e) {}
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    window._swReg = reg
+    const sub = await reg.pushManager.getSubscription().catch(() => null)
+    window._pushEnabled = !!sub
+  } catch(e) {}
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -436,19 +441,21 @@ function renderHoldings(holdings) {
     const ai = ord.indexOf(String(a.id)), bi = ord.indexOf(String(b.id))
     if (ai===-1&&bi===-1) return 0; if (ai===-1) return 1; if (bi===-1) return -1; return ai-bi
   }) : holdings
-  let totalUSD = 0, hasMixed = false
+  let totalUSD = 0, totalILS = 0
   list.innerHTML = sorted.map(h => {
     const a = h.analysis_json || {}
     const sd = a.stock_data || {}
     const tags = a.tags || {}
     const pct = sd.change_pct ? parseFloat(sd.change_pct) : null
     const cc = pct > 0 ? 'change-up' : pct < 0 ? 'change-down' : 'change-neutral'
-    const cs = pct !== null ? `${pct>0?'+':''}${pct}%` : (h.analyzed_at ? '—' : t('no_analysis'))
+    const isAnalyzing = _analyzingTickers.has(h.ticker)
+    const cs = pct !== null ? `${pct>0?'+':''}${pct}%` : (h.analyzed_at ? '—' : isAnalyzing ? '' : t('no_analysis'))
     const isILS = sd.currency === 'ILS' || h.exchange === 'TASE'
     const cur = isILS ? '₪' : '$'
     const price = sd.price ? `${cur}${parseFloat(sd.price).toLocaleString()}` : '—'
     if (sd.price && h.quantity) {
-      if (isILS) { hasMixed = true } else { totalUSD += parseFloat(sd.price) * parseFloat(h.quantity) }
+      if (isILS) { totalILS += parseFloat(sd.price) * parseFloat(h.quantity) }
+      else { totalUSD += parseFloat(sd.price) * parseFloat(h.quantity) }
     }
     const verdictTag = tags.verdict ? `<span class="tag ${VERDICT_TAG_COLOR[tags.verdict]||'tag-yellow'}">${escapeHtml(tags.verdict)}</span>` : ''
     const charLabel = tags.character || tags.risk
@@ -456,7 +463,9 @@ function renderHoldings(holdings) {
     const charTag = charLabel ? `<span class="tag ${charClass}">${escapeHtml(charLabel)}</span>` : ''
     const isCardEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || ETF_CHARS.has(tags.character) || /\bETF\b/i.test(a.summary || '')
     const etfTag = isCardEtf ? `<span class="tag tag-purple">ETF</span>` : ''
-    const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
+    const noAnalysis = _analyzingTickers.has(h.ticker)
+      ? `<span class="tag tag-yellow"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;vertical-align:middle;margin-left:4px"></span> ${t('analyzing')}</span>`
+      : (!h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : '')
     return `<div class="card" data-holding-id="${h.id}" data-ticker="${safeAttr(h.ticker)}" data-exchange="${safeAttr(h.exchange)}">
       <div class="card-row">
         <div style="display:flex;align-items:center;gap:6px">
@@ -475,10 +484,10 @@ function renderHoldings(holdings) {
       <div class="tags">${etfTag}${verdictTag}${charTag}${noAnalysis}</div>
     </div>`
   }).join('')
-  const totalLabel = totalUSD > 0
-    ? `$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}${hasMixed ? ' +₪' : ''}`
-    : '—'
-  document.getElementById('portfolio-total').textContent = totalLabel
+  const parts = []
+  if (totalUSD > 0) parts.push(`$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}`)
+  if (totalILS > 0) parts.push(`₪${totalILS.toLocaleString(undefined,{maximumFractionDigits:0})}`)
+  document.getElementById('portfolio-total').textContent = parts.length ? parts.join(' · ') : '—'
 }
 
 async function openAnalysis(ticker, exchange) {
@@ -489,10 +498,14 @@ async function openAnalysis(ticker, exchange) {
   if (!holding) { content.innerHTML = '<div class="sheet-handle"></div><div style="padding:24px;text-align:center">שגיאה</div>'; return }
   const a = holding.analysis_json
   if (!a) {
+    const isAnalyzing = _analyzingTickers.has(ticker)
     content.innerHTML = `<div class="sheet-handle"></div>
       <div style="text-align:center;padding:24px">
-        <div style="margin-bottom:12px;color:var(--text-muted)">${t('no_analysis')}</div>
-        <button class="btn btn-primary" data-ticker="${safeAttr(ticker)}" data-exchange="${safeAttr(exchange)}" onclick="runAnalysis(this.dataset.ticker,this.dataset.exchange)">${t('refresh_analysis')}</button>
+        ${isAnalyzing
+          ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-muted)"><span class="spinner"></span>${t('analyzing')}</div>`
+          : `<div style="margin-bottom:12px;color:var(--text-muted)">${t('no_analysis')}</div>
+             <button class="btn btn-primary" data-ticker="${safeAttr(ticker)}" data-exchange="${safeAttr(exchange)}" onclick="runAnalysis(this.dataset.ticker,this.dataset.exchange)">${t('refresh_analysis')}</button>`
+        }
       </div>
       <button class="sheet-close" style="position:absolute;top:12px;left:12px" onclick="closeSheet()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -628,7 +641,7 @@ function switchAddMode(mode) {
 
 function selectExchange(ex) { addExchange = ex }
 
-let _tickerSearchTimer = null, _notifData = []
+let _tickerSearchTimer = null, _notifData = [], _analyzingTickers = new Set()
 const VERDICT_TAG_COLOR = { 'קנה':'tag-green','buy':'tag-green','מכור':'tag-red','sell':'tag-red','החזק':'tag-yellow','hold':'tag-yellow','עקוב':'tag-teal','watch':'tag-teal','הימנע':'tag-red','avoid':'tag-red' }
 const CHAR_TAG_COLOR = { 'צמיחה':'tag-green','growth':'tag-green','מומנטום':'tag-green','momentum':'tag-green','ערך':'tag-teal','value':'tag-teal','מדד':'tag-teal','index':'tag-teal','אגח':'tag-teal','bonds':'tag-teal','דפנסיבי':'tag-purple','defensive':'tag-purple','תמטי':'tag-purple','thematic':'tag-purple','ספקולטיבי':'tag-orange','speculative':'tag-orange','ענף':'tag-orange','sector':'tag-orange','התאוששות':'tag-yellow','turnaround':'tag-yellow' }
 const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
@@ -740,13 +753,14 @@ async function confirmAddHolding() {
   btn.textContent = t('add')
   if (result?.error) { document.getElementById('add-error').textContent = result.error; return }
   closeModal('add-modal')
-  loadPortfolio()
-  // Auto-analyze newly added holdings in the background
   const newTickers = result?.holdings
     ? items.map(i => ({ ticker: i.ticker.toUpperCase(), exchange: i.exchange || addExchange }))
     : []
+  newTickers.forEach(({ ticker }) => _analyzingTickers.add(ticker))
+  await loadPortfolio()
   newTickers.forEach(({ ticker, exchange }) =>
-    api('POST', `/api/analyze/${ticker}`, { exchange, language: lang }).then(() => loadPortfolio())
+    api('POST', `/api/analyze/${ticker}`, { exchange, language: lang })
+      .finally(() => { _analyzingTickers.delete(ticker); loadPortfolio() })
   )
 }
 

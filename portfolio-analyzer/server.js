@@ -1330,6 +1330,14 @@ async function initDB() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_push_user_endpoint
     ON push_subscriptions(user_id, (subscription_json->>'endpoint'))
   `).catch(e => console.warn('Unique index idx_push_user_endpoint:', e.message))
+  // One-time migration: clear poisoned news translations from buggy previous versions
+  await pool.query(`CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now())`)
+  const { rows: migRows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = 'clear_news_translations_v1'`)
+  if (!migRows.length) {
+    await pool.query(`UPDATE news_notifications SET translations = '{}'`)
+    await pool.query(`INSERT INTO _migrations(id) VALUES ('clear_news_translations_v1')`)
+    console.log('Migration: cleared all news translations for fresh re-translation')
+  }
   console.log('DB initialized')
 }
 

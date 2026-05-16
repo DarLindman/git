@@ -815,17 +815,17 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
     )
 
-    // Translate uncached items in chunks of 20 to stay within token limits
+    // Translate uncached items: split into chunks of 20, run all chunks in parallel
     const CHUNK_SIZE = 20
     const hint = language === 'he'
       ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
       : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
 
-    const byId = {}
-    for (let i = 0; i < toTranslate.length; i += CHUNK_SIZE) {
-      const chunk = toTranslate.slice(i, i + CHUNK_SIZE)
+    const chunks = []
+    for (let i = 0; i < toTranslate.length; i += CHUNK_SIZE) chunks.push(toTranslate.slice(i, i + CHUNK_SIZE))
+
+    const chunkResults = await Promise.all(chunks.map(async (chunk, ci) => {
       const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
-      console.log(`translate/batch: chunk ${Math.floor(i/CHUNK_SIZE)+1}/${Math.ceil(toTranslate.length/CHUNK_SIZE)}, ${chunk.length} items`)
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 8000,
@@ -833,21 +833,21 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
           role: 'user',
           content: `${hint}\nReturn ONLY a valid JSON array. Each element must have "id" (same number as input), "h" (translated headline), "s" (translated summary). No markdown, no explanation.\n\nInput: ${JSON.stringify(batchInput)}`
         }]
-      }).catch(e => { console.error('Claude batch news translate error:', e.message, 'status:', e.status); return null })
+      }).catch(e => { console.error(`Claude news chunk ${ci+1} error:`, e.message); return null })
 
-      console.log(`translate/batch: stop_reason=${batchMsg?.stop_reason}`)
-      const rawText = batchMsg?.content?.[0]?.text || ''
-      const translated = extractJson(rawText)
-      console.log(`translate/batch: parsed ${Array.isArray(translated) ? translated.length : 0}/${chunk.length} from chunk`)
-      if (Array.isArray(translated)) for (const t of translated) if (t?.id) byId[t.id] = t
-    }
+      if (batchMsg?.stop_reason === 'max_tokens') console.warn(`translate/batch: chunk ${ci+1} hit max_tokens`)
+      const translated = extractJson(batchMsg?.content?.[0]?.text || '')
+      console.log(`translate/batch: chunk ${ci+1}/${chunks.length} → ${Array.isArray(translated) ? translated.length : 0}/${chunk.length} translated`)
+      return Array.isArray(translated) ? translated : []
+    }))
+
+    const byId = {}
+    for (const items of chunkResults) for (const t of items) if (t?.id) byId[t.id] = t
 
     const translateOps = toTranslate.map(({ n, cache }) => {
       const t = byId[n.id]
-      if (!t?.s) { console.warn('no translation returned for news id=%d', n.id); return }
-      if (from_language && !cache[from_language]) {
-        cache[from_language] = { s: n.summary, h: n.headline }
-      }
+      if (!t?.s) return
+      if (from_language && !cache[from_language]) cache[from_language] = { s: n.summary, h: n.headline }
       cache[language] = { s: t.s, h: t.h || null }
       return pool.query(
         'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',

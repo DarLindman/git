@@ -714,20 +714,32 @@ const TAG_MAP = {
   }
 }
 
-function buildTranslatePrompt(targetLang, items, fields) {
+function makeTranslateSystem(targetLang) {
+  return [{ type: 'text', text: `Translate financial text to ${targetLang}. Return valid JSON only, no other text.`, cache_control: { type: 'ephemeral' } }]
+}
+
+function holdingTranslatePrompt(targetLang, item) {
   const isHe = targetLang === 'Hebrew'
-  return `You are a professional financial translator. Translate the text fields below into fluent, natural ${targetLang}.
+  const terms = isHe ? 'Hebrew terms: תזה=thesis, סיכונים=risks, זרז=catalyst, תרחיש שלילי=bear case, שווי שוק=market cap, הכנסות=revenue, יתרון תחרותי=competitive advantage. Use modern Israeli Hebrew.' : ''
+  return `Translate to natural, fluent ${targetLang}. ${terms}
+Rules: keep all numbers, ticker symbols, percentages, company names exactly as-is. Rephrase naturally — never translate word-for-word.
 
-Rules:
-- Write naturally — rephrase sentences so they read like native ${targetLang}. Never translate word-for-word.
-- Keep all numbers, ticker symbols (AMZN, AWS, NVDA, etc.), percentages, and company names unchanged.
-${isHe ? `- Hebrew financial terms: תזה (thesis), סיכונים (risks), זרז (catalyst), שווי שוק (market cap), הכנסות (revenue), תחרות (competition), יתרון תחרותי (competitive advantage), ניתוח (analysis), תרחיש שלילי (bear case).
-- Use modern Israeli Hebrew. Avoid archaic or overly formal phrasing.` : ''}
-- Maintain the same direct, candid investment-note tone.
+Return ONLY this JSON object (no array, no wrapper):
+{"summary":"...","thesis":"...","risks":"...","catalyst":"..."}
 
-Return ONLY a valid JSON array with the same structure as the input (id + translated fields):
+Text to translate:
+${JSON.stringify({ summary: item.summary, thesis: item.thesis, risks: item.risks, catalyst: item.catalyst })}`
+}
 
-Input:
+function newsTranslatePrompt(targetLang, items) {
+  const isHe = targetLang === 'Hebrew'
+  const terms = isHe ? 'Use modern Israeli Hebrew. ' : ''
+  return `Translate these news summaries to natural ${targetLang}. ${terms}Keep company names, ticker symbols, and numbers unchanged.
+
+Return ONLY a JSON array in EXACTLY this format (keep the same ids):
+[{"id":${items[0]?.id},"summary":"translated text"},{"id":${items[1]?.id || items[0]?.id},"summary":"..."}]
+
+Input array:
 ${JSON.stringify(items)}`
 }
 
@@ -739,7 +751,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, summary FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+      pool.query('SELECT id, summary FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
     ])
 
     const hInput = holdings.filter(h => h.analysis_json?.summary).map(h => ({
@@ -751,33 +763,34 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     if (!hInput.length && !nInput.length) return res.json({ ok: true })
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
-    const system = [{ type: 'text', text: 'You are a professional financial translator. Respond with valid JSON array only. Never include text outside the JSON.', cache_control: { type: 'ephemeral' } }]
+    const system = makeTranslateSystem(targetLang)
 
-    // Two parallel Claude calls so news can never be starved by a large holdings list
-    const [hMsg, nMsg] = await Promise.all([
-      hInput.length ? anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: Math.min(hInput.length * 700 + 400, 8000),
-        system,
-        messages: [{ role: 'user', content: buildTranslatePrompt(targetLang, hInput, ['summary','thesis','risks','catalyst']) }]
-      }) : null,
+    // Each holding gets its own small parallel call — much faster than one big call
+    // News gets its own dedicated call in parallel
+    const allCalls = [
+      ...hInput.map(item => anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 800, system,
+        messages: [{ role: 'user', content: holdingTranslatePrompt(targetLang, item) }]
+      }).then(msg => ({ type: 'holding', id: item.id, result: extractJson(msg.content[0].text) })).catch(() => null)),
       nInput.length ? anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: Math.min(nInput.length * 250 + 200, 4000),
-        system,
-        messages: [{ role: 'user', content: buildTranslatePrompt(targetLang, nInput, ['summary']) }]
-      }) : null
-    ])
+        model: 'claude-haiku-4-5-20251001', max_tokens: Math.min(nInput.length * 300 + 200, 4000), system,
+        messages: [{ role: 'user', content: newsTranslatePrompt(targetLang, nInput) }]
+      }).then(msg => ({ type: 'news', result: extractJson(msg.content[0].text) })).catch(() => null) : null
+    ].filter(Boolean)
 
-    const hResult = hMsg ? (extractJson(hMsg.content[0].text) || []) : []
-    const nResult = nMsg ? (extractJson(nMsg.content[0].text) || []) : []
+    const settled = await Promise.all(allCalls)
 
     const tagMap = TAG_MAP[language === 'he' ? 'en_to_he' : 'he_to_en']
     const holdingMap = new Map(holdings.map(h => [h.id, h]))
 
+    const hResults = settled.filter(r => r?.type === 'holding')
+    const nSettled = settled.find(r => r?.type === 'news')
+    const nResult = Array.isArray(nSettled?.result) ? nSettled.result : []
+
     await Promise.all([
-      ...(Array.isArray(hResult) ? hResult : []).map(th => {
-        const orig = holdingMap.get(th.id)
+      ...hResults.map(({ id, result }) => {
+        if (!result) return Promise.resolve()
+        const orig = holdingMap.get(id)
         if (!orig) return Promise.resolve()
         const a = orig.analysis_json
         const tags = a.tags ? {
@@ -786,15 +799,16 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
         } : a.tags
         return pool.query(
           'UPDATE holdings SET analysis_json = $1 WHERE id = $2 AND portfolio_id = $3',
-          [JSON.stringify({ ...a, summary: th.summary, thesis: th.thesis, risks: th.risks, catalyst: th.catalyst, tags }), th.id, portfolioId]
+          [JSON.stringify({ ...a, summary: result.summary || a.summary, thesis: result.thesis || a.thesis, risks: result.risks || a.risks, catalyst: result.catalyst || a.catalyst, tags }), id, portfolioId]
         )
       }),
-      ...(Array.isArray(nResult) ? nResult : []).map(tn =>
-        pool.query('UPDATE news_notifications SET summary = $1 WHERE id = $2 AND user_id = $3', [tn.summary, tn.id, req.user.id])
+      ...nResult.map(tn => tn?.summary && tn?.id
+        ? pool.query('UPDATE news_notifications SET summary = $1 WHERE id = $2 AND user_id = $3', [tn.summary, tn.id, req.user.id])
+        : Promise.resolve()
       )
     ])
 
-    res.json({ ok: true })
+    res.json({ ok: true, translated_holdings: hResults.filter(r => r?.result).length, translated_news: nResult.length })
   } catch (err) {
     console.error('translate/batch error:', err.message)
     res.status(500).json({ error: 'Translation failed' })

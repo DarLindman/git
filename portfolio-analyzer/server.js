@@ -384,10 +384,15 @@ async function fetchStockDataFinnhub(ticker) {
       // values for ADRs (NT$ for TSM, EUR for ASML). Sanity-check: if value implies P/S > 200×
       // revenue or >$20T it's almost certainly a local-currency bleed-through, discard it.
       market_cap: (() => {
-        const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? null
-        if (raw != null) return raw
+        // 1. YF direct (most reliable for ADRs)
+        const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? yfs.summaryDetail?.marketCap?.raw ?? null
+        if (raw != null && raw < 20e12) return raw
+        // 2. Compute from shares × price (works for ADRs — uses US-listed shares & USD price)
+        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw ?? null
+        if (shares && price) return Math.round(shares * price)
+        // 3. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
         const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
-        if (fh != null && fh > 20e12) return null   // >$20T is almost certainly wrong (TWD/EUR leak)
+        if (fh != null && fh > 20e12) return null
         return fh
       })(),
       pe_ratio,

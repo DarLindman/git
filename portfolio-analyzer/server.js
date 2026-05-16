@@ -1329,13 +1329,18 @@ async function initDB() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_push_user_endpoint
     ON push_subscriptions(user_id, (subscription_json->>'endpoint'))
   `).catch(e => console.warn('Unique index idx_push_user_endpoint:', e.message))
-  // One-time migration: clear poisoned news translations from buggy previous versions
+  // One-time migrations tracked in _migrations table
   await pool.query(`CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, ran_at TIMESTAMPTZ DEFAULT now())`)
-  const { rows: migRows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = 'clear_news_translations_v1'`)
-  if (!migRows.length) {
-    await pool.query(`UPDATE news_notifications SET translations = '{}'`)
-    await pool.query(`INSERT INTO _migrations(id) VALUES ('clear_news_translations_v1')`)
-    console.log('Migration: cleared all news translations for fresh re-translation')
+  for (const [id, sql] of [
+    ['clear_news_translations_v1', `UPDATE news_notifications SET translations = '{}'`],
+    ['clear_news_translations_v2', `UPDATE news_notifications SET translations = '{}'`],
+  ]) {
+    const { rows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = $1`, [id])
+    if (!rows.length) {
+      await pool.query(sql)
+      await pool.query(`INSERT INTO _migrations(id) VALUES ($1)`, [id])
+      console.log(`Migration ${id}: cleared all news translations`)
+    }
   }
   console.log('DB initialized')
 }

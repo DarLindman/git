@@ -1134,7 +1134,6 @@ async function initDB() {
 
     CREATE INDEX IF NOT EXISTS idx_holdings_portfolio ON holdings(portfolio_id);
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_push_user_endpoint ON push_subscriptions(user_id, (subscription_json->>'endpoint'));
     CREATE INDEX IF NOT EXISTS idx_notif_user ON news_notifications(user_id, sent_at DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url ON news_notifications(user_id, article_url) WHERE article_url IS NOT NULL;
   `)
@@ -1151,12 +1150,24 @@ async function initDB() {
       WHERE article_url IS NOT NULL
       GROUP BY user_id, article_url
     ) AND article_url IS NOT NULL
-  `).catch(e => console.warn('Dedup cleanup:', e.message))
+  `).catch(e => console.warn('Dedup cleanup news_notifications:', e.message))
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_user_url
     ON news_notifications(user_id, article_url)
     WHERE article_url IS NOT NULL
-  `).catch(e => console.warn('Unique index:', e.message))
+  `).catch(e => console.warn('Unique index idx_notif_user_url:', e.message))
+  // Remove duplicate push subscriptions (same user+endpoint) before creating unique index
+  await pool.query(`
+    DELETE FROM push_subscriptions
+    WHERE id NOT IN (
+      SELECT MAX(id) FROM push_subscriptions
+      GROUP BY user_id, (subscription_json->>'endpoint')
+    )
+  `).catch(e => console.warn('Dedup cleanup push_subscriptions:', e.message))
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_push_user_endpoint
+    ON push_subscriptions(user_id, (subscription_json->>'endpoint'))
+  `).catch(e => console.warn('Unique index idx_push_user_endpoint:', e.message))
   console.log('DB initialized')
 }
 

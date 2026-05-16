@@ -678,7 +678,7 @@ Respond ONLY with the JSON array, nothing else.` }
     const holdings = extractJson(message.content[0].text)
     if (!Array.isArray(holdings)) return res.status(422).json({ error: 'לא ניתן לזהות מניות בצילום המסך' })
 
-    const valid = holdings.filter(h => h.ticker && (h.quantity || h.quantity === 0))
+    const valid = holdings.filter(h => h.ticker && h.quantity > 0)
     if (!valid.length) return res.status(422).json({ error: 'לא נמצאו מניות בצילום המסך' })
 
     // Resolve Hebrew/unknown TASE tickers to their English symbol via YF search
@@ -952,39 +952,42 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     if (!fresh.length) return
 
     // Pre-filter: ticker must appear somewhere in title or description
+    const tickersUpper = tickers.map(t => t.toUpperCase())
     const relevant = fresh.filter(a => {
       const text = ((a.title || '') + ' ' + (a.description || '')).toUpperCase()
-      return tickers.some(t => text.includes(t.toUpperCase()))
+      return tickersUpper.some(t => text.includes(t))
     })
     if (!relevant.length) return
 
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)
     const resultsByIndex = new Map(results.map(r => [r.index, r]))
 
-    const insertRows = []
-    const pushQueue = []
+    // Resolve earnings summaries in parallel, then build insert rows
+    const classified = relevant
+      .map((article, i) => ({ article, r: resultsByIndex.get(i) }))
+      .filter(({ r }) => !!r)
 
-    for (let i = 0; i < relevant.length; i++) {
-      const article = relevant[i]
-      const r = resultsByIndex.get(i)
-      // Skip articles Claude did not classify — no ticker to assign them to
-      if (!r) continue
-      const shouldNotify = r.notify === true
-
+    const withEarnings = await Promise.all(classified.map(async ({ article, r }) => {
       let earningsBullets = null, evasionWarning = null
-      if (shouldNotify && r.is_earnings && article.content) {
+      if (r.notify === true && r.is_earnings && article.content) {
         const summary = await summarizeEarningsCall(article.content, language)
         earningsBullets = summary?.bullets || null
         evasionWarning = summary?.evasion_warning || null
       }
+      return { article, r, earningsBullets, evasionWarning }
+    }))
 
+    const insertRows = []
+    const pushQueue = []
+
+    for (const { article, r, earningsBullets, evasionWarning } of withEarnings) {
+      const shouldNotify = r.notify === true
       insertRows.push([
         userId, r.ticker, article.title,
         shouldNotify ? r.summary : null, r.category, r.importance || 2,
         article.url, earningsBullets ? JSON.stringify(earningsBullets) : null,
         evasionWarning, shouldNotify
       ])
-
       if (shouldNotify) pushQueue.push({ r, article })
     }
 

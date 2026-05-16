@@ -436,7 +436,7 @@ function renderHoldings(holdings) {
     const ai = ord.indexOf(String(a.id)), bi = ord.indexOf(String(b.id))
     if (ai===-1&&bi===-1) return 0; if (ai===-1) return 1; if (bi===-1) return -1; return ai-bi
   }) : holdings
-  let totalUSD = 0
+  let totalUSD = 0, hasMixed = false
   list.innerHTML = sorted.map(h => {
     const a = h.analysis_json || {}
     const sd = a.stock_data || {}
@@ -444,16 +444,17 @@ function renderHoldings(holdings) {
     const pct = sd.change_pct ? parseFloat(sd.change_pct) : null
     const cc = pct > 0 ? 'change-up' : pct < 0 ? 'change-down' : 'change-neutral'
     const cs = pct !== null ? `${pct>0?'+':''}${pct}%` : (h.analyzed_at ? '—' : t('no_analysis'))
-    const cur = (sd.currency === 'ILS' || h.exchange === 'TASE') ? '₪' : '$'
+    const isILS = sd.currency === 'ILS' || h.exchange === 'TASE'
+    const cur = isILS ? '₪' : '$'
     const price = sd.price ? `${cur}${parseFloat(sd.price).toLocaleString()}` : '—'
-    if (sd.price && h.quantity) totalUSD += parseFloat(sd.price) * parseFloat(h.quantity)
-    const VERDICT_TAG_COLOR = { 'קנה':'tag-green','buy':'tag-green','מכור':'tag-red','sell':'tag-red','החזק':'tag-yellow','hold':'tag-yellow','עקוב':'tag-teal','watch':'tag-teal','הימנע':'tag-red','avoid':'tag-red' }
-    const CHAR_TAG_COLOR = { 'צמיחה':'tag-green','growth':'tag-green','מומנטום':'tag-green','momentum':'tag-green','ערך':'tag-teal','value':'tag-teal','מדד':'tag-teal','index':'tag-teal','אגח':'tag-teal','bonds':'tag-teal','דפנסיבי':'tag-purple','defensive':'tag-purple','תמטי':'tag-purple','thematic':'tag-purple','ספקולטיבי':'tag-orange','speculative':'tag-orange','ענף':'tag-orange','sector':'tag-orange','התאוששות':'tag-yellow','turnaround':'tag-yellow' }
-    const verdictTag = tags.verdict ? `<span class="tag ${VERDICT_TAG_COLOR[tags.verdict]||'tag-yellow'}">${tags.verdict}</span>` : ''
+    if (sd.price && h.quantity) {
+      if (isILS) { hasMixed = true } else { totalUSD += parseFloat(sd.price) * parseFloat(h.quantity) }
+    }
+    const verdictTag = tags.verdict ? `<span class="tag ${VERDICT_TAG_COLOR[tags.verdict]||'tag-yellow'}">${escapeHtml(tags.verdict)}</span>` : ''
     const charLabel = tags.character || tags.risk
     const charClass = tags.character ? (CHAR_TAG_COLOR[tags.character]||'tag-teal') : (tags.risk === 'נמוך'||tags.risk==='low'?'tag-teal':tags.risk==='גבוה'||tags.risk==='high'?'tag-red':'tag-yellow')
-    const charTag = charLabel ? `<span class="tag ${charClass}">${charLabel}</span>` : ''
-    const isCardEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח']).has(tags.character) || /\bETF\b/i.test(a.summary || '')
+    const charTag = charLabel ? `<span class="tag ${charClass}">${escapeHtml(charLabel)}</span>` : ''
+    const isCardEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || ETF_CHARS.has(tags.character) || /\bETF\b/i.test(a.summary || '')
     const etfTag = isCardEtf ? `<span class="tag tag-purple">ETF</span>` : ''
     const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
     return `<div class="card" data-holding-id="${h.id}" data-ticker="${safeAttr(h.ticker)}" data-exchange="${safeAttr(h.exchange)}">
@@ -474,7 +475,10 @@ function renderHoldings(holdings) {
       <div class="tags">${etfTag}${verdictTag}${charTag}${noAnalysis}</div>
     </div>`
   }).join('')
-  document.getElementById('portfolio-total').textContent = totalUSD > 0 ? `$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}` : '—'
+  const totalLabel = totalUSD > 0
+    ? `$${totalUSD.toLocaleString(undefined,{maximumFractionDigits:0})}${hasMixed ? ' +₪' : ''}`
+    : '—'
+  document.getElementById('portfolio-total').textContent = totalLabel
 }
 
 async function openAnalysis(ticker, exchange) {
@@ -501,7 +505,6 @@ async function openAnalysis(ticker, exchange) {
   const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${escapeHtml(e.ticker)}</span> — ${escapeHtml(e.impact)}</div>`).join('')
   const VERDICT_BADGE = { 'קנה':'verdict-buy','buy':'verdict-buy','מכור':'verdict-avoid','sell':'verdict-avoid','החזק':'verdict-hold','hold':'verdict-hold','עקוב':'verdict-watch','watch':'verdict-watch','הימנע':'verdict-avoid','avoid':'verdict-avoid' }
   const verdictBadge = a.verdict ? `<div class="verdict-badge ${VERDICT_BADGE[a.verdict]||'verdict-hold'}">${a.tags?.verdict || a.verdict}</div>` : ''
-  const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
   const isEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || ETF_CHARS.has(a.tags?.character) || /\bETF\b/i.test(a.summary || '')
   const week52boxes = [
     sd.week52_low != null ? `<div class="metric-box"><div class="metric-val">${cur}${parseFloat(sd.week52_low).toFixed(0)}</div><div class="metric-key">52W Low</div></div>` : '',
@@ -626,6 +629,9 @@ function switchAddMode(mode) {
 function selectExchange(ex) { addExchange = ex }
 
 let _tickerSearchTimer = null, _notifData = []
+const VERDICT_TAG_COLOR = { 'קנה':'tag-green','buy':'tag-green','מכור':'tag-red','sell':'tag-red','החזק':'tag-yellow','hold':'tag-yellow','עקוב':'tag-teal','watch':'tag-teal','הימנע':'tag-red','avoid':'tag-red' }
+const CHAR_TAG_COLOR = { 'צמיחה':'tag-green','growth':'tag-green','מומנטום':'tag-green','momentum':'tag-green','ערך':'tag-teal','value':'tag-teal','מדד':'tag-teal','index':'tag-teal','אגח':'tag-teal','bonds':'tag-teal','דפנסיבי':'tag-purple','defensive':'tag-purple','תמטי':'tag-purple','thematic':'tag-purple','ספקולטיבי':'tag-orange','speculative':'tag-orange','ענף':'tag-orange','sector':'tag-orange','התאוששות':'tag-yellow','turnaround':'tag-yellow' }
+const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
 async function searchTickers(q) {
   clearTimeout(_tickerSearchTimer)
   const dd = document.getElementById('ticker-dropdown')
@@ -709,7 +715,7 @@ async function handleScreenshotUpload(input) {
   preview.innerHTML = `<span class="spinner"></span> ${t('analyzing')}`
   const form = new FormData(); form.append('screenshot', input.files[0])
   const data = await api('POST', '/api/portfolio/screenshot', form, true)
-  if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${data?.error||t('screenshot_error')}</div>`; return }
+  if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${escapeHtml(data?.error||t('screenshot_error'))}</div>`; return }
   pendingHoldings = data.holdings
   preview.innerHTML = `<div style="color:var(--accent);font-size:13px;margin-top:4px">${t('screenshot_found').replace('{count}', data.holdings.length)}</div>` +
     data.holdings.map(h=>`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escapeHtml(h.ticker)} (${escapeHtml(h.exchange)}) × ${escapeHtml(String(h.quantity||'?'))}</div>`).join('')

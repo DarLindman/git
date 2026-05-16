@@ -69,8 +69,14 @@ const fs = require('fs')
 const path = require('path')
 
 const app = express()
-app.set('trust proxy', 1) // Railway runs behind a reverse proxy
+app.set('trust proxy', 1)
 const PORT = process.env.PORT || 3000
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET env var is required in production')
+  process.exit(1)
+}
+const _jwtSecret = JWT_SECRET || 'dev_secret_do_not_use_in_prod'
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -98,7 +104,7 @@ function auth(req, res, next) {
   const header = req.headers.authorization
   if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' })
   try {
-    req.user = jwt.verify(header.slice(7), process.env.JWT_SECRET || 'dev_secret')
+    req.user = jwt.verify(header.slice(7), _jwtSecret)
     next()
   } catch {
     res.status(401).json({ error: 'Invalid token' })
@@ -140,7 +146,7 @@ app.post('/auth/register', authLimiter, async (req, res) => {
     const user = rows[0]
     await pool.query('INSERT INTO portfolios (user_id) VALUES ($1)', [user.id])
     await pool.query('INSERT INTO user_profiles (user_id) VALUES ($1)', [user.id])
-    const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' })
+    const token = jwt.sign({ id: user.id, username: user.username }, _jwtSecret, { expiresIn: '7d' })
     res.status(201).json({ token, username: user.username })
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'שם המשתמש כבר קיים' })
@@ -158,7 +164,7 @@ app.post('/auth/login', authLimiter, async (req, res) => {
     const user = rows[0]
     const valid = await bcrypt.compare(password, user ? user.password_hash : dummy)
     if (!user || !valid) return res.status(401).json({ error: 'שם משתמש או סיסמה שגויים' })
-    const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' })
+    const token = jwt.sign({ id: user.id, username: user.username }, _jwtSecret, { expiresIn: '7d' })
     res.json({ token, username: user.username })
   } catch (err) {
     console.error(err)
@@ -370,8 +376,8 @@ async function fetchStockData(ticker, exchange) {
         axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
           params: { interval: '1d', range: '1d', ...crumbParam }, headers, timeout: 12000
         }),
-        axios.get(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
-          params: { modules: 'summaryDetail,defaultKeyStatistics,price,assetProfile', ...crumbParam },
+        axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
+          params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile', ...crumbParam },
           headers, timeout: 8000
         }).catch(() => null),
         axios.get('https://query1.finance.yahoo.com/v1/finance/search', {
@@ -528,7 +534,7 @@ Portfolio tickers for ecosystem mapping: [${allTickers.join(', ')}]
 Return a JSON object keyed by ticker:
 {
   "TICKER": {
-    "verdict": "buy|watch|hold|avoid",
+    "verdict": "buy|sell|hold",
     "summary": "2-3 sentences, bottom line first, use actual numbers",
     "thesis": "What must go right for this to work (for ETFs: why this fund for this exposure)",
     "risks": "Specific bear case with real stakes",
@@ -603,7 +609,7 @@ app.post('/api/analyze/:ticker', auth, analyzeLimiter, async (req, res) => {
     res.json({ ticker, stock_data: stockData, analysis })
   } catch (err) {
     console.error('analyzeStock error:', err.message)
-    res.status(500).json({ error: 'שגיאת ניתוח: ' + err.message })
+    res.status(500).json({ error: 'שגיאת ניתוח — נסה שנית' })
   }
 })
 
@@ -969,7 +975,6 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
 }
 
 async function pollNews() {
-  if (!process.env.NEWS_API_KEY) return
   try {
     const { rows: users } = await pool.query(
       `SELECT DISTINCT po.user_id,
@@ -978,7 +983,7 @@ async function pollNews() {
        FROM portfolios po JOIN holdings h ON h.portfolio_id = po.id
        LEFT JOIN user_profiles up ON up.user_id = po.user_id`
     )
-    for (const u of users) await pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2, u.language || 'he')
+    await Promise.all(users.map(u => pollNewsForUser(u.user_id, parseInt(u.alert_level) || 2, u.language || 'he')))
   } catch (err) {
     console.error('pollNews top-level error:', err.message)
   }
@@ -1018,7 +1023,7 @@ async function generateIcons() {
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText('₪', size / 2, size / 2)
-      fs.writeFileSync(p, canvas.toBuffer('image/png'))
+      await fs.promises.writeFile(p, canvas.toBuffer('image/png'))
     }
     console.log('Icons generated')
   } catch (e) {

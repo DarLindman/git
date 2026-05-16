@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f2027">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -285,6 +285,11 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
 </div>
 
 <script>
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+}
+function safeAttr(s) { return escapeHtml(s) }
+
 const T = {
   he: {
     tab_portfolio:'תיק', tab_notifications:'התראות', tab_settings:'הגדרות',
@@ -451,18 +456,18 @@ function renderHoldings(holdings) {
     const isCardEtf = sd.instrument_type === 'ETF' || a.instrument_type === 'ETF' || new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח']).has(tags.character) || /\bETF\b/i.test(a.summary || '')
     const etfTag = isCardEtf ? `<span class="tag tag-purple">ETF</span>` : ''
     const noAnalysis = !h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : ''
-    return `<div class="card" data-holding-id="${h.id}" onclick="openAnalysis('${h.ticker}','${h.exchange}')">
+    return `<div class="card" data-holding-id="${h.id}" data-ticker="${safeAttr(h.ticker)}" data-exchange="${safeAttr(h.exchange)}">
       <div class="card-row">
         <div style="display:flex;align-items:center;gap:6px">
           <button class="drag-handle" onpointerdown="dragStart(event)" onclick="event.stopPropagation()" title="גרור לשינוי סדר">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
           </button>
-          <span class="ticker">${h.ticker}</span><span class="exchange-badge">${h.exchange}</span>
+          <span class="ticker">${escapeHtml(h.ticker)}</span><span class="exchange-badge">${escapeHtml(h.exchange)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="${cc}">${cs}</span>
-          <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="event.stopPropagation();editHolding(${h.id},'${h.ticker}',${h.quantity})">${t('edit_qty')}</button>
-          <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="event.stopPropagation();deleteHolding(${h.id},'${h.ticker}')">${t('remove')}</button>
+          <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="edit" data-id="${h.id}" data-qty="${h.quantity}" onclick="event.stopPropagation();editHolding(this.dataset.id,this.dataset.ticker||this.closest('.card').dataset.ticker,this.dataset.qty)">${t('edit_qty')}</button>
+          <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="delete" data-id="${h.id}" onclick="event.stopPropagation();deleteHolding(this.dataset.id,this.closest('.card').dataset.ticker)">${t('remove')}</button>
         </div>
       </div>
       <div class="card-sub">${price} · ${h.quantity} ${t('shares')}</div>
@@ -476,15 +481,14 @@ async function openAnalysis(ticker, exchange) {
   const sheet = document.getElementById('analysis-sheet')
   const content = document.getElementById('analysis-sheet-content')
   sheet.classList.add('open')
-  const data = await api('GET', '/api/portfolio')
-  const holding = data?.holdings?.find(h => h.ticker === ticker)
+  const holding = currentHoldings.find(h => h.ticker === ticker)
   if (!holding) { content.innerHTML = '<div class="sheet-handle"></div><div style="padding:24px;text-align:center">שגיאה</div>'; return }
   const a = holding.analysis_json
   if (!a) {
     content.innerHTML = `<div class="sheet-handle"></div>
       <div style="text-align:center;padding:24px">
         <div style="margin-bottom:12px;color:var(--text-muted)">${t('no_analysis')}</div>
-        <button class="btn btn-primary" onclick="runAnalysis('${ticker}','${exchange}')">${t('refresh_analysis')}</button>
+        <button class="btn btn-primary" data-ticker="${safeAttr(ticker)}" data-exchange="${safeAttr(exchange)}" onclick="runAnalysis(this.dataset.ticker,this.dataset.exchange)">${t('refresh_analysis')}</button>
       </div>
       <button class="sheet-close" style="position:absolute;top:12px;left:12px" onclick="closeSheet()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -494,7 +498,7 @@ async function openAnalysis(ticker, exchange) {
   const sd = a.stock_data || {}
   const cur = (sd.currency === 'ILS' || exchange === 'TASE') ? '₪' : '$'
   const pct = parseFloat(sd.change_pct || 0)
-  const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${e.ticker}</span> — ${e.impact}</div>`).join('')
+  const eco = (a.ecosystem||[]).map(e=>`<div class="eco-item"><span class="eco-ticker">${escapeHtml(e.ticker)}</span> — ${escapeHtml(e.impact)}</div>`).join('')
   const VERDICT_BADGE = { 'קנה':'verdict-buy','buy':'verdict-buy','מכור':'verdict-avoid','sell':'verdict-avoid','החזק':'verdict-hold','hold':'verdict-hold','עקוב':'verdict-watch','watch':'verdict-watch','הימנע':'verdict-avoid','avoid':'verdict-avoid' }
   const verdictBadge = a.verdict ? `<div class="verdict-badge ${VERDICT_BADGE[a.verdict]||'verdict-hold'}">${a.tags?.verdict || a.verdict}</div>` : ''
   const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
@@ -514,8 +518,8 @@ async function openAnalysis(ticker, exchange) {
       </button>
       <div class="sheet-header">
         <div>
-          <div class="sheet-ticker">${ticker}${isEtf ? ' <span class="tag tag-purple" style="font-size:11px;vertical-align:middle;margin-right:6px">ETF</span>' : ''}</div>
-          <div class="sheet-exchange">${sd.short_name||''} · ${exchange}</div>
+          <div class="sheet-ticker">${escapeHtml(ticker)}${isEtf ? ' <span class="tag tag-purple" style="font-size:11px;vertical-align:middle;margin-right:6px">ETF</span>' : ''}</div>
+          <div class="sheet-exchange">${escapeHtml(sd.short_name||'')} · ${escapeHtml(exchange)}</div>
         </div>
         <div>
           <div class="sheet-price-val">${sd.price?`${cur}${parseFloat(sd.price).toLocaleString()}`:'—'}</div>
@@ -524,10 +528,10 @@ async function openAnalysis(ticker, exchange) {
       </div>
     </div>
     ${verdictBadge}
-    ${a.summary ? `<div class="sheet-section"><div class="sheet-section-title">${t('ai_analysis')}</div><div class="analysis-section"><div class="analysis-section-body">${a.summary}</div></div></div>` : ''}
-    ${a.thesis ? `<div class="sheet-section"><div class="sheet-section-title">${t('thesis')}</div><div class="analysis-section"><div class="analysis-section-body">${a.thesis}</div></div></div>` : ''}
-    ${a.risks ? `<div class="sheet-section"><div class="sheet-section-title">${t('risks')}</div><div class="analysis-section" style="border-right:3px solid rgba(248,113,113,.4)"><div class="analysis-section-body">${a.risks}</div></div></div>` : ''}
-    ${a.catalyst ? `<div class="sheet-section"><div class="sheet-section-title">${t('catalyst')}</div><div class="analysis-section" style="border-right:3px solid rgba(100,255,218,.3)"><div class="analysis-section-body">${a.catalyst}</div></div></div>` : ''}
+    ${a.summary ? `<div class="sheet-section"><div class="sheet-section-title">${t('ai_analysis')}</div><div class="analysis-section"><div class="analysis-section-body">${escapeHtml(a.summary)}</div></div></div>` : ''}
+    ${a.thesis ? `<div class="sheet-section"><div class="sheet-section-title">${t('thesis')}</div><div class="analysis-section"><div class="analysis-section-body">${escapeHtml(a.thesis)}</div></div></div>` : ''}
+    ${a.risks ? `<div class="sheet-section"><div class="sheet-section-title">${t('risks')}</div><div class="analysis-section" style="border-right:3px solid rgba(248,113,113,.4)"><div class="analysis-section-body">${escapeHtml(a.risks)}</div></div></div>` : ''}
+    ${a.catalyst ? `<div class="sheet-section"><div class="sheet-section-title">${t('catalyst')}</div><div class="analysis-section" style="border-right:3px solid rgba(100,255,218,.3)"><div class="analysis-section-body">${escapeHtml(a.catalyst)}</div></div></div>` : ''}
     <div class="sheet-section">
       <div class="sheet-section-title">${t('financial_metrics')}</div>
       <div class="metrics-grid">
@@ -540,7 +544,7 @@ async function openAnalysis(ticker, exchange) {
       </div>
     </div>
     ${eco ? `<div class="sheet-section"><div class="sheet-section-title">${t('ecosystem')}</div>${eco}</div>` : ''}
-    <button class="btn btn-secondary btn-full mt-12" onclick="runAnalysis('${ticker}','${exchange}')">
+    <button class="btn btn-secondary btn-full mt-12" data-ticker="${safeAttr(ticker)}" data-exchange="${safeAttr(exchange)}" onclick="runAnalysis(this.dataset.ticker,this.dataset.exchange)">
       <span id="refresh-lbl">${t('refresh_analysis')}</span>
     </button>`
 }
@@ -621,7 +625,7 @@ function switchAddMode(mode) {
 
 function selectExchange(ex) { addExchange = ex }
 
-let _tickerSearchTimer = null
+let _tickerSearchTimer = null, _notifData = []
 async function searchTickers(q) {
   clearTimeout(_tickerSearchTimer)
   const dd = document.getElementById('ticker-dropdown')
@@ -631,10 +635,10 @@ async function searchTickers(q) {
     const results = res?.results || []
     if (!results.length) { dd.style.display = 'none'; return }
     dd.innerHTML = results.map(r =>
-      `<div class="ticker-item" onclick="selectTicker('${r.symbol}','${r.exchange}')">
-        <span class="ticker-sym">${r.symbol}</span>
-        <span class="ticker-name">${r.name}</span>
-        <span class="ticker-exch">${r.exchange}</span>
+      `<div class="ticker-item" data-symbol="${safeAttr(r.symbol)}" data-exchange="${safeAttr(r.exchange)}" onclick="selectTicker(this.dataset.symbol,this.dataset.exchange)">
+        <span class="ticker-sym">${escapeHtml(r.symbol)}</span>
+        <span class="ticker-name">${escapeHtml(r.name)}</span>
+        <span class="ticker-exch">${escapeHtml(r.exchange)}</span>
       </div>`
     ).join('')
     dd.style.display = 'block'
@@ -651,6 +655,10 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#add-manual-mode')) {
     const dd = document.getElementById('ticker-dropdown')
     if (dd) dd.style.display = 'none'
+  }
+  const card = e.target.closest('.card[data-ticker]')
+  if (card && !e.target.closest('button') && !e.target.closest('.drag-handle')) {
+    openAnalysis(card.dataset.ticker, card.dataset.exchange)
   }
 })
 
@@ -704,7 +712,7 @@ async function handleScreenshotUpload(input) {
   if (!data?.holdings) { preview.innerHTML = `<div class="error-msg">${data?.error||t('screenshot_error')}</div>`; return }
   pendingHoldings = data.holdings
   preview.innerHTML = `<div style="color:var(--accent);font-size:13px;margin-top:4px">${t('screenshot_found').replace('{count}', data.holdings.length)}</div>` +
-    data.holdings.map(h=>`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${h.ticker} (${h.exchange}) × ${h.quantity||'?'}</div>`).join('')
+    data.holdings.map(h=>`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escapeHtml(h.ticker)} (${escapeHtml(h.exchange)}) × ${escapeHtml(String(h.quantity||'?'))}</div>`).join('')
 }
 
 async function confirmAddHolding() {
@@ -778,11 +786,11 @@ async function loadNotifications() {
       </div>
     </div>`
   }).join('')
-  window._notifData = notifs
+  _notifData = notifs
 }
 
 function openNotifSheet(i) {
-  const n = window._notifData?.[i]
+  const n = _notifData?.[i]
   if (!n) return
   const imp = Math.min(3, Math.max(1, n.importance || 2))
   const impLabel = IMP_LABEL[lang][imp]
@@ -791,18 +799,19 @@ function openNotifSheet(i) {
     ? (typeof n.earnings_bullets === 'string' ? JSON.parse(n.earnings_bullets) : n.earnings_bullets)
     : null
   const time = new Date(n.sent_at).toLocaleString(lang === 'he' ? 'he-IL' : 'en-US', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+  const safeUrl = n.article_url && /^https?:\/\//i.test(n.article_url) ? n.article_url : null
   document.getElementById('notif-detail-content').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <span style="font-weight:700;font-size:16px">${n.ticker}</span>
-      <span class="imp-badge ${IMP_CLASS[imp]}" style="font-size:11px;padding:3px 7px">${impLabel}</span>
-      <span class="tag ${cc}">${n.category || ''}</span>
-      <span class="notif-time" style="margin-right:auto">${time}</span>
+      <span style="font-weight:700;font-size:16px">${escapeHtml(n.ticker)}</span>
+      <span class="imp-badge ${IMP_CLASS[imp]}" style="font-size:11px;padding:3px 7px">${escapeHtml(impLabel)}</span>
+      <span class="tag ${cc}">${escapeHtml(n.category || '')}</span>
+      <span class="notif-time" style="margin-right:auto">${escapeHtml(time)}</span>
     </div>
-    <div style="font-size:15px;font-weight:600;line-height:1.4;margin-bottom:12px;color:rgba(255,255,255,.95)">${n.headline || ''}</div>
-    ${n.summary ? `<div style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:12px">${n.summary}</div>` : ''}
-    ${bullets ? `<ul class="earnings-bullets" style="margin-bottom:12px">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
-    ${n.evasion_warning ? `<div class="evasion-warning">⚠ ${n.evasion_warning}</div>` : ''}
-    ${n.article_url ? `<a href="${n.article_url}" target="_blank" rel="noopener" style="display:block;margin-top:16px;font-size:13px;color:var(--accent);text-decoration:none">${lang === 'he' ? 'קרא את הכתבה המלאה ↗' : 'Read full article ↗'}</a>` : ''}`
+    <div style="font-size:15px;font-weight:600;line-height:1.4;margin-bottom:12px;color:rgba(255,255,255,.95)">${escapeHtml(n.headline || '')}</div>
+    ${n.summary ? `<div style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:12px">${escapeHtml(n.summary)}</div>` : ''}
+    ${bullets ? `<ul class="earnings-bullets" style="margin-bottom:12px">${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
+    ${n.evasion_warning ? `<div class="evasion-warning">⚠ ${escapeHtml(n.evasion_warning)}</div>` : ''}
+    ${safeUrl ? `<a href="${safeAttr(safeUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;margin-top:16px;font-size:13px;color:var(--accent);text-decoration:none">${lang === 'he' ? 'קרא את הכתבה המלאה ↗' : 'Read full article ↗'}</a>` : ''}`
   document.getElementById('notif-detail-sheet').classList.add('open')
 }
 

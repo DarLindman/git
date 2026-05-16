@@ -792,8 +792,10 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     const toTranslate = []
     for (const n of newsRows) {
       const cache = n.translations || {}
-      if (from_language && !cache[from_language]) {
-        cache[from_language] = { s: n.summary, h: n.headline }
+      // Detect poisoned cache: cached "translation" is identical to the current DB text
+      // — means a previous failed run saved the source text under the target language key.
+      if (cache[language] && typeof cache[language] === 'object' && cache[language].s === n.summary) {
+        delete cache[language]
       }
       if (cache[language]) {
         const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
@@ -842,6 +844,10 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       translateOps = toTranslate.map(({ n, cache }) => {
         const t = byId[n.id]
         if (!t?.s) { console.warn('no translation returned for news id=%d', n.id); return }
+        // Save source text for reverse-switch — only once we have a real translation
+        if (from_language && !cache[from_language]) {
+          cache[from_language] = { s: n.summary, h: n.headline }
+        }
         cache[language] = { s: t.s, h: t.h || null }
         return pool.query(
           'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',

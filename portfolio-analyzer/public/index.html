@@ -491,6 +491,7 @@ function renderHoldings(holdings) {
 }
 
 async function openAnalysis(ticker, exchange) {
+  _openSheetTicker = ticker; _openSheetExchange = exchange
   const sheet = document.getElementById('analysis-sheet')
   const content = document.getElementById('analysis-sheet-content')
   sheet.classList.add('open')
@@ -578,7 +579,7 @@ async function runAnalysis(ticker, exchange) {
   loadPortfolio()
 }
 
-function closeSheet() { document.getElementById('analysis-sheet').classList.remove('open') }
+function closeSheet() { document.getElementById('analysis-sheet').classList.remove('open'); _openSheetTicker = null; _openSheetExchange = null }
 
 let editHoldingId = null
 
@@ -642,6 +643,7 @@ function switchAddMode(mode) {
 function selectExchange(ex) { addExchange = ex }
 
 let _tickerSearchTimer = null, _notifData = [], _analyzingTickers = new Set()
+let _openSheetTicker = null, _openSheetExchange = null
 const VERDICT_TAG_COLOR = { 'קנה':'tag-green','buy':'tag-green','מכור':'tag-red','sell':'tag-red','החזק':'tag-yellow','hold':'tag-yellow','עקוב':'tag-teal','watch':'tag-teal','הימנע':'tag-red','avoid':'tag-red' }
 const CHAR_TAG_COLOR = { 'צמיחה':'tag-green','growth':'tag-green','מומנטום':'tag-green','momentum':'tag-green','ערך':'tag-teal','value':'tag-teal','מדד':'tag-teal','index':'tag-teal','אגח':'tag-teal','bonds':'tag-teal','דפנסיבי':'tag-purple','defensive':'tag-purple','תמטי':'tag-purple','thematic':'tag-purple','ספקולטיבי':'tag-orange','speculative':'tag-orange','ענף':'tag-orange','sector':'tag-orange','התאוששות':'tag-yellow','turnaround':'tag-yellow' }
 const ETF_CHARS = new Set(['index','sector','thematic','bonds','מדד','ענף','תמטי','אגח'])
@@ -946,8 +948,9 @@ async function setLanguage(l) {
     if (btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
     await api('POST', '/api/translate/batch', { language: l, from_language: prevLang })
     if (btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
-    loadPortfolio()
-    if (currentTab === 'notifications') loadNotifications()
+    await loadPortfolio()
+    loadNotifications()
+    if (_openSheetTicker) openAnalysis(_openSheetTicker, _openSheetExchange)
   }
 }
 

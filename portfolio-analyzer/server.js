@@ -86,11 +86,15 @@ const pool = new Pool({
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@example.com'
-webpush.setVapidDetails(
-  vapidEmail.startsWith('mailto:') || vapidEmail.startsWith('https://') ? vapidEmail : `mailto:${vapidEmail}`,
-  process.env.VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
-)
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    vapidEmail.startsWith('mailto:') || vapidEmail.startsWith('https://') ? vapidEmail : `mailto:${vapidEmail}`,
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+} else {
+  console.warn('VAPID keys not configured — push notifications disabled')
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
 

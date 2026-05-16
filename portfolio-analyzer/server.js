@@ -731,17 +731,6 @@ Text to translate:
 ${JSON.stringify({ summary: item.summary, thesis: item.thesis, risks: item.risks, catalyst: item.catalyst })}`
 }
 
-function newsTranslatePrompt(targetLang, items) {
-  const isHe = targetLang === 'Hebrew'
-  const terms = isHe ? 'Use modern Israeli Hebrew. ' : ''
-  return `Translate these news summaries to natural ${targetLang}. ${terms}Keep company names, ticker symbols, and numbers unchanged.
-
-Return ONLY a JSON array in EXACTLY this format (keep the same ids):
-[{"id":${items[0]?.id},"summary":"translated text"},{"id":${items[1]?.id || items[0]?.id},"summary":"..."}]
-
-Input array:
-${JSON.stringify(items)}`
-}
 
 app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
   const { language = 'he', from_language } = req.body
@@ -795,42 +784,36 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     })
 
     // ── News ─────────────────────────────────────────────────────────────
-    // Split into: serve from cache vs needs Claude
-    const newsNeedClaude = [], newsFromCache = []
-    for (const n of newsRows) {
+    // Each news item translated independently — avoids JSON array format issues entirely.
+    // Returns plain text (not JSON) so there's nothing to parse.
+    const newsOps = newsRows.map(async n => {
       const cache = n.translations || {}
+      if (from_language && n.summary && !cache[from_language]) cache[from_language] = n.summary
+
+      // Serve from cache if already translated to this language
       if (cache[language]) {
-        newsFromCache.push({ id: n.id, summary: cache[language], cache })
-      } else {
-        // Save current summary to cache before translating
-        if (from_language && n.summary) cache[from_language] = n.summary
-        newsNeedClaude.push({ id: n.id, summary: n.summary, cache })
-      }
-    }
-
-    const newsCacheOps = newsFromCache.map(({ id, summary, cache }) =>
-      pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-        [summary, JSON.stringify(cache), id, req.user.id])
-    )
-
-    const newsTranslateOp = newsNeedClaude.length ? (async () => {
-      const msg = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: Math.min(newsNeedClaude.length * 300 + 200, 4000), system,
-        messages: [{ role: 'user', content: newsTranslatePrompt(targetLang, newsNeedClaude.map(n => ({ id: n.id, summary: n.summary }))) }]
-      }).catch(() => null)
-      const translated = msg ? (extractJson(msg.content[0].text) || []) : []
-      const byId = new Map(newsNeedClaude.map(n => [n.id, n]))
-      return Promise.all((Array.isArray(translated) ? translated : []).map(tn => {
-        if (!tn?.summary || !tn?.id) return Promise.resolve()
-        const orig = byId.get(tn.id) || byId.get(String(tn.id)) || byId.get(Number(tn.id))
-        if (!orig) return Promise.resolve()
-        orig.cache[language] = tn.summary
         return pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-          [tn.summary, JSON.stringify(orig.cache), tn.id, req.user.id])
-      }))
-    })() : Promise.resolve()
+          [cache[language], JSON.stringify(cache), n.id, req.user.id])
+      }
 
-    await Promise.all([...holdingOps, ...newsCacheOps, newsTranslateOp])
+      // Call Claude — returns plain translated text, no JSON, no format ambiguity
+      const isHe = language === 'he'
+      const msg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+        system: [{ type: 'text', text: `Translate to ${targetLang}. Return ONLY the translated text. No quotes, no JSON, no explanations.`, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: `${isHe ? 'Use natural Israeli Hebrew. Keep company names and ticker symbols unchanged.' : 'Keep company names and ticker symbols unchanged.'}\n\n${n.summary}` }]
+      }).catch(() => null)
+
+      if (!msg) return
+      const translated = msg.content[0].text.trim().replace(/^["'`]|["'`]$/g, '')
+      if (!translated || translated.length < 5) return
+
+      cache[language] = translated
+      return pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
+        [translated, JSON.stringify(cache), n.id, req.user.id])
+    })
+
+    await Promise.all([...holdingOps, ...newsOps])
     res.json({ ok: true })
   } catch (err) {
     console.error('translate/batch error:', err.message)

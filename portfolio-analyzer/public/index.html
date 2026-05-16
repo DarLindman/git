@@ -936,6 +936,7 @@ function renderSettings() {
 
 async function setLanguage(l) {
   if (l === lang) return
+  const prevLang = lang
   applyLang(l); profile.language = l
   await api('PUT', '/api/profile', { language: l })
   renderSettings()
@@ -943,7 +944,7 @@ async function setLanguage(l) {
   if (hasAnalyzed) {
     const btn = document.getElementById('refresh-all-btn')
     if (btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
-    await api('POST', '/api/translate/batch', { language: l })
+    await api('POST', '/api/translate/batch', { language: l, from_language: prevLang })
     if (btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
     loadPortfolio()
     if (currentTab === 'notifications') loadNotifications()

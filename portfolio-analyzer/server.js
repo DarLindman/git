@@ -744,71 +744,94 @@ ${JSON.stringify(items)}`
 }
 
 app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
-  const { language = 'he' } = req.body
+  const { language = 'he', from_language } = req.body
   try {
     const portfolioId = await getUserPortfolioId(req.user.id)
     if (!portfolioId) return res.json({ ok: true })
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, summary FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+      pool.query('SELECT id, summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
     ])
-
-    const hInput = holdings.filter(h => h.analysis_json?.summary).map(h => ({
-      id: h.id, summary: h.analysis_json.summary, thesis: h.analysis_json.thesis,
-      risks: h.analysis_json.risks, catalyst: h.analysis_json.catalyst
-    }))
-    const nInput = newsRows.map(n => ({ id: n.id, summary: n.summary }))
-
-    if (!hInput.length && !nInput.length) return res.json({ ok: true })
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
+    const tagMap = TAG_MAP[language === 'he' ? 'en_to_he' : 'he_to_en']
     const system = makeTranslateSystem(targetLang)
 
-    // Each holding gets its own small parallel call — much faster than one big call
-    // News gets its own dedicated call in parallel
-    const allCalls = [
-      ...hInput.map(item => anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 800, system,
-        messages: [{ role: 'user', content: holdingTranslatePrompt(targetLang, item) }]
-      }).then(msg => ({ type: 'holding', id: item.id, result: extractJson(msg.content[0].text) })).catch(() => null)),
-      nInput.length ? anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: Math.min(nInput.length * 300 + 200, 4000), system,
-        messages: [{ role: 'user', content: newsTranslatePrompt(targetLang, nInput) }]
-      }).then(msg => ({ type: 'news', result: extractJson(msg.content[0].text) })).catch(() => null) : null
-    ].filter(Boolean)
+    // ── Holdings ──────────────────────────────────────────────────────────
+    const holdingOps = holdings.filter(h => h.analysis_json?.summary).map(async h => {
+      const a = h.analysis_json
+      const cache = a._translations || {}
 
-    const settled = await Promise.all(allCalls)
+      // Persist current display text into cache before overwriting
+      if (from_language && !cache[from_language]) {
+        cache[from_language] = { summary: a.summary, thesis: a.thesis, risks: a.risks, catalyst: a.catalyst, tags: a.tags }
+      }
 
-    const tagMap = TAG_MAP[language === 'he' ? 'en_to_he' : 'he_to_en']
-    const holdingMap = new Map(holdings.map(h => [h.id, h]))
+      // Return from cache if already translated
+      let result = cache[language] || null
 
-    const hResults = settled.filter(r => r?.type === 'holding')
-    const nSettled = settled.find(r => r?.type === 'news')
-    const nResult = Array.isArray(nSettled?.result) ? nSettled.result : []
+      if (!result) {
+        // Call Claude only when cache misses
+        const msg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 800, system,
+          messages: [{ role: 'user', content: holdingTranslatePrompt(targetLang, { summary: a.summary, thesis: a.thesis, risks: a.risks, catalyst: a.catalyst }) }]
+        }).catch(() => null)
+        result = msg ? extractJson(msg.content[0].text) : null
+        if (result) cache[language] = result
+      }
 
-    await Promise.all([
-      ...hResults.map(({ id, result }) => {
-        if (!result) return Promise.resolve()
-        const orig = holdingMap.get(id)
-        if (!orig) return Promise.resolve()
-        const a = orig.analysis_json
-        const tags = a.tags ? {
-          verdict:   tagMap.verdict[a.tags.verdict]   || a.tags.verdict,
-          character: tagMap.character[a.tags.character] || a.tags.character
-        } : a.tags
-        return pool.query(
-          'UPDATE holdings SET analysis_json = $1 WHERE id = $2 AND portfolio_id = $3',
-          [JSON.stringify({ ...a, summary: result.summary || a.summary, thesis: result.thesis || a.thesis, risks: result.risks || a.risks, catalyst: result.catalyst || a.catalyst, tags }), id, portfolioId]
-        )
-      }),
-      ...nResult.map(tn => tn?.summary && tn?.id
-        ? pool.query('UPDATE news_notifications SET summary = $1 WHERE id = $2 AND user_id = $3', [tn.summary, tn.id, req.user.id])
-        : Promise.resolve()
+      if (!result) return
+
+      const tags = a.tags ? {
+        verdict:   tagMap.verdict[a.tags.verdict]   || a.tags.verdict,
+        character: tagMap.character[a.tags.character] || a.tags.character
+      } : a.tags
+
+      await pool.query(
+        'UPDATE holdings SET analysis_json = $1 WHERE id = $2 AND portfolio_id = $3',
+        [JSON.stringify({ ...a, summary: result.summary || a.summary, thesis: result.thesis || a.thesis, risks: result.risks || a.risks, catalyst: result.catalyst || a.catalyst, tags, _translations: cache }), h.id, portfolioId]
       )
-    ])
+    })
 
-    res.json({ ok: true, translated_holdings: hResults.filter(r => r?.result).length, translated_news: nResult.length })
+    // ── News ─────────────────────────────────────────────────────────────
+    // Split into: serve from cache vs needs Claude
+    const newsNeedClaude = [], newsFromCache = []
+    for (const n of newsRows) {
+      const cache = n.translations || {}
+      if (cache[language]) {
+        newsFromCache.push({ id: n.id, summary: cache[language], cache })
+      } else {
+        // Save current summary to cache before translating
+        if (from_language && n.summary) cache[from_language] = n.summary
+        newsNeedClaude.push({ id: n.id, summary: n.summary, cache })
+      }
+    }
+
+    const newsCacheOps = newsFromCache.map(({ id, summary, cache }) =>
+      pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
+        [summary, JSON.stringify(cache), id, req.user.id])
+    )
+
+    const newsTranslateOp = newsNeedClaude.length ? (async () => {
+      const msg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: Math.min(newsNeedClaude.length * 300 + 200, 4000), system,
+        messages: [{ role: 'user', content: newsTranslatePrompt(targetLang, newsNeedClaude.map(n => ({ id: n.id, summary: n.summary }))) }]
+      }).catch(() => null)
+      const translated = msg ? (extractJson(msg.content[0].text) || []) : []
+      const byId = new Map(newsNeedClaude.map(n => [n.id, n]))
+      return Promise.all((Array.isArray(translated) ? translated : []).map(tn => {
+        if (!tn?.summary || !tn?.id) return Promise.resolve()
+        const orig = byId.get(tn.id) || byId.get(String(tn.id)) || byId.get(Number(tn.id))
+        if (!orig) return Promise.resolve()
+        orig.cache[language] = tn.summary
+        return pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
+          [tn.summary, JSON.stringify(orig.cache), tn.id, req.user.id])
+      }))
+    })() : Promise.resolve()
+
+    await Promise.all([...holdingOps, ...newsCacheOps, newsTranslateOp])
+    res.json({ ok: true })
   } catch (err) {
     console.error('translate/batch error:', err.message)
     res.status(500).json({ error: 'Translation failed' })
@@ -1253,6 +1276,7 @@ async function initDB() {
   await pool.query(`
     ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS importance INTEGER DEFAULT 2;
     ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT true;
+    ALTER TABLE news_notifications ADD COLUMN IF NOT EXISTS translations JSONB DEFAULT '{}';
   `)
   // Remove duplicate (user_id, article_url) rows before creating unique index
   await pool.query(`

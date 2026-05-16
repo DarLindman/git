@@ -1027,20 +1027,27 @@ async function sendPushToUser(userId, payload) {
 async function batchFilterNewsAllTickers(tickers, articles, alertLevel, language = 'he') {
   if (!articles.length) return []
   const isEn = language === 'en'
-  const articleList = articles.map((a, i) =>
-    `[${i}] ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
-  ).join('\n')
   const categories = isEn
     ? 'earnings|management|lawsuit|analyst|supply_chain|general'
     : 'רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי'
-  try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
-      system: [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
-      messages: [{
-        role: 'user',
-        content: `Portfolio tickers: ${tickers.join(', ')}
+  const CHUNK = 25
+  const sys = [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }]
+
+  const chunks = []
+  for (let i = 0; i < articles.length; i += CHUNK) chunks.push({ start: i, items: articles.slice(i, i + CHUNK) })
+
+  const chunkResults = await Promise.all(chunks.map(async ({ start, items }) => {
+    const articleList = items.map((a, i) =>
+      `[${start + i}] ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
+    ).join('\n')
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system: sys,
+        messages: [{
+          role: 'user',
+          content: `Portfolio tickers: ${tickers.join(', ')}
 Alert level: ${alertLevel} (1=earnings/M&A/CEO only, 2=+analyst/lawsuits/guidance, 3=all mentions)
 Write summaries in: ${isEn ? 'English' : 'Hebrew'}
 
@@ -1051,14 +1058,18 @@ For each article relevant to any portfolio ticker return an entry. Ignore unrela
 Return JSON array: [{"index":0,"ticker":"AAPL","notify":true,"category":"${categories}","importance":2,"summary":"${isEn ? 'Two concise sentences.' : 'שני משפטים תמציתיים.'}","is_earnings":false}]
 importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)
 If none qualify, return [].`
-      }]
-    })
-    const result = extractJson(message.content[0].text)
-    return Array.isArray(result) ? result : []
-  } catch (err) {
-    console.error('batchFilterNewsAllTickers error:', err.message)
-    return []
-  }
+        }]
+      })
+      const result = extractJson(message.content[0].text)
+      if (message.stop_reason === 'max_tokens') console.warn('batchFilterNews: chunk hit max_tokens, some articles may be missed')
+      return Array.isArray(result) ? result : []
+    } catch (err) {
+      console.error('batchFilterNewsAllTickers chunk error:', err.message)
+      return []
+    }
+  }))
+
+  return chunkResults.flat()
 }
 
 async function summarizeEarningsCall(articleText, language = 'he') {
@@ -1183,6 +1194,7 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     if (!relevant.length) return
 
     const results = await batchFilterNewsAllTickers(tickers, relevant, alertLevel, language)
+    console.log(`pollNewsForUser user=${userId}: ${results.length} classified by Claude (notify=${results.filter(r=>r.notify).length})`)
     const resultsByIndex = new Map(results.map(r => [r.index, r]))
 
     // Resolve earnings summaries in parallel, then build insert rows

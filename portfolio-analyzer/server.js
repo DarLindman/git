@@ -261,8 +261,8 @@ app.post('/api/portfolio/holdings', auth, async (req, res) => {
         .then(({ rows: p }) => {
           const alertLevel = parseInt(p[0]?.al) || 2
           const language = p[0]?.lang || 'he'
-          console.log(`bg news poll: starting pollNewsForUser user=${req.user.id} alertLevel=${alertLevel} lang=${language}`)
-          return pollNewsForUser(req.user.id, alertLevel, language)
+          console.log(`bg news poll: starting pollNewsForUser user=${req.user.id} alertLevel=${alertLevel} lang=${language} tickers=${addedTickers.join(',')}`)
+          return pollNewsForUser(req.user.id, alertLevel, language, addedTickers)
         })
         .then(() => console.log(`bg news poll: done for user=${req.user.id}`))
         .catch(e => console.error('bg news poll error:', e.message))
@@ -1145,7 +1145,8 @@ async function fetchYFNewsArticles(holdings) {
   return articles
 }
 
-async function pollNewsForUser(userId, alertLevel, language = 'he') {
+// onlyTickers: when set, only fetch RSS for those specific tickers (e.g. newly added ones)
+async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers = null) {
   const portfolioId = await getUserPortfolioId(userId)
   if (!portfolioId) return
 
@@ -1155,11 +1156,16 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
   if (!holdings.length) return
   const tickers = holdings.map(h => h.ticker)
 
+  // Limit RSS fetching to specific tickers when triggered by a new-ticker add
+  const holdingsToFetch = onlyTickers
+    ? holdings.filter(h => onlyTickers.includes(h.ticker))
+    : holdings
+
   try {
     // Fetch NewsAPI + Yahoo Finance RSS in parallel
     const [newsApiArticles, yfArticles] = await Promise.all([
       fetchNewsAPIArticles(tickers),
-      fetchYFNewsArticles(holdings)
+      fetchYFNewsArticles(holdingsToFetch)
     ])
     console.log(`pollNewsForUser user=${userId}: newsApi=${newsApiArticles.length} yf=${yfArticles.length}`)
 

@@ -169,6 +169,9 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
 .mt-12 { margin-top: 12px; }
 .mt-20 { margin-top: 20px; }
 .flex-gap { display: flex; gap: 6px; }
+.lang-select { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 14px; font-family: var(--font); padding: 6px 10px; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: left 10px center; padding-left: 28px; }
+.lang-select:focus { border-color: var(--accent); }
+.lang-select option { background: #152533; color: var(--text); }
 </style>
 </head>
 <body>
@@ -881,9 +884,12 @@ function renderSettings() {
   document.getElementById('settings-content').innerHTML = `
     <div class="settings-section">
       <div class="settings-label">${t('settings_language')}</div>
-      <div class="flex-gap">
-        <div class="seg-btn ${lang==='he'?'active':''}" onclick="setLanguage('he')">עברית</div>
-        <div class="seg-btn ${lang==='en'?'active':''}" onclick="setLanguage('en')">English</div>
+      <div class="settings-row" style="cursor:default">
+        <span style="font-size:14px">${lang === 'he' ? '🇮🇱 עברית' : '🇺🇸 English'}</span>
+        <select class="lang-select" onchange="setLanguage(this.value)">
+          <option value="he" ${lang==='he'?'selected':''}>🇮🇱 עברית</option>
+          <option value="en" ${lang==='en'?'selected':''}>🇺🇸 English</option>
+        </select>
       </div>
     </div>
 

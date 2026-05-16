@@ -1121,6 +1121,7 @@ async function fetchYFNewsArticles(holdings) {
           title: $el.find('title').text().trim(),
           description: $el.find('description').text().replace(/<[^>]*>/g, '').trim(),
           url,
+          ticker: h.ticker,
           source: { name: 'Yahoo Finance' }
         })
       })
@@ -1168,6 +1169,9 @@ async function pollNewsForUser(userId, alertLevel, language = 'he') {
     // Pre-filter: ticker must appear somewhere in title or description
     const tickersUpper = tickers.map(t => t.toUpperCase())
     const relevant = fresh.filter(a => {
+      // YF RSS articles are fetched per-ticker — always relevant even if company
+      // name appears instead of ticker symbol (e.g. "AeroVironment" not "AVAV")
+      if (a.ticker && tickersUpper.includes(a.ticker.toUpperCase())) return true
       const text = ((a.title || '') + ' ' + (a.description || '')).toUpperCase()
       return tickersUpper.some(t => text.includes(t))
     })

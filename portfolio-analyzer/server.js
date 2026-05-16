@@ -740,7 +740,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+      pool.query('SELECT id, headline, summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
     ])
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
@@ -784,33 +784,48 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     })
 
     // ── News ─────────────────────────────────────────────────────────────
-    // Each news item translated independently — avoids JSON array format issues entirely.
-    // Returns plain text (not JSON) so there's nothing to parse.
+    // Translate both headline + summary per item. Cache format: { lang: { s, h } }
+    // Backward compat: old cache entries stored as plain strings (summary only).
     const newsOps = newsRows.map(async n => {
       const cache = n.translations || {}
-      if (from_language && n.summary && !cache[from_language]) cache[from_language] = n.summary
 
-      // Serve from cache if already translated to this language
-      if (cache[language]) {
-        return pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-          [cache[language], JSON.stringify(cache), n.id, req.user.id])
+      // Save current display texts to cache before overwriting
+      if (from_language && !cache[from_language]) {
+        cache[from_language] = { s: n.summary, h: n.headline }
       }
 
-      // Call Claude — returns plain translated text, no JSON, no format ambiguity
+      // Serve from cache — handle both new { s, h } and old plain-string formats
+      if (cache[language]) {
+        const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
+        return pool.query(
+          'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+          [c.s, c.h, JSON.stringify(cache), n.id, req.user.id]
+        )
+      }
+
+      // Call Claude — translate headline + summary together as a tiny JSON object
       const isHe = language === 'he'
+      const hintHe = isHe ? 'Use natural Israeli Hebrew. ' : ''
       const msg = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
-        system: [{ type: 'text', text: `Translate to ${targetLang}. Return ONLY the translated text. No quotes, no JSON, no explanations.`, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: `${isHe ? 'Use natural Israeli Hebrew. Keep company names and ticker symbols unchanged.' : 'Keep company names and ticker symbols unchanged.'}\n\n${n.summary}` }]
+        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+        system: [{ type: 'text', text: `Translate financial news to ${targetLang}. Return valid JSON only.`, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: `${hintHe}Keep company names, ticker symbols, and numbers unchanged. Translate naturally.
+
+Return ONLY: {"h":"translated headline","s":"translated summary"}
+
+headline: ${n.headline}
+summary: ${n.summary}` }]
       }).catch(() => null)
 
       if (!msg) return
-      const translated = msg.content[0].text.trim().replace(/^["'`]|["'`]$/g, '')
-      if (!translated || translated.length < 5) return
+      const result = extractJson(msg.content[0].text)
+      if (!result?.s) return
 
-      cache[language] = translated
-      return pool.query('UPDATE news_notifications SET summary = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-        [translated, JSON.stringify(cache), n.id, req.user.id])
+      cache[language] = { s: result.s, h: result.h || null }
+      return pool.query(
+        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+        [result.s, result.h, JSON.stringify(cache), n.id, req.user.id]
+      )
     })
 
     await Promise.all([...holdingOps, ...newsOps])

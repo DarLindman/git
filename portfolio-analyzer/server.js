@@ -784,17 +784,19 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     })
 
     // ── News ─────────────────────────────────────────────────────────────
-    // Translate both headline + summary per item. Cache format: { lang: { s, h } }
-    // Backward compat: old cache entries stored as plain strings (summary only).
+    // Two plain-text calls per item (headline + summary) in parallel — no JSON parsing.
+    const plainSys = [{ type: 'text', text: `Translate to ${targetLang}. Return ONLY the translated text, nothing else.`, cache_control: { type: 'ephemeral' } }]
+    const hint = language === 'he' ? 'Use natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.\n\n' : 'Keep company names, ticker symbols, and numbers unchanged.\n\n'
+
     const newsOps = newsRows.map(async n => {
       const cache = n.translations || {}
 
-      // Save current display texts to cache before overwriting
+      // Save current texts before overwriting so we can restore on reverse switch
       if (from_language && !cache[from_language]) {
         cache[from_language] = { s: n.summary, h: n.headline }
       }
 
-      // Serve from cache — handle both new { s, h } and old plain-string formats
+      // Serve from cache
       if (cache[language]) {
         const c = typeof cache[language] === 'object' ? cache[language] : { s: cache[language], h: null }
         return pool.query(
@@ -803,28 +805,26 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
         )
       }
 
-      // Call Claude — translate headline + summary together as a tiny JSON object
-      const isHe = language === 'he'
-      const hintHe = isHe ? 'Use natural Israeli Hebrew. ' : ''
-      const msg = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
-        system: [{ type: 'text', text: `Translate financial news to ${targetLang}. Return valid JSON only.`, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: `${hintHe}Keep company names, ticker symbols, and numbers unchanged. Translate naturally.
+      // Two parallel plain-text calls — headline and summary independently
+      const [hMsg, sMsg] = await Promise.all([
+        anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 200, system: plainSys,
+          messages: [{ role: 'user', content: hint + n.headline }]
+        }).catch(() => null),
+        anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 350, system: plainSys,
+          messages: [{ role: 'user', content: hint + n.summary }]
+        }).catch(() => null)
+      ])
 
-Return ONLY: {"h":"translated headline","s":"translated summary"}
+      const h = hMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
+      const s = sMsg?.content[0].text.trim().replace(/^["'`]|["'`]$/g, '') || null
+      if (!s) return
 
-headline: ${n.headline}
-summary: ${n.summary}` }]
-      }).catch(() => null)
-
-      if (!msg) return
-      const result = extractJson(msg.content[0].text)
-      if (!result?.s) return
-
-      cache[language] = { s: result.s, h: result.h || null }
+      cache[language] = { s, h }
       return pool.query(
         'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-        [result.s, result.h, JSON.stringify(cache), n.id, req.user.id]
+        [s, h, JSON.stringify(cache), n.id, req.user.id]
       )
     })
 

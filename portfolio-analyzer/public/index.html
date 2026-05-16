@@ -935,9 +935,18 @@ function renderSettings() {
 }
 
 async function setLanguage(l) {
+  if (l === lang) return
   applyLang(l); profile.language = l
   await api('PUT', '/api/profile', { language: l })
   renderSettings()
+  const hasAnalyzed = currentHoldings.some(h => h.analyzed_at)
+  if (hasAnalyzed) {
+    const btn = document.getElementById('refresh-all-btn')
+    if (btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
+    const result = await api('POST', '/api/analyze/batch', { language: l })
+    if (btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
+    if (result?.ok) loadPortfolio()
+  }
 }
 
 async function setAlertLevel(level) {

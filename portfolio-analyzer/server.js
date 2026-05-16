@@ -841,7 +841,10 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     const translateOps = toTranslate.map(({ n, cache }) => {
       const t = byId[n.id]
       if (!t?.h) return
-      if (from_language && !cache[from_language]) cache[from_language] = { h: n.headline }
+      // Only save the translated result — never save n.headline as a "source backup"
+      // because n.headline might already be in the wrong language from a previous run.
+      // Cache accumulates one entry per language; both directions get populated after
+      // the first round-trip (en→he saves cache['he'], he→en saves cache['en']).
       cache[language] = { h: t.h }
       return pool.query(
         'UPDATE news_notifications SET headline = $1, translations = $2 WHERE id = $3 AND user_id = $4',
@@ -1368,6 +1371,7 @@ async function initDB() {
   for (const [id, sql] of [
     ['clear_news_translations_v1', `UPDATE news_notifications SET translations = '{}'`],
     ['clear_news_translations_v2', `UPDATE news_notifications SET translations = '{}'`],
+    ['clear_news_translations_v3', `UPDATE news_notifications SET translations = '{}'`],
   ]) {
     const { rows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = $1`, [id])
     if (!rows.length) {

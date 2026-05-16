@@ -943,9 +943,10 @@ async function setLanguage(l) {
   if (hasAnalyzed) {
     const btn = document.getElementById('refresh-all-btn')
     if (btn) { btn.innerHTML = `<span class="spinner"></span> ${t('refreshing_all')}`; btn.disabled = true }
-    const result = await api('POST', '/api/analyze/batch', { language: l })
+    await api('POST', '/api/translate/batch', { language: l })
     if (btn) { btn.textContent = t('refresh_all'); btn.disabled = false }
-    if (result?.ok) loadPortfolio()
+    loadPortfolio()
+    if (currentTab === 'notifications') loadNotifications()
   }
 }
 

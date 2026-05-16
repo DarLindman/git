@@ -703,6 +703,80 @@ Respond ONLY with the JSON array, nothing else.` }
   }
 })
 
+const TAG_MAP = {
+  en_to_he: {
+    verdict:   { buy:'קנה', sell:'מכור', hold:'החזק', watch:'עקוב', avoid:'הימנע' },
+    character: { growth:'צמיחה', value:'ערך', momentum:'מומנטום', defensive:'דפנסיבי', speculative:'ספקולטיבי', turnaround:'התאוששות', index:'מדד', sector:'ענף', thematic:'תמטי', bonds:'אגח' }
+  },
+  he_to_en: {
+    verdict:   { 'קנה':'buy','מכור':'sell','החזק':'hold','עקוב':'watch','הימנע':'avoid' },
+    character: { 'צמיחה':'growth','ערך':'value','מומנטום':'momentum','דפנסיבי':'defensive','ספקולטיבי':'speculative','התאוששות':'turnaround','מדד':'index','ענף':'sector','תמטי':'thematic','אגח':'bonds' }
+  }
+}
+
+app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
+  const { language = 'he' } = req.body
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    if (!portfolioId) return res.json({ ok: true })
+
+    const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
+      pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
+      pool.query('SELECT id, summary FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+    ])
+
+    const hInput = holdings.filter(h => h.analysis_json?.summary).map(h => ({
+      id: h.id, summary: h.analysis_json.summary, thesis: h.analysis_json.thesis,
+      risks: h.analysis_json.risks, catalyst: h.analysis_json.catalyst
+    }))
+    const nInput = newsRows.map(n => ({ id: n.id, summary: n.summary }))
+
+    if (!hInput.length && !nInput.length) return res.json({ ok: true })
+
+    const targetLang = language === 'he' ? 'Hebrew' : 'English'
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: Math.min(hInput.length * 600 + nInput.length * 150 + 300, 8000),
+      system: [{ type: 'text', text: 'You are a financial translator. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: `Translate these financial analysis texts to ${targetLang}. Preserve all numbers, ticker symbols, percentages, and financial data exactly. Same analytical tone.
+
+Return ONLY: {"holdings":[{"id":<id>,"summary":"...","thesis":"...","risks":"...","catalyst":"..."}],"news":[{"id":<id>,"summary":"..."}]}
+
+Input: ${JSON.stringify({ holdings: hInput, news: nInput })}` }]
+    })
+
+    const result = extractJson(message.content[0].text)
+    if (!result) return res.status(502).json({ error: 'Translation failed' })
+
+    const tagMap = TAG_MAP[language === 'he' ? 'en_to_he' : 'he_to_en']
+    const holdingMap = new Map(holdings.map(h => [h.id, h]))
+
+    await Promise.all([
+      ...(result.holdings || []).map(th => {
+        const orig = holdingMap.get(th.id)
+        if (!orig) return Promise.resolve()
+        const a = orig.analysis_json
+        const tags = a.tags ? {
+          verdict:   tagMap.verdict[a.tags.verdict]   || a.tags.verdict,
+          character: tagMap.character[a.tags.character] || a.tags.character
+        } : a.tags
+        return pool.query(
+          'UPDATE holdings SET analysis_json = $1 WHERE id = $2 AND portfolio_id = $3',
+          [JSON.stringify({ ...a, summary: th.summary, thesis: th.thesis, risks: th.risks, catalyst: th.catalyst, tags }), th.id, portfolioId]
+        )
+      }),
+      ...(result.news || []).map(tn =>
+        pool.query('UPDATE news_notifications SET summary = $1 WHERE id = $2 AND user_id = $3', [tn.summary, tn.id, req.user.id])
+      )
+    ])
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('translate/batch error:', err.message)
+    res.status(500).json({ error: 'Translation failed' })
+  }
+})
+
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')

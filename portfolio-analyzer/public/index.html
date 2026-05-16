@@ -895,9 +895,12 @@ function renderSettings() {
 
     <div class="settings-section">
       <div class="settings-label">${isHe ? 'מקורות נתונים' : 'Data Sources'}</div>
-      <div style="font-size:13px;color:var(--text-muted);line-height:1.7">
-        <div>Yahoo Finance &mdash; ${isHe ? 'מחיר, שינוי, 52W' : 'price, change, 52W'} ✓</div>
-        <div>Finnhub &mdash; P/E, EPS, ${isHe ? 'שווי שוק, סקטור' : 'market cap, sector'} ${_serverStatus.finnhub ? '✓' : '✗'}</div>
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.8">
+        <div>Yahoo Finance &mdash; ${isHe ? 'מחיר, שינוי, 52W, P/E, EPS, שווי שוק, סקטור' : 'price, change, 52W, P/E, EPS, market cap, sector'} ✓</div>
+        <div>Yahoo Finance RSS &mdash; ${isHe ? 'חדשות בזמן אמת לכל מניה' : 'real-time news per ticker'} ✓</div>
+        <div>Finnhub &mdash; ${isHe ? 'P/E, EPS, שווי שוק (ADR-corrected)' : 'P/E, EPS, market cap (ADR-corrected)'} ${_serverStatus.finnhub ? '✓' : '✗'}</div>
+        <div>NewsAPI &mdash; ${isHe ? 'חדשות נוספות' : 'supplemental news'} ${_serverStatus.news ? '✓' : '✗'}</div>
+        <div>Claude AI &mdash; ${isHe ? 'ניתוח, סיכום חדשות, תרגום' : 'analysis, news summaries, translation'} ✓</div>
       </div>
       ${!_serverStatus.finnhub ? `<div class="info-box" style="margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.7">
         ${isHe
@@ -908,15 +911,14 @@ function renderSettings() {
 
     <div class="settings-section">
       <div class="settings-label">${t('settings_alert_level')}</div>
-      <div class="alert-level-cards">
-        ${alertLevels.map(a => `
-        <div class="alert-card ${profile.alert_level===a.level?'active':''}" onclick="setAlertLevel(${a.level})">
-          <div class="alert-card-header">
-            <span class="alert-card-title">${a.label}</span>
-            ${profile.alert_level===a.level ? `<span class="alert-card-badge">${isHe?'פעיל':'Active'}</span>` : ''}
-          </div>
-          <div class="alert-card-desc">${a.desc}</div>
-        </div>`).join('')}
+      <div class="settings-row" style="cursor:default">
+        <div>
+          <div style="font-size:14px">${alertLevels.find(a=>a.level===profile.alert_level)?.label || ''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;max-width:220px;line-height:1.4">${alertLevels.find(a=>a.level===profile.alert_level)?.desc || ''}</div>
+        </div>
+        <select class="lang-select" onchange="setAlertLevel(Number(this.value))">
+          ${alertLevels.map(a => `<option value="${a.level}" ${profile.alert_level===a.level?'selected':''}>${a.label}</option>`).join('')}
+        </select>
       </div>
     </div>
 

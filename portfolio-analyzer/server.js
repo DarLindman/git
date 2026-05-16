@@ -740,7 +740,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, headline, summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+      pool.query('SELECT id, headline, LEFT(summary, 350) AS summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 20', [req.user.id])
     ])
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
@@ -911,7 +911,7 @@ app.get('/api/notifications', auth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM news_notifications WHERE user_id = $1 AND notified = true ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
+      `SELECT id, user_id, ticker, headline, LEFT(summary, 350) AS summary, category, importance, article_url, earnings_bullets, evasion_warning, sent_at, notified FROM news_notifications WHERE user_id = $1 AND notified = true ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     )
     res.json({ notifications: rows })

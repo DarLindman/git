@@ -557,7 +557,7 @@ async function openAnalysis(ticker, exchange) {
       <div class="metrics-grid">
         ${!isEtf && sd.pe_ratio != null ? `<div class="metric-box"><div class="metric-val">${parseFloat(sd.pe_ratio).toFixed(1)}</div><div class="metric-key">P/E</div></div>` : ''}
         ${!isEtf && sd.eps != null ? `<div class="metric-box"><div class="metric-val">${cur}${parseFloat(sd.eps).toFixed(2)}</div><div class="metric-key">EPS</div></div>` : ''}
-        ${sd.market_cap != null ? `<div class="metric-box"><div class="metric-val">${(sd.market_cap/1e9).toFixed(0)}B</div><div class="metric-key">${isEtf?'AUM':'Mkt Cap'}</div></div>` : ''}
+        ${sd.market_cap != null ? `<div class="metric-box"><div class="metric-val">${sd.market_cap>=1e12?(sd.market_cap/1e12).toFixed(2)+'T':(sd.market_cap/1e9).toFixed(1)+'B'}</div><div class="metric-key">${isEtf?'AUM':'Mkt Cap'}</div></div>` : ''}
         ${week52boxes}
         ${extraMetrics}
         ${sd.sector && sd.sector !== 'N/A' ? `<div class="metric-box"><div class="metric-val" style="font-size:10px">${sd.sector}</div><div class="metric-key">${isEtf?'Category':'Sector'}</div></div>` : ''}

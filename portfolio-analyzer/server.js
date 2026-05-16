@@ -380,8 +380,16 @@ async function fetchStockDataFinnhub(ticker) {
       ticker, symbol: ticker,
       price,
       change_pct,
-      // Prefer YF for market cap — Finnhub fundamental data uses home-exchange values for ADRs
-      market_cap: yfs.price?.marketCap?.raw ?? (p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null),
+      // Prefer YF for market cap (price or financialData module) — Finnhub returns home-exchange
+      // values for ADRs (NT$ for TSM, EUR for ASML). Sanity-check: if value implies P/S > 200×
+      // revenue or >$20T it's almost certainly a local-currency bleed-through, discard it.
+      market_cap: (() => {
+        const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? null
+        if (raw != null) return raw
+        const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
+        if (fh != null && fh > 20e12) return null   // >$20T is almost certainly wrong (TWD/EUR leak)
+        return fh
+      })(),
       pe_ratio,
       eps,
       // YF chart 52W — reliable for ADRs
@@ -475,7 +483,10 @@ async function analyzeStock(stockData, allPortfolioTickers, language = 'he') {
   const pctOfRange = stockData.week52_high && stockData.week52_low && stockData.week52_high !== stockData.week52_low
     ? Math.round((stockData.price - stockData.week52_low) / (stockData.week52_high - stockData.week52_low) * 100)
     : null
-  const mktCapFmt = stockData.market_cap ? (stockData.market_cap / 1e9).toFixed(1) + 'B' : 'N/A'
+  const mktCapFmt = stockData.market_cap
+    ? stockData.market_cap >= 1e12 ? (stockData.market_cap / 1e12).toFixed(2) + 'T'
+    : (stockData.market_cap / 1e9).toFixed(1) + 'B'
+    : 'N/A'
   const verdictTag = isEn ? 'buy|sell|hold' : 'קנה|מכור|החזק'
   const characterTag = isEn
     ? (isEtf ? 'index|sector|thematic|bonds' : 'growth|value|momentum|defensive|speculative|turnaround')
@@ -554,14 +565,14 @@ async function analyzePortfolioBatch(stockDataList, language = 'he') {
     const isEtf = sd.instrument_type === 'ETF'
     if (isEtf) {
       return `## ${sd.ticker} [ETF] (${sd.short_name || sd.ticker})
-Price: ${sd.price} ${sd.currency} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | AUM: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'}`
+Price: ${sd.price} ${sd.currency} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | AUM: ${sd.market_cap ? sd.market_cap>=1e12 ? (sd.market_cap/1e12).toFixed(2)+'T' : (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'}`
     }
     const extras = [
       sd.revenue_growth != null ? `RevGrowth:${sd.revenue_growth}%` : '',
       sd.net_margin != null ? `NetMargin:${sd.net_margin}%` : ''
     ].filter(Boolean).join(' | ')
     return `## ${sd.ticker} (${sd.short_name || sd.ticker})
-Price: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps || 'N/A'} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | Cap: ${sd.market_cap ? (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'} | ${sd.sector}${extras ? '\n' + extras : ''}`
+Price: ${sd.price} ${sd.currency} | P/E: ${sd.pe_ratio || 'N/A'} | EPS: ${sd.eps || 'N/A'} | 52W: ${sd.week52_low}–${sd.week52_high} ${pct} | Cap: ${sd.market_cap ? sd.market_cap>=1e12 ? (sd.market_cap/1e12).toFixed(2)+'T' : (sd.market_cap/1e9).toFixed(1)+'B' : 'N/A'} | ${sd.sector}${extras ? '\n' + extras : ''}`
   }).join('\n\n')
 
   const message = await anthropic.messages.create({

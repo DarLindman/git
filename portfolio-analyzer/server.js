@@ -795,6 +795,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       // Detect poisoned cache: cached "translation" is identical to the current DB text
       // — means a previous failed run saved the source text under the target language key.
       if (cache[language] && typeof cache[language] === 'object' && cache[language].s === n.summary) {
+        console.log(`translate/batch: clearing poisoned cache for news id=${n.id}`)
         delete cache[language]
       }
       if (cache[language]) {
@@ -804,6 +805,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
         toTranslate.push({ n, cache })
       }
     }
+    console.log(`translate/batch: ${cacheHits.length} cache hits, ${toTranslate.length} need translation`)
 
     // Apply cache hits (no Claude call needed)
     const cacheOps = cacheHits.map(({ n, cache, c }) =>
@@ -813,30 +815,28 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
     )
 
-    // One batch call for all uncached items — assistant prefill forces JSON array output
+    // One batch call for all uncached items
     let translateOps = []
     if (toTranslate.length > 0) {
       const hint = language === 'he'
         ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
         : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
       const batchInput = toTranslate.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
+      console.log(`translate/batch: sending ${toTranslate.length} items to Claude, ids=${toTranslate.map(x=>x.n.id).join(',')}`)
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: Math.min(4096, Math.max(1000, toTranslate.length * 400)),
-        system: 'Translation API. Respond ONLY with a valid JSON array. No markdown, no explanation.',
-        messages: [
-          {
-            role: 'user',
-            content: `${hint}\nReturn a JSON array with the same "id" values and translated "h" (headline) and "s" (summary) fields.\n\n${JSON.stringify(batchInput)}`
-          },
-          { role: 'assistant', content: '[' }
-        ]
-      }).catch(e => { console.error('Claude batch news translate error:', e.message); return null })
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: `${hint}\nReturn ONLY a valid JSON array. Each element must have "id" (same number as input), "h" (translated headline), "s" (translated summary). No markdown, no explanation.\n\nInput: ${JSON.stringify(batchInput)}`
+        }]
+      }).catch(e => { console.error('Claude batch news translate error:', e.message, 'status:', e.status); return null })
 
-      // Prepend the '[' we used as prefill to reconstruct the full array
-      const rawText = '[' + (batchMsg?.content?.[0]?.text || '')
+      console.log(`translate/batch: Claude stop_reason=${batchMsg?.stop_reason}, content_blocks=${batchMsg?.content?.length}`)
+      const rawText = batchMsg?.content?.[0]?.text || ''
+      console.log(`translate/batch: raw response (first 300): ${rawText.substring(0, 300)}`)
       const translated = extractJson(rawText)
-      console.log(`translate/batch: Claude translated ${Array.isArray(translated) ? translated.length : 0}/${toTranslate.length} news items (raw len=${rawText.length})`)
+      console.log(`translate/batch: parsed ${Array.isArray(translated) ? translated.length : 'null'} items`)
 
       const byId = {}
       if (Array.isArray(translated)) for (const t of translated) if (t?.id) byId[t.id] = t

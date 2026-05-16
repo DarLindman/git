@@ -842,7 +842,7 @@ function isMarketHours() {
   const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
   const day = et.getDay()   // 0=Sun, 6=Sat
   const hour = et.getHours()
-  return day >= 1 && day <= 5 && hour >= 8 && hour < 18
+  return day >= 1 && day <= 5 && hour >= 9 && hour < 17
 }
 
 async function fetchNewsAPIArticles(tickers) {

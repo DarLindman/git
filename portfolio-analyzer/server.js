@@ -815,46 +815,45 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
       ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
     )
 
-    // One batch call for all uncached items
-    let translateOps = []
-    if (toTranslate.length > 0) {
-      const hint = language === 'he'
-        ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
-        : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
-      const batchInput = toTranslate.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
-      console.log(`translate/batch: sending ${toTranslate.length} items to Claude, ids=${toTranslate.map(x=>x.n.id).join(',')}`)
+    // Translate uncached items in chunks of 20 to stay within token limits
+    const CHUNK_SIZE = 20
+    const hint = language === 'he'
+      ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
+      : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
+
+    const byId = {}
+    for (let i = 0; i < toTranslate.length; i += CHUNK_SIZE) {
+      const chunk = toTranslate.slice(i, i + CHUNK_SIZE)
+      const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary }))
+      console.log(`translate/batch: chunk ${Math.floor(i/CHUNK_SIZE)+1}/${Math.ceil(toTranslate.length/CHUNK_SIZE)}, ${chunk.length} items`)
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
+        max_tokens: 8000,
         messages: [{
           role: 'user',
           content: `${hint}\nReturn ONLY a valid JSON array. Each element must have "id" (same number as input), "h" (translated headline), "s" (translated summary). No markdown, no explanation.\n\nInput: ${JSON.stringify(batchInput)}`
         }]
       }).catch(e => { console.error('Claude batch news translate error:', e.message, 'status:', e.status); return null })
 
-      console.log(`translate/batch: Claude stop_reason=${batchMsg?.stop_reason}, content_blocks=${batchMsg?.content?.length}`)
+      console.log(`translate/batch: stop_reason=${batchMsg?.stop_reason}`)
       const rawText = batchMsg?.content?.[0]?.text || ''
-      console.log(`translate/batch: raw response (first 300): ${rawText.substring(0, 300)}`)
       const translated = extractJson(rawText)
-      console.log(`translate/batch: parsed ${Array.isArray(translated) ? translated.length : 'null'} items`)
-
-      const byId = {}
+      console.log(`translate/batch: parsed ${Array.isArray(translated) ? translated.length : 0}/${chunk.length} from chunk`)
       if (Array.isArray(translated)) for (const t of translated) if (t?.id) byId[t.id] = t
-
-      translateOps = toTranslate.map(({ n, cache }) => {
-        const t = byId[n.id]
-        if (!t?.s) { console.warn('no translation returned for news id=%d', n.id); return }
-        // Save source text for reverse-switch — only once we have a real translation
-        if (from_language && !cache[from_language]) {
-          cache[from_language] = { s: n.summary, h: n.headline }
-        }
-        cache[language] = { s: t.s, h: t.h || null }
-        return pool.query(
-          'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
-          [t.s, t.h || null, JSON.stringify(cache), n.id, req.user.id]
-        ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
-      })
     }
+
+    const translateOps = toTranslate.map(({ n, cache }) => {
+      const t = byId[n.id]
+      if (!t?.s) { console.warn('no translation returned for news id=%d', n.id); return }
+      if (from_language && !cache[from_language]) {
+        cache[from_language] = { s: n.summary, h: n.headline }
+      }
+      cache[language] = { s: t.s, h: t.h || null }
+      return pool.query(
+        'UPDATE news_notifications SET summary = $1, headline = COALESCE($2, headline), translations = $3 WHERE id = $4 AND user_id = $5',
+        [t.s, t.h || null, JSON.stringify(cache), n.id, req.user.id]
+      ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
+    })
 
     await Promise.allSettled([...holdingOps, ...cacheOps, ...translateOps])
     res.json({ ok: true })

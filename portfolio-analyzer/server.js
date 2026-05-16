@@ -714,6 +714,23 @@ const TAG_MAP = {
   }
 }
 
+function buildTranslatePrompt(targetLang, items, fields) {
+  const isHe = targetLang === 'Hebrew'
+  return `You are a professional financial translator. Translate the text fields below into fluent, natural ${targetLang}.
+
+Rules:
+- Write naturally — rephrase sentences so they read like native ${targetLang}. Never translate word-for-word.
+- Keep all numbers, ticker symbols (AMZN, AWS, NVDA, etc.), percentages, and company names unchanged.
+${isHe ? `- Hebrew financial terms: תזה (thesis), סיכונים (risks), זרז (catalyst), שווי שוק (market cap), הכנסות (revenue), תחרות (competition), יתרון תחרותי (competitive advantage), ניתוח (analysis), תרחיש שלילי (bear case).
+- Use modern Israeli Hebrew. Avoid archaic or overly formal phrasing.` : ''}
+- Maintain the same direct, candid investment-note tone.
+
+Return ONLY a valid JSON array with the same structure as the input (id + translated fields):
+
+Input:
+${JSON.stringify(items)}`
+}
+
 app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
   const { language = 'he' } = req.body
   try {
@@ -734,25 +751,32 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     if (!hInput.length && !nInput.length) return res.json({ ok: true })
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: Math.min(hInput.length * 600 + nInput.length * 150 + 300, 8000),
-      system: [{ type: 'text', text: 'You are a financial translator. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: `Translate these financial analysis texts to ${targetLang}. Preserve all numbers, ticker symbols, percentages, and financial data exactly. Same analytical tone.
+    const system = [{ type: 'text', text: 'You are a professional financial translator. Respond with valid JSON array only. Never include text outside the JSON.', cache_control: { type: 'ephemeral' } }]
 
-Return ONLY: {"holdings":[{"id":<id>,"summary":"...","thesis":"...","risks":"...","catalyst":"..."}],"news":[{"id":<id>,"summary":"..."}]}
+    // Two parallel Claude calls so news can never be starved by a large holdings list
+    const [hMsg, nMsg] = await Promise.all([
+      hInput.length ? anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: Math.min(hInput.length * 700 + 400, 8000),
+        system,
+        messages: [{ role: 'user', content: buildTranslatePrompt(targetLang, hInput, ['summary','thesis','risks','catalyst']) }]
+      }) : null,
+      nInput.length ? anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: Math.min(nInput.length * 250 + 200, 4000),
+        system,
+        messages: [{ role: 'user', content: buildTranslatePrompt(targetLang, nInput, ['summary']) }]
+      }) : null
+    ])
 
-Input: ${JSON.stringify({ holdings: hInput, news: nInput })}` }]
-    })
-
-    const result = extractJson(message.content[0].text)
-    if (!result) return res.status(502).json({ error: 'Translation failed' })
+    const hResult = hMsg ? (extractJson(hMsg.content[0].text) || []) : []
+    const nResult = nMsg ? (extractJson(nMsg.content[0].text) || []) : []
 
     const tagMap = TAG_MAP[language === 'he' ? 'en_to_he' : 'he_to_en']
     const holdingMap = new Map(holdings.map(h => [h.id, h]))
 
     await Promise.all([
-      ...(result.holdings || []).map(th => {
+      ...(Array.isArray(hResult) ? hResult : []).map(th => {
         const orig = holdingMap.get(th.id)
         if (!orig) return Promise.resolve()
         const a = orig.analysis_json
@@ -765,7 +789,7 @@ Input: ${JSON.stringify({ holdings: hInput, news: nInput })}` }]
           [JSON.stringify({ ...a, summary: th.summary, thesis: th.thesis, risks: th.risks, catalyst: th.catalyst, tags }), th.id, portfolioId]
         )
       }),
-      ...(result.news || []).map(tn =>
+      ...(Array.isArray(nResult) ? nResult : []).map(tn =>
         pool.query('UPDATE news_notifications SET summary = $1 WHERE id = $2 AND user_id = $3', [tn.summary, tn.id, req.user.id])
       )
     ])

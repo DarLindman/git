@@ -740,7 +740,7 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const [{ rows: holdings }, { rows: newsRows }] = await Promise.all([
       pool.query('SELECT id, analysis_json FROM holdings WHERE portfolio_id = $1 AND analysis_json IS NOT NULL', [portfolioId]),
-      pool.query('SELECT id, headline, translations FROM news_notifications WHERE user_id = $1 AND headline IS NOT NULL AND headline != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
+      pool.query('SELECT id, headline, LEFT(summary,400) AS summary, translations FROM news_notifications WHERE user_id = $1 AND summary IS NOT NULL AND summary != \'\' ORDER BY sent_at DESC LIMIT 50', [req.user.id])
     ])
 
     const targetLang = language === 'he' ? 'Hebrew' : 'English'
@@ -784,16 +784,13 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     })
 
     // ── News ─────────────────────────────────────────────────────────────
-    // Single batch Claude call with tool use → guaranteed JSON, no per-item concurrency issues.
-    console.log(`translate/batch: ${newsRows.length} news headlines, ${holdings.length} holdings → ${targetLang}`)
+    console.log(`translate/batch: ${newsRows.length} news, ${holdings.length} holdings → ${targetLang}`)
 
-    // Batch translates HEADLINES only — fast (50 items ~4s).
-    // Summaries are translated on-demand via POST /api/translate/news/:id/summary.
     const cacheHits = []
     const toTranslate = []
     for (const n of newsRows) {
       const cache = n.translations || {}
-      if (cache[language]?.h) {
+      if (cache[language]?.h && cache[language]?.s) {
         cacheHits.push({ n, cache })
       } else {
         toTranslate.push({ n, cache })
@@ -801,16 +798,17 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     }
     console.log(`translate/batch: ${cacheHits.length} cache hits, ${toTranslate.length} need translation`)
 
-    // Cache hits: restore translated headline to DB
-    const cacheOps = cacheHits.map(({ n, cache }) =>
-      pool.query(
-        'UPDATE news_notifications SET headline = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-        [cache[language].h, JSON.stringify(cache), n.id, req.user.id]
-      ).catch(e => console.error('news cache DB update failed id=%d:', n.id, e.message))
-    )
+    // Cache hits: restore both headline and summary
+    const cacheOps = cacheHits.map(({ n, cache }) => {
+      const c = cache[language]
+      return pool.query(
+        'UPDATE news_notifications SET headline = $1, summary = $2, translations = $3 WHERE id = $4 AND user_id = $5',
+        [c.h, c.s, JSON.stringify(cache), n.id, req.user.id]
+      ).catch(e => console.error('news cache restore failed id=%d:', n.id, e.message))
+    })
 
-    // Translate headlines in parallel chunks of 25
-    const CHUNK_SIZE = 25
+    // Translate headline + summary together, chunks of 15 in parallel
+    const CHUNK_SIZE = 15
     const hint = language === 'he'
       ? 'Translate to natural Israeli Hebrew. Keep company names, ticker symbols, and numbers unchanged.'
       : 'Translate to English. Keep company names, ticker symbols, and numbers unchanged.'
@@ -819,17 +817,17 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
     for (let i = 0; i < toTranslate.length; i += CHUNK_SIZE) chunks.push(toTranslate.slice(i, i + CHUNK_SIZE))
 
     const chunkResults = await Promise.all(chunks.map(async (chunk, ci) => {
-      const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '' }))
+      const batchInput = chunk.map(({ n }) => ({ id: n.id, h: n.headline || '', s: n.summary || '' }))
       const batchMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
+        max_tokens: 8000,
         messages: [{
           role: 'user',
-          content: `${hint}\nReturn ONLY a JSON array. Each element: {"id": <same id>, "h": <translated headline>}. No markdown.\n\nInput: ${JSON.stringify(batchInput)}`
+          content: `${hint}\nReturn ONLY a JSON array. Each element: {"id":<same id>,"h":<translated headline>,"s":<translated summary>}. No markdown.\n\nInput: ${JSON.stringify(batchInput)}`
         }]
       }).catch(e => { console.error(`Claude news chunk ${ci+1} error:`, e.message); return null })
 
-      if (batchMsg?.stop_reason === 'max_tokens') console.warn(`translate/batch: chunk ${ci+1} hit max_tokens`)
+      if (batchMsg?.stop_reason === 'max_tokens') console.warn(`translate/batch: chunk ${ci+1} hit max_tokens — increase max_tokens or reduce chunk size`)
       const translated = extractJson(batchMsg?.content?.[0]?.text || '')
       console.log(`translate/batch: chunk ${ci+1}/${chunks.length} → ${Array.isArray(translated) ? translated.length : 0}/${chunk.length}`)
       return Array.isArray(translated) ? translated : []
@@ -840,15 +838,11 @@ app.post('/api/translate/batch', auth, analyzeLimiter, async (req, res) => {
 
     const translateOps = toTranslate.map(({ n, cache }) => {
       const t = byId[n.id]
-      if (!t?.h) return
-      // Only save the translated result — never save n.headline as a "source backup"
-      // because n.headline might already be in the wrong language from a previous run.
-      // Cache accumulates one entry per language; both directions get populated after
-      // the first round-trip (en→he saves cache['he'], he→en saves cache['en']).
-      cache[language] = { h: t.h }
+      if (!t?.h || !t?.s) { console.warn('missing translation for id=%d', n.id); return }
+      cache[language] = { h: t.h, s: t.s }
       return pool.query(
-        'UPDATE news_notifications SET headline = $1, translations = $2 WHERE id = $3 AND user_id = $4',
-        [t.h, JSON.stringify(cache), n.id, req.user.id]
+        'UPDATE news_notifications SET headline = $1, summary = $2, translations = $3 WHERE id = $4 AND user_id = $5',
+        [t.h, t.s, JSON.stringify(cache), n.id, req.user.id]
       ).catch(e => console.error('news translate DB update failed id=%d:', n.id, e.message))
     })
 
@@ -948,7 +942,7 @@ app.get('/api/notifications', auth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0
   try {
     const { rows } = await pool.query(
-      `SELECT id, user_id, ticker, headline, LEFT(summary, 350) AS summary, category, importance, article_url, earnings_bullets, evasion_warning, sent_at, notified FROM news_notifications WHERE user_id = $1 AND notified = true ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
+      `SELECT * FROM news_notifications WHERE user_id = $1 AND notified = true ORDER BY sent_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     )
     res.json({ notifications: rows })
@@ -1372,6 +1366,7 @@ async function initDB() {
     ['clear_news_translations_v1', `UPDATE news_notifications SET translations = '{}'`],
     ['clear_news_translations_v2', `UPDATE news_notifications SET translations = '{}'`],
     ['clear_news_translations_v3', `UPDATE news_notifications SET translations = '{}'`],
+    ['clear_news_translations_v4', `DELETE FROM news_notifications`],
   ]) {
     const { rows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = $1`, [id])
     if (!rows.length) {

@@ -1477,6 +1477,7 @@ async function initDB() {
     ['clear_news_translations_v2', `UPDATE news_notifications SET translations = '{}'`],
     ['clear_news_translations_v3', `UPDATE news_notifications SET translations = '{}'`],
     ['clear_news_translations_v4', `DELETE FROM news_notifications`],
+    ['clear_news_v5', `DELETE FROM news_notifications`],
   ]) {
     const { rows } = await pool.query(`SELECT 1 FROM _migrations WHERE id = $1`, [id])
     if (!rows.length) {

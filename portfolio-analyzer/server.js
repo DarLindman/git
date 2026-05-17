@@ -345,20 +345,21 @@ async function fetchStockData(ticker, exchange) {
 async function fetchStockDataFinnhub(ticker) {
   const apiKey = process.env.FINNHUB_API_KEY
   try {
+    const yfHeaders = { ...YF_HEADERS, ...(_yfCookie ? { Cookie: _yfCookie } : {}) }
+    const yfCrumb = _yfCrumb ? { crumb: _yfCrumb } : {}
     const [quoteRes, profileRes, metricRes, yfChartRes, yfSummaryRes, yfV7Res] = await Promise.all([
       axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: ticker, metric: 'all', token: apiKey }, timeout: 8000 }),
       axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
-        params: { interval: '1d', range: '1d' }, headers: YF_HEADERS, timeout: 8000
+        params: { interval: '1d', range: '1d', ...yfCrumb }, headers: yfHeaders, timeout: 8000
       }).catch(() => null),
       axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
-        params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile' },
-        headers: YF_HEADERS, timeout: 8000
+        params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile', ...yfCrumb },
+        headers: yfHeaders, timeout: 8000
       }).catch(() => null),
-      // v7/finance/quote — simple endpoint, reliably returns marketCap for ADRs
       axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
-        params: { symbols: ticker }, headers: YF_HEADERS, timeout: 6000
+        params: { symbols: ticker, ...yfCrumb }, headers: yfHeaders, timeout: 6000
       }).catch(() => null)
     ])
     const q = quoteRes.data

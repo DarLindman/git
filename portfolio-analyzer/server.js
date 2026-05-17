@@ -1324,7 +1324,11 @@ async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers 
         ? `${pushQueue.length} portfolio update${pushQueue.length > 1 ? 's' : ''}`
         : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''} בתיק`
       const body = top3
-        .map(({ r }) => `• ${r.ticker}: ${r.summary}`)
+        .map(({ r, article }) => {
+          const text = article.title || r.summary || ''
+          const short = text.length > 72 ? text.slice(0, 70) + '…' : text
+          return `• ${r.ticker}: ${short}`
+        })
         .join('\n')
       await sendPushToUser(userId, { title, body, tag: 'portfolio-news', url: '/' })
     }

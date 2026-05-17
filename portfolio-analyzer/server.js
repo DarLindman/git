@@ -1317,21 +1317,15 @@ async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers 
 
     if (pushQueue.length > 0) {
       const isEn = language === 'en'
-      const top2 = pushQueue
-        .sort((a, b) => (a.r.importance || 2) - (b.r.importance || 2))
-        .slice(0, 2)
-      const rest = pushQueue.length - top2.length
-      const title = isEn
-        ? `${pushQueue.length} portfolio update${pushQueue.length > 1 ? 's' : ''}`
-        : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''} בתיק`
-      const bullets = top2
-        .map(({ r, article }) => {
-          const text = article.title || r.summary || ''
-          const short = text.length > 47 ? text.slice(0, 45) + '…' : text
-          return `• ${r.ticker}: ${short}`
-        })
-      if (rest > 0) bullets.push(isEn ? `+${rest} more` : `+${rest} נוספות`)
-      const body = bullets.join('\n')
+      const sorted = pushQueue.sort((a, b) => (a.r.importance || 2) - (b.r.importance || 2))
+      const top = sorted[0]
+      const tickers = [...new Set(sorted.map(({ r }) => r.ticker))].slice(0, 4).join(' ')
+      const countLabel = isEn
+        ? `${pushQueue.length} update${pushQueue.length > 1 ? 's' : ''}`
+        : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''}`
+      const title = `${countLabel} • ${tickers}`
+      const topText = top.article.title || top.r.summary || ''
+      const body = topText.length > 90 ? topText.slice(0, 88) + '…' : topText
       await sendPushToUser(userId, { title, body, tag: 'portfolio-news', url: '/' })
     }
   } catch (err) {

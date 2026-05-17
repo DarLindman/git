@@ -1116,8 +1116,9 @@ RULES:
 - [src:X] hints which RSS feed the article came from, but do NOT use it as the assigned ticker if the article is actually about a different company (e.g. an article about NVDA should not be tagged to MRVL even if it appeared in MRVL's feed).
 - If no article qualifies, return [].
 
-Return JSON array: [{"index":0,"ticker":"AAPL","notify":true,"category":"${categories}","importance":2,"summary":"${isEn ? 'Two concise sentences.' : 'שני משפטים תמציתיים.'}","is_earnings":false}]
-importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)`
+Return JSON array: [{"index":0,"ticker":"AAPL","notify":true,"category":"${categories}","importance":2,"summary":"${isEn ? 'Two concise sentences.' : 'שני משפטים תמציתיים.'}","push":"${isEn ? '5-6 word key fact, no filler' : 'עובדה מרכזית ב-5-6 מילים'}","is_earnings":false}]
+importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)
+push: ultra-short push notification line, max 40 chars, complete phrase — not a truncated sentence`
         }]
       })
       const result = extractJson(message.content[0].text)
@@ -1318,14 +1319,14 @@ async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers 
     if (pushQueue.length > 0) {
       const isEn = language === 'en'
       const sorted = pushQueue.sort((a, b) => (a.r.importance || 2) - (b.r.importance || 2))
-      const top = sorted[0]
-      const tickers = [...new Set(sorted.map(({ r }) => r.ticker))].slice(0, 4).join(' ')
-      const countLabel = isEn
-        ? `${pushQueue.length} update${pushQueue.length > 1 ? 's' : ''}`
-        : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''}`
-      const title = `${countLabel} • ${tickers}`
-      const topText = top.article.title || top.r.summary || ''
-      const body = topText.length > 90 ? topText.slice(0, 88) + '…' : topText
+      const top3 = sorted.slice(0, 3)
+      const rest = pushQueue.length - top3.length
+      const title = isEn
+        ? `${pushQueue.length} portfolio update${pushQueue.length > 1 ? 's' : ''}`
+        : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''} בתיק`
+      const lines = top3.map(({ r }) => `• ${r.ticker}: ${r.push || r.summary?.split('.')[0] || ''}`)
+      if (rest > 0) lines.push(isEn ? `+${rest} more` : `+${rest} נוספות`)
+      const body = lines.join('\n')
       await sendPushToUser(userId, { title, body, tag: 'portfolio-news', url: '/' })
     }
   } catch (err) {

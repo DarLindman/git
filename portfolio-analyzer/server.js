@@ -462,11 +462,19 @@ async function _fetchStockDataImpl(ticker, exchange) {
       const div = exchange === 'TASE' ? 100 : 1
       const raw52h = meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null
       const raw52l = meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
+      const yfPrice = rawPrice / div
+      const yfMktCap = (() => {
+        const raw = s.price?.marketCap?.raw ?? s.financialData?.marketCap?.raw ?? s.summaryDetail?.marketCap?.raw ?? meta.marketCap ?? null
+        if (raw != null && raw < 20e12) return raw
+        const shares = s.defaultKeyStatistics?.sharesOutstanding?.raw ?? s.price?.sharesOutstanding?.raw ?? null
+        if (shares && yfPrice) { const c = Math.round(shares * yfPrice); if (c < 20e12) return c }
+        return null
+      })()
       return {
         ticker, symbol,
-        price: rawPrice / div,
+        price: yfPrice,
         change_pct: parseFloat(((rawPrice - rawPrevClose) / rawPrevClose * 100).toFixed(2)),
-        market_cap: s.price?.marketCap?.raw ?? null,
+        market_cap: yfMktCap,
         pe_ratio: s.summaryDetail?.trailingPE?.raw ?? null,
         eps: s.defaultKeyStatistics?.trailingEps?.raw ?? null,
         week52_high: raw52h != null ? raw52h / div : null,

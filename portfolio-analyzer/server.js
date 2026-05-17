@@ -1315,16 +1315,18 @@ async function pollNewsForUser(userId, alertLevel, language = 'he', onlyTickers 
       )
     }
 
-    for (const { r, article } of pushQueue) {
-      const impLabel = language === 'en'
-        ? ['','CRITICAL','HIGH','MEDIUM'][r.importance || 2]
-        : ['','קריטי','גבוה','בינוני'][r.importance || 2]
-      await sendPushToUser(userId, {
-        title: `${r.ticker} — ${r.category} [${impLabel}]`,
-        body: r.summary,
-        tag: `${r.ticker}-${article.url}`,
-        url: '/'
-      })
+    if (pushQueue.length > 0) {
+      const isEn = language === 'en'
+      const top3 = pushQueue
+        .sort((a, b) => (a.r.importance || 2) - (b.r.importance || 2))
+        .slice(0, 3)
+      const title = isEn
+        ? `${pushQueue.length} portfolio update${pushQueue.length > 1 ? 's' : ''}`
+        : `${pushQueue.length} עדכון${pushQueue.length > 1 ? 'ים' : ''} בתיק`
+      const body = top3
+        .map(({ r }) => `• ${r.ticker}: ${r.summary}`)
+        .join('\n')
+      await sendPushToUser(userId, { title, body, tag: 'portfolio-news', url: '/' })
     }
   } catch (err) {
     console.error('pollNewsForUser error:', err.message)

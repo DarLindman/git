@@ -388,20 +388,24 @@ async function fetchStockDataFinnhub(ticker) {
       // values for ADRs (NT$ for TSM, EUR for ASML). Sanity-check: if value implies P/S > 200×
       // revenue or >$20T it's almost certainly a local-currency bleed-through, discard it.
       market_cap: (() => {
-        // 1. YF v7/finance/quote — simple, reliable for ADRs
+        // 1. YF v7/finance/quote
         if (yfV7Quote?.marketCap != null && yfV7Quote.marketCap < 20e12) return yfV7Quote.marketCap
         // 2. YF quoteSummary modules
         const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? yfs.summaryDetail?.marketCap?.raw ?? null
         if (raw != null && raw < 20e12) return raw
         // 3. YF chart meta
         if (yfMeta?.marketCap != null && yfMeta.marketCap < 20e12) return yfMeta.marketCap
-        // 4. Shares × price
-        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw ?? yfs.price?.sharesOutstanding?.raw ?? null
+        // 4. Shares × price — try YF shares first, then Finnhub shareOutstandingAnnual
+        //    Finnhub returns ADR-equivalent shares for US-listed tickers
+        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw
+          ?? yfs.price?.sharesOutstanding?.raw
+          ?? (m.shareOutstandingAnnual ? m.shareOutstandingAnnual * 1e6 : null)
+          ?? null
         if (shares && price) { const c = Math.round(shares * price); if (c < 20e12) return c }
-        // 5. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
+        // 5. Finnhub marketCapitalization — discard if >$20T (local-currency leak for ADRs)
         const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
         if (fh != null && fh < 20e12) return fh
-        console.log(`market_cap null for ${ticker}: v7=${yfV7Quote?.marketCap} shares=${shares} fh=${fh}`)
+        console.log(`market_cap null for ${ticker}: v7=${yfV7Quote?.marketCap} chartCap=${yfMeta?.marketCap} shares=${shares} fhShares=${m.shareOutstandingAnnual} fh=${fh}`)
         return null
       })(),
       pe_ratio,

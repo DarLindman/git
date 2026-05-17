@@ -1085,15 +1085,17 @@ async function batchFilterNewsAllTickers(tickers, articles, alertLevel, language
     ? 'earnings|management|lawsuit|analyst|supply_chain|general'
     : 'רווחים|הנהלה|תביעה|שינוי המלצה|שרשרת אספקה|כללי'
   const CHUNK = 25
+  const validTickers = new Set(tickers.map(t => t.toUpperCase()))
   const sys = [{ type: 'text', text: 'You are a financial news classifier. Respond with valid JSON only.', cache_control: { type: 'ephemeral' } }]
 
   const chunks = []
   for (let i = 0; i < articles.length; i += CHUNK) chunks.push({ start: i, items: articles.slice(i, i + CHUNK) })
 
   const chunkResults = await Promise.all(chunks.map(async ({ start, items }) => {
-    const articleList = items.map((a, i) =>
-      `[${start + i}] ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
-    ).join('\n')
+    const articleList = items.map((a, i) => {
+      const hint = a.ticker ? ` [src:${a.ticker}]` : ''
+      return `[${start + i}]${hint} ${a.title || ''}: ${(a.description || '').slice(0, 150)}`
+    }).join('\n')
     try {
       const message = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
@@ -1108,15 +1110,23 @@ Write summaries in: ${isEn ? 'English' : 'Hebrew'}
 Articles:
 ${articleList}
 
-For each article relevant to any portfolio ticker return an entry. Ignore unrelated articles.
+RULES:
+- ONLY use tickers from the portfolio list above. Never return a ticker not in that list.
+- Assign an article to a ticker ONLY if the article is primarily about that company. Reject articles that merely mention it in passing.
+- [src:X] hints which RSS feed the article came from, but do NOT use it as the assigned ticker if the article is actually about a different company (e.g. an article about NVDA should not be tagged to MRVL even if it appeared in MRVL's feed).
+- If no article qualifies, return [].
+
 Return JSON array: [{"index":0,"ticker":"AAPL","notify":true,"category":"${categories}","importance":2,"summary":"${isEn ? 'Two concise sentences.' : 'שני משפטים תמציתיים.'}","is_earnings":false}]
-importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)
-If none qualify, return [].`
+importance: 1=critical (CEO resign/arrest, acquisition, fraud, SEC), 2=high (earnings, analyst change, major lawsuit, guidance), 3=medium (general mention)`
         }]
       })
       const result = extractJson(message.content[0].text)
       if (message.stop_reason === 'max_tokens') console.warn('batchFilterNews: chunk hit max_tokens, some articles may be missed')
-      return Array.isArray(result) ? result : []
+      const raw = Array.isArray(result) ? result : []
+      return raw.filter(r => {
+        const t = r.ticker?.toUpperCase()
+        return t && validTickers.has(t)
+      })
     } catch (err) {
       console.error('batchFilterNewsAllTickers chunk error:', err.message)
       return []

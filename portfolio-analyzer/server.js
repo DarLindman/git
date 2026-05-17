@@ -372,6 +372,16 @@ async function fetchStockDataFinnhub(ticker) {
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
     // Prefer YF chart price for ADRs — Finnhub quote can return home-exchange prices
     const price = yfMeta?.regularMarketPrice ?? q.c
+
+    // If Finnhub market cap looks like local currency (>$20T), fetch live FX rate from YF
+    const fhRaw = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
+    let fxFactor = 1
+    if (fhRaw != null && fhRaw > 20e12 && p.currency && p.currency !== 'USD') {
+      const fxRes = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(p.currency + 'USD=X')}`, {
+        params: { interval: '1d', range: '1d' }, headers: yfHeaders, timeout: 5000
+      }).catch(() => null)
+      fxFactor = fxRes?.data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 1
+    }
     const prevClose = yfMeta?.chartPreviousClose || yfMeta?.previousClose || q.pc || price
     const change_pct = parseFloat(((price - prevClose) / prevClose * 100).toFixed(2))
     const pe_ratio = yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null
@@ -402,16 +412,13 @@ async function fetchStockDataFinnhub(ticker) {
           ?? (m.shareOutstandingAnnual ? m.shareOutstandingAnnual * 1e6 : null)
           ?? null
         if (shares && price) { const c = Math.round(shares * price); if (c < 20e12) return c }
-        // 5. Finnhub marketCapitalization — convert local currency to USD if needed
-        const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
-        if (fh != null) {
-          if (fh < 20e12) return fh  // already in USD (or reasonable)
-          // ADR leak: Finnhub returned home-exchange currency — apply conversion
-          const FX = { TWD:1/32, HKD:1/7.8, JPY:1/150, KRW:1/1350, EUR:0.91, GBP:1.27, CNY:1/7.25, CAD:0.74, AUD:0.65, CHF:1.1 }
-          const fx = FX[p.currency] ?? null
-          if (fx) { const converted = Math.round(fh * fx); if (converted < 20e12) return converted }
+        // 5. Finnhub marketCapitalization — use live FX rate if local currency detected
+        if (fhRaw != null) {
+          if (fhRaw < 20e12) return fhRaw
+          const converted = Math.round(fhRaw * fxFactor)
+          if (converted < 20e12) return converted
         }
-        console.log(`market_cap null for ${ticker}: currency=${p.currency} v7=${yfV7Quote?.marketCap} shares=${shares} fh=${fh}`)
+        console.log(`market_cap null for ${ticker}: currency=${p.currency} fxFactor=${fxFactor} shares=${shares} fhRaw=${fhRaw}`)
         return null
       })(),
       pe_ratio,

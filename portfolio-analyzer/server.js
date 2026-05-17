@@ -345,18 +345,20 @@ async function fetchStockData(ticker, exchange) {
 async function fetchStockDataFinnhub(ticker) {
   const apiKey = process.env.FINNHUB_API_KEY
   try {
-    const [quoteRes, profileRes, metricRes, yfChartRes, yfSummaryRes] = await Promise.all([
+    const [quoteRes, profileRes, metricRes, yfChartRes, yfSummaryRes, yfV7Res] = await Promise.all([
       axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
       axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: ticker, metric: 'all', token: apiKey }, timeout: 8000 }),
-      // YF chart: reliable 52W data + ETF detection (Finnhub metric unreliable for ADRs)
       axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
         params: { interval: '1d', range: '1d' }, headers: YF_HEADERS, timeout: 8000
       }).catch(() => null),
-      // YF quoteSummary via query1 (same host as v8/chart, works from Railway unlike query2)
       axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
         params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile' },
         headers: YF_HEADERS, timeout: 8000
+      }).catch(() => null),
+      // v7/finance/quote — simple endpoint, reliably returns marketCap for ADRs
+      axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
+        params: { symbols: ticker }, headers: YF_HEADERS, timeout: 6000
       }).catch(() => null)
     ])
     const q = quoteRes.data
@@ -364,6 +366,7 @@ async function fetchStockDataFinnhub(ticker) {
     const m = metricRes.data?.metric || {}
     const yfMeta = yfChartRes?.data?.chart?.result?.[0]?.meta
     const yfs = yfSummaryRes?.data?.quoteSummary?.result?.[0] || {}
+    const yfV7Quote = yfV7Res?.data?.quoteResponse?.result?.[0] ?? null
     if (!q?.c && !yfMeta?.regularMarketPrice) return null
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
     // Prefer YF chart price for ADRs — Finnhub quote can return home-exchange prices
@@ -384,21 +387,20 @@ async function fetchStockDataFinnhub(ticker) {
       // values for ADRs (NT$ for TSM, EUR for ASML). Sanity-check: if value implies P/S > 200×
       // revenue or >$20T it's almost certainly a local-currency bleed-through, discard it.
       market_cap: (() => {
-        // 1. YF direct (price / financialData / summaryDetail modules)
+        // 1. YF v7/finance/quote — simple, reliable for ADRs
+        if (yfV7Quote?.marketCap != null && yfV7Quote.marketCap < 20e12) return yfV7Quote.marketCap
+        // 2. YF quoteSummary modules
         const raw = yfs.price?.marketCap?.raw ?? yfs.financialData?.marketCap?.raw ?? yfs.summaryDetail?.marketCap?.raw ?? null
         if (raw != null && raw < 20e12) return raw
-        // 2. YF chart meta sometimes carries marketCap
-        const chartCap = yfMeta?.marketCap ?? null
-        if (chartCap != null && chartCap < 20e12) return chartCap
-        // 3. Compute from shares × price (US-listed shares + USD price)
-        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw
-          ?? yfs.price?.sharesOutstanding?.raw ?? null
+        // 3. YF chart meta
+        if (yfMeta?.marketCap != null && yfMeta.marketCap < 20e12) return yfMeta.marketCap
+        // 4. Shares × price
+        const shares = yfs.defaultKeyStatistics?.sharesOutstanding?.raw ?? yfs.price?.sharesOutstanding?.raw ?? null
         if (shares && price) { const c = Math.round(shares * price); if (c < 20e12) return c }
-        // 4. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
+        // 5. Finnhub fallback — discard if >$20T (local-currency bleed-through for TSM/ASML)
         const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
         if (fh != null && fh < 20e12) return fh
-        // log what we have so we can debug ADR issues
-        console.log(`market_cap null for ${ticker}: yfs.price.mktCap=${yfs.price?.marketCap?.raw} shares=${shares} fh=${fh}`)
+        console.log(`market_cap null for ${ticker}: v7=${yfV7Quote?.marketCap} shares=${shares} fh=${fh}`)
         return null
       })(),
       pe_ratio,
@@ -437,7 +439,7 @@ async function _fetchStockDataImpl(ticker, exchange) {
       const crumbParam = _yfCrumb ? { crumb: _yfCrumb } : {}
       // v8/chart is more permissive on auth than v7/quote
       // search API requires no auth and returns sector/industry reliably
-      const [chartRes, summaryRes, searchRes] = await Promise.all([
+      const [chartRes, summaryRes, searchRes, yfV7Res2] = await Promise.all([
         axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
           params: { interval: '1d', range: '1d', ...crumbParam }, headers, timeout: 12000
         }),
@@ -448,6 +450,9 @@ async function _fetchStockDataImpl(ticker, exchange) {
         axios.get('https://query1.finance.yahoo.com/v1/finance/search', {
           params: { q: symbol, quotesCount: 1, newsCount: 0, enableFuzzyQuery: false },
           headers: YF_HEADERS, timeout: 5000
+        }).catch(() => null),
+        axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
+          params: { symbols: symbol }, headers: YF_HEADERS, timeout: 6000
         }).catch(() => null)
       ])
       const meta = chartRes.data?.chart?.result?.[0]?.meta
@@ -456,14 +461,15 @@ async function _fetchStockDataImpl(ticker, exchange) {
       }
       const s = summaryRes?.data?.quoteSummary?.result?.[0] || {}
       const sq = searchRes?.data?.quotes?.find(q => q.symbol?.toUpperCase() === symbol.toUpperCase()) || {}
+      const v7q = yfV7Res2?.data?.quoteResponse?.result?.[0] ?? null
       const rawPrice = meta.regularMarketPrice
       const rawPrevClose = meta.chartPreviousClose || meta.previousClose || rawPrice
-      // TASE (Yahoo Finance) returns prices in agorot (1 ILS = 100 agorot)
       const div = exchange === 'TASE' ? 100 : 1
       const raw52h = meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null
       const raw52l = meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
       const yfPrice = rawPrice / div
       const yfMktCap = (() => {
+        if (v7q?.marketCap != null && v7q.marketCap < 20e12) return v7q.marketCap
         const raw = s.price?.marketCap?.raw ?? s.financialData?.marketCap?.raw ?? s.summaryDetail?.marketCap?.raw ?? meta.marketCap ?? null
         if (raw != null && raw < 20e12) return raw
         const shares = s.defaultKeyStatistics?.sharesOutstanding?.raw ?? s.price?.sharesOutstanding?.raw ?? null

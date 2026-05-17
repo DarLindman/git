@@ -402,10 +402,16 @@ async function fetchStockDataFinnhub(ticker) {
           ?? (m.shareOutstandingAnnual ? m.shareOutstandingAnnual * 1e6 : null)
           ?? null
         if (shares && price) { const c = Math.round(shares * price); if (c < 20e12) return c }
-        // 5. Finnhub marketCapitalization — discard if >$20T (local-currency leak for ADRs)
+        // 5. Finnhub marketCapitalization — convert local currency to USD if needed
         const fh = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
-        if (fh != null && fh < 20e12) return fh
-        console.log(`market_cap null for ${ticker}: v7=${yfV7Quote?.marketCap} chartCap=${yfMeta?.marketCap} shares=${shares} fhShares=${m.shareOutstandingAnnual} fh=${fh}`)
+        if (fh != null) {
+          if (fh < 20e12) return fh  // already in USD (or reasonable)
+          // ADR leak: Finnhub returned home-exchange currency — apply conversion
+          const FX = { TWD:1/32, HKD:1/7.8, JPY:1/150, KRW:1/1350, EUR:0.91, GBP:1.27, CNY:1/7.25, CAD:0.74, AUD:0.65, CHF:1.1 }
+          const fx = FX[p.currency] ?? null
+          if (fx) { const converted = Math.round(fh * fx); if (converted < 20e12) return converted }
+        }
+        console.log(`market_cap null for ${ticker}: currency=${p.currency} v7=${yfV7Quote?.marketCap} shares=${shares} fh=${fh}`)
         return null
       })(),
       pe_ratio,

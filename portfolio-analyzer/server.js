@@ -408,12 +408,14 @@ async function fetchStockDataFinnhub(ticker, exchange = 'US') {
       }).catch(() => null)
       fxFactor = fxRes?.data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 1
     }
-    // For TASE, YF often has no previousClose — derive from OHLC closes (range=5d)
     const yfCloses = yfChartResult?.indicators?.quote?.[0]?.close?.filter(v => v != null) ?? []
     const yfPrevRaw = yfCloses.length >= 2 ? yfCloses[yfCloses.length - 2] : null
     const yfPrev = yfPrevRaw != null ? yfPrevRaw / yfDiv : null
     const fhPrev = q.pc || null
-    const prevClose = fhPrev || yfPrev || yfMeta?.chartPreviousClose / yfDiv || yfMeta?.previousClose / yfDiv || price
+    // For TASE: chartPreviousClose = close at START of 5d range (not yesterday) — use OHLC
+    const prevClose = isTase
+      ? (fhPrev || yfPrev || price)
+      : (fhPrev || yfMeta?.chartPreviousClose || yfMeta?.previousClose || yfPrev || price)
     const change_pct = parseFloat(((price - prevClose) / prevClose * 100).toFixed(2))
     const pe_ratio = yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null
     // Validate EPS against price/PE: ADRs often get home-share EPS in local currency (e.g. TSM gets NT$ EPS)
@@ -514,10 +516,12 @@ async function _fetchStockDataImpl(ticker, exchange) {
       const v7q = yfV7Res2?.data?.quoteResponse?.result?.[0] ?? null
       const rawPrice = meta.regularMarketPrice
       const div = exchange === 'TASE' ? 100 : 1
-      // TASE: chartPreviousClose often missing — derive from OHLC closes (range=5d)
       const ohlcCloses = chartRes.data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v => v != null) ?? []
       const ohlcPrev = ohlcCloses.length >= 2 ? ohlcCloses[ohlcCloses.length - 2] : null
-      const rawPrevClose = meta.chartPreviousClose || meta.previousClose || ohlcPrev || rawPrice
+      // For TASE: chartPreviousClose = close at START of range (5d ago), not yesterday — use OHLC instead
+      const rawPrevClose = exchange === 'TASE'
+        ? (ohlcPrev || rawPrice)
+        : (meta.chartPreviousClose || meta.previousClose || ohlcPrev || rawPrice)
       const raw52h = meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null
       const raw52l = meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
       const yfPrice = rawPrice / div

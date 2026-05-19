@@ -33,8 +33,9 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
 .screen.active { display: block; }
 #auth-wrapper { height: 100dvh; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 24px; }
 #auth-wrapper.active { display: flex; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; backdrop-filter: blur(8px); cursor: pointer; transition: background .15s; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; backdrop-filter: blur(8px); cursor: pointer; transition: background .15s, border-color .15s; }
 .card:hover { background: var(--surface-hover); }
+.card.selected { border-color: var(--accent); background: rgba(99,102,241,.12); }
 .card-row { display: flex; justify-content: space-between; align-items: center; }
 .ticker { font-weight: 700; font-size: 16px; }
 .exchange-badge { font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,.07); padding: 2px 7px; border-radius: 8px; margin-right: 6px; }
@@ -195,12 +196,19 @@ body { height: 100%; background: var(--bg); color: var(--text); font-family: var
   <div id="screen-portfolio" class="screen active">
     <div class="screen-header">
       <div class="screen-title" id="portfolio-title" data-i18n="portfolio_title">הפורטפוליו שלי</div>
-      <div class="total-badge" id="portfolio-total">—</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="total-badge" id="portfolio-total">—</div>
+        <button id="select-mode-btn" class="btn btn-secondary" style="padding:3px 10px;font-size:11px;border-radius:8px" onclick="toggleSelectMode()">${t('select_mode')}</button>
+      </div>
     </div>
     <div id="holdings-list"></div>
-    <div class="mt-12 flex-gap">
+    <div class="mt-12 flex-gap" id="portfolio-actions">
       <button class="btn btn-secondary" style="flex:1" onclick="openAddModal()" id="add-btn" data-i18n="add_stocks">+ הוסף מניות</button>
       <button class="btn btn-secondary" style="flex:1" id="refresh-all-btn" onclick="refreshAllAnalysis()" data-i18n="refresh_all">רענן הכל</button>
+    </div>
+    <div class="mt-12 flex-gap" id="select-actions" style="display:none">
+      <button class="btn btn-secondary" style="flex:1" onclick="toggleSelectMode()" id="cancel-select-btn">ביטול</button>
+      <button class="btn btn-danger" style="flex:1" id="delete-selected-btn" onclick="deleteSelected()" disabled>הסר (0)</button>
     </div>
   </div>
 
@@ -310,6 +318,8 @@ const T = {
     bear_case:'למה אני טועה?', ecosystem:'Ecosystem Mapping',
     no_analysis:'ללא ניתוח — לחץ לניתוח', analyzing:'מנתח...',
     remove:'הסר', remove_confirm:'להסיר את {ticker} מהתיק?',
+    remove_selected:'הסר ({n})', remove_selected_confirm:'להסיר {n} מניות מהתיק?',
+    select_mode:'בחר', cancel_select:'ביטול',
     shares:'מניות', edit_qty:'ערוך', save:'שמור', error_qty:'כמות לא תקינה',
     ticker_label:'טיקר / שם חברה', quantity_label:'כמות מניות',
     screenshot_found:'זוהו {count} מניות', screenshot_error:'שגיאה בזיהוי'
@@ -330,6 +340,8 @@ const T = {
     bear_case:'Why Am I Wrong?', ecosystem:'Ecosystem Mapping',
     no_analysis:'No analysis — tap to analyze', analyzing:'Analyzing...',
     remove:'Remove', remove_confirm:'Remove {ticker} from portfolio?',
+    remove_selected:'Remove ({n})', remove_selected_confirm:'Remove {n} stocks from portfolio?',
+    select_mode:'Select', cancel_select:'Cancel',
     shares:'shares', edit_qty:'Edit', save:'Save', error_qty:'Invalid quantity',
     ticker_label:'Ticker / Company Name', quantity_label:'Shares',
     screenshot_found:'{count} holdings identified', screenshot_error:'Recognition error'
@@ -348,6 +360,8 @@ function applyLang(l) {
   document.documentElement.lang = l
   document.documentElement.dir = l === 'he' ? 'rtl' : 'ltr'
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n) })
+  const smb = document.getElementById('select-mode-btn')
+  if (smb) smb.textContent = selectMode ? t('cancel_select') : t('select_mode')
 }
 
 async function api(method, path, body, isForm) {
@@ -469,18 +483,21 @@ function renderHoldings(holdings) {
     const noAnalysis = _analyzingTickers.has(h.ticker)
       ? `<span class="tag tag-yellow"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;vertical-align:middle;margin-left:4px"></span> ${t('analyzing')}</span>`
       : (!h.analyzed_at ? `<span class="tag tag-yellow">${t('no_analysis')}</span>` : '')
-    return `<div class="card" data-holding-id="${h.id}" data-ticker="${safeAttr(h.ticker)}" data-exchange="${safeAttr(h.exchange)}">
+    const isSelected = selectedIds.has(h.id)
+    return `<div class="card${isSelected ? ' selected' : ''}" data-holding-id="${h.id}" data-ticker="${safeAttr(h.ticker)}" data-exchange="${safeAttr(h.exchange)}" ${selectMode ? `onclick="event.stopPropagation();toggleSelectHolding(${h.id})"` : ''}>
       <div class="card-row">
         <div style="display:flex;align-items:center;gap:6px">
-          <button class="drag-handle" onpointerdown="dragStart(event)" onclick="event.stopPropagation()" title="גרור לשינוי סדר">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-          </button>
+          ${selectMode
+            ? `<div style="width:20px;height:20px;border-radius:50%;border:2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'};background:${isSelected ? 'var(--accent)' : 'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center">${isSelected ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>`
+            : `<button class="drag-handle" onpointerdown="dragStart(event)" onclick="event.stopPropagation()" title="גרור לשינוי סדר"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button>`
+          }
           <span class="ticker">${escapeHtml(h.ticker)}</span><span class="exchange-badge">${escapeHtml(h.exchange)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="${cc}">${cs}</span>
+          ${selectMode ? '' : `
           <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="edit" data-id="${h.id}" data-qty="${h.quantity}" onclick="event.stopPropagation();editHolding(this.dataset.id,this.dataset.ticker||this.closest('.card').dataset.ticker,this.dataset.qty)">${t('edit_qty')}</button>
-          <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="delete" data-id="${h.id}" onclick="event.stopPropagation();deleteHolding(this.dataset.id,this.closest('.card').dataset.ticker)">${t('remove')}</button>
+          <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;border-radius:8px" data-action="delete" data-id="${h.id}" onclick="event.stopPropagation();deleteHolding(this.dataset.id,this.closest('.card').dataset.ticker)">${t('remove')}</button>`}
         </div>
       </div>
       <div class="card-sub">${price} · ${h.quantity} ${t('shares')}${h.analyzed_at ? ` · ${notifAge(h.analyzed_at)}` : ''}</div>
@@ -610,6 +627,36 @@ async function saveEditQuantity() {
 async function deleteHolding(id, ticker) {
   if (!confirm(t('remove_confirm').replace('{ticker}', ticker))) return
   await api('DELETE', `/api/portfolio/holdings/${id}`)
+  loadPortfolio()
+}
+
+let selectMode = false
+let selectedIds = new Set()
+
+function toggleSelectMode() {
+  selectMode = !selectMode
+  selectedIds.clear()
+  document.getElementById('portfolio-actions').style.display = selectMode ? 'none' : ''
+  document.getElementById('select-actions').style.display = selectMode ? '' : 'none'
+  document.getElementById('select-mode-btn').textContent = selectMode ? t('cancel_select') : t('select_mode')
+  renderHoldings(currentHoldings)
+}
+
+function toggleSelectHolding(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id)
+  else selectedIds.add(id)
+  const card = document.querySelector(`.card[data-holding-id="${id}"]`)
+  if (card) card.classList.toggle('selected', selectedIds.has(id))
+  const btn = document.getElementById('delete-selected-btn')
+  btn.disabled = selectedIds.size === 0
+  btn.textContent = t('remove_selected').replace('{n}', selectedIds.size)
+}
+
+async function deleteSelected() {
+  if (!selectedIds.size) return
+  if (!confirm(t('remove_selected_confirm').replace('{n}', selectedIds.size))) return
+  await api('DELETE', '/api/portfolio/holdings', { ids: [...selectedIds] })
+  toggleSelectMode()
   loadPortfolio()
 }
 

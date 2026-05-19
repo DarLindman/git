@@ -273,6 +273,19 @@ app.post('/api/portfolio/holdings', auth, async (req, res) => {
   }
 })
 
+app.delete('/api/portfolio/holdings', auth, async (req, res) => {
+  const { ids } = req.body
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids נדרש' })
+  try {
+    const portfolioId = await getUserPortfolioId(req.user.id)
+    await pool.query('DELETE FROM holdings WHERE id = ANY($1) AND portfolio_id = $2', [ids.map(Number), portfolioId])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'שגיאת שרת' })
+  }
+})
+
 app.delete('/api/portfolio/holdings/:id', auth, async (req, res) => {
   try {
     const portfolioId = await getUserPortfolioId(req.user.id)

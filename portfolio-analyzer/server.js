@@ -355,36 +355,47 @@ async function fetchStockData(ticker, exchange) {
   return data
 }
 
-async function fetchStockDataFinnhub(ticker) {
+async function fetchStockDataFinnhub(ticker, exchange = 'US') {
   const apiKey = process.env.FINNHUB_API_KEY
+  const isTase = exchange === 'TASE'
+  const fhSymbol = isTase ? `TA:${ticker}` : ticker
+  const yfSymbol = isTase ? `${ticker}.TA` : ticker
   try {
     const yfHeaders = { ...YF_HEADERS, ...(_yfCookie ? { Cookie: _yfCookie } : {}) }
     const yfCrumb = _yfCrumb ? { crumb: _yfCrumb } : {}
     const [quoteRes, profileRes, metricRes, yfChartRes, yfSummaryRes, yfV7Res] = await Promise.all([
-      axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
-      axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: ticker, token: apiKey }, timeout: 8000 }),
-      axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: ticker, metric: 'all', token: apiKey }, timeout: 8000 }),
-      axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`, {
-        params: { interval: '1d', range: '1d', ...yfCrumb }, headers: yfHeaders, timeout: 8000
+      axios.get('https://finnhub.io/api/v1/quote', { params: { symbol: fhSymbol, token: apiKey }, timeout: 8000 }),
+      axios.get('https://finnhub.io/api/v1/stock/profile2', { params: { symbol: fhSymbol, token: apiKey }, timeout: 8000 }),
+      axios.get('https://finnhub.io/api/v1/stock/metric', { params: { symbol: fhSymbol, metric: 'all', token: apiKey }, timeout: 8000 }),
+      axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}`, {
+        params: { interval: '1d', range: '5d', ...yfCrumb }, headers: yfHeaders, timeout: 8000
       }).catch(() => null),
-      axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`, {
+      axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yfSymbol)}`, {
         params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile', ...yfCrumb },
         headers: yfHeaders, timeout: 8000
       }).catch(() => null),
       axios.get('https://query1.finance.yahoo.com/v7/finance/quote', {
-        params: { symbols: ticker, ...yfCrumb }, headers: yfHeaders, timeout: 6000
+        params: { symbols: yfSymbol, ...yfCrumb }, headers: yfHeaders, timeout: 6000
       }).catch(() => null)
     ])
     const q = quoteRes.data
     const p = profileRes.data
     const m = metricRes.data?.metric || {}
-    const yfMeta = yfChartRes?.data?.chart?.result?.[0]?.meta
+    const yfChartResult = yfChartRes?.data?.chart?.result?.[0]
+    const yfMeta = yfChartResult?.meta
     const yfs = yfSummaryRes?.data?.quoteSummary?.result?.[0] || {}
     const yfV7Quote = yfV7Res?.data?.quoteResponse?.result?.[0] ?? null
+    if (isTase) {
+      console.log(`TASE Finnhub raw [${fhSymbol}]: quote.c=${q?.c} profile.currency=${p?.currency} profile.name=${p?.name} metric.peBasicExclExtraTTM=${m.peBasicExclExtraTTM} yfMeta.price=${yfMeta?.regularMarketPrice} yfMeta.currency=${yfMeta?.currency}`)
+    }
     if (!q?.c && !yfMeta?.regularMarketPrice) return null
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
-    // Prefer YF chart price for ADRs — Finnhub quote can return home-exchange prices
-    const price = yfMeta?.regularMarketPrice ?? q.c
+    // For TASE: YF returns price in ILA (agorot) — divide by 100. Finnhub returns ILS.
+    const yfDiv = (isTase && yfMeta?.currency === 'ILA') ? 100 : 1
+    // For TASE prefer Finnhub price (ILS); fall back to YF chart (ILA÷100)
+    const price = isTase
+      ? (q?.c || (yfMeta?.regularMarketPrice != null ? yfMeta.regularMarketPrice / yfDiv : null))
+      : (yfMeta?.regularMarketPrice ?? q.c)
 
     // If Finnhub market cap looks like local currency (>$20T), fetch live FX rate from YF
     const fhRaw = p.marketCapitalization ? Math.round(p.marketCapitalization * 1e6) : null
@@ -395,7 +406,12 @@ async function fetchStockDataFinnhub(ticker) {
       }).catch(() => null)
       fxFactor = fxRes?.data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 1
     }
-    const prevClose = yfMeta?.chartPreviousClose || yfMeta?.previousClose || q.pc || price
+    // For TASE, YF often has no previousClose — derive from OHLC closes (range=5d)
+    const yfCloses = yfChartResult?.indicators?.quote?.[0]?.close?.filter(v => v != null) ?? []
+    const yfPrevRaw = yfCloses.length >= 2 ? yfCloses[yfCloses.length - 2] : null
+    const yfPrev = yfPrevRaw != null ? yfPrevRaw / yfDiv : null
+    const fhPrev = q.pc || null
+    const prevClose = fhPrev || yfPrev || yfMeta?.chartPreviousClose / yfDiv || yfMeta?.previousClose / yfDiv || price
     const change_pct = parseFloat(((price - prevClose) / prevClose * 100).toFixed(2))
     const pe_ratio = yfs.summaryDetail?.trailingPE?.raw ?? m.peBasicExclExtraTTM ?? null
     // Validate EPS against price/PE: ADRs often get home-share EPS in local currency (e.g. TSM gets NT$ EPS)
@@ -403,8 +419,10 @@ async function fetchStockDataFinnhub(ticker) {
     const derivedEps = pe_ratio && price ? parseFloat((price / pe_ratio).toFixed(2)) : null
     const epsRatio = rawEps != null && derivedEps != null ? Math.abs(rawEps / derivedEps) : null
     const eps = epsRatio != null && (epsRatio > 3 || epsRatio < 0.33) ? derivedEps : (rawEps ?? derivedEps)
+    const raw52h = yfMeta?.fiftyTwoWeekHigh ?? m['52WeekHigh'] ?? null
+    const raw52l = yfMeta?.fiftyTwoWeekLow ?? m['52WeekLow'] ?? null
     return {
-      ticker, symbol: ticker,
+      ticker, symbol: isTase ? yfSymbol : ticker,
       price,
       change_pct,
       // Prefer YF for market cap (price or financialData module) — Finnhub returns home-exchange
@@ -436,13 +454,12 @@ async function fetchStockDataFinnhub(ticker) {
       })(),
       pe_ratio,
       eps,
-      // YF chart 52W — reliable for ADRs
-      week52_high: yfMeta?.fiftyTwoWeekHigh ?? m['52WeekHigh'] ?? null,
-      week52_low: yfMeta?.fiftyTwoWeekLow ?? m['52WeekLow'] ?? null,
+      week52_high: raw52h != null ? raw52h / yfDiv : null,
+      week52_low: raw52l != null ? raw52l / yfDiv : null,
       sector: yfs.assetProfile?.sector || p.finnhubIndustry || 'N/A',
       industry: yfs.assetProfile?.industry || p.finnhubIndustry || 'N/A',
       short_name: p.name || yfMeta?.shortName || ticker,
-      currency: p.currency || yfMeta?.currency || 'USD',
+      currency: isTase ? 'ILS' : (p.currency || yfMeta?.currency || 'USD'),
       instrument_type: isEtf ? 'ETF' : 'Stock',
       revenue_growth: yfs.financialData?.revenueGrowth?.raw != null
         ? parseFloat((yfs.financialData.revenueGrowth.raw * 100).toFixed(1))
@@ -458,10 +475,10 @@ async function fetchStockDataFinnhub(ticker) {
 }
 
 async function _fetchStockDataImpl(ticker, exchange) {
-  if (process.env.FINNHUB_API_KEY && exchange !== 'TASE') {
-    const data = await fetchStockDataFinnhub(ticker)
+  if (process.env.FINNHUB_API_KEY) {
+    const data = await fetchStockDataFinnhub(ticker, exchange)
     if (data) return data
-    console.warn(`Finnhub returned no data for ${ticker}, falling back to Yahoo`)
+    console.warn(`Finnhub returned no data for ${ticker} (${exchange}), falling back to Yahoo`)
   }
   const symbol = exchange === 'TASE' ? `${ticker}.TA` : ticker
   for (let attempt = 0; attempt < 2; attempt++) {

@@ -387,6 +387,8 @@ async function fetchStockDataFinnhub(ticker, exchange = 'US') {
     const yfV7Quote = yfV7Res?.data?.quoteResponse?.result?.[0] ?? null
     if (isTase) {
       console.log(`TASE Finnhub raw [${fhSymbol}]: quote.c=${q?.c} profile.currency=${p?.currency} profile.name=${p?.name} metric.peBasicExclExtraTTM=${m.peBasicExclExtraTTM} yfMeta.price=${yfMeta?.regularMarketPrice} yfMeta.currency=${yfMeta?.currency}`)
+      // Finnhub doesn't cover this Israeli stock — bail out and let YF-only path handle it
+      if (!q?.c && !p?.name) return null
     }
     if (!q?.c && !yfMeta?.regularMarketPrice) return null
     const isEtf = p.type === 'ETF' || yfMeta?.quoteType === 'ETF'
@@ -489,7 +491,7 @@ async function _fetchStockDataImpl(ticker, exchange) {
       // search API requires no auth and returns sector/industry reliably
       const [chartRes, summaryRes, searchRes, yfV7Res2] = await Promise.all([
         axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
-          params: { interval: '1d', range: '1d', ...crumbParam }, headers, timeout: 12000
+          params: { interval: '1d', range: exchange === 'TASE' ? '5d' : '1d', ...crumbParam }, headers, timeout: 12000
         }),
         axios.get(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}`, {
           params: { modules: 'summaryDetail,defaultKeyStatistics,price,financialData,assetProfile', ...crumbParam },
@@ -511,8 +513,11 @@ async function _fetchStockDataImpl(ticker, exchange) {
       const sq = searchRes?.data?.quotes?.find(q => q.symbol?.toUpperCase() === symbol.toUpperCase()) || {}
       const v7q = yfV7Res2?.data?.quoteResponse?.result?.[0] ?? null
       const rawPrice = meta.regularMarketPrice
-      const rawPrevClose = meta.chartPreviousClose || meta.previousClose || rawPrice
       const div = exchange === 'TASE' ? 100 : 1
+      // TASE: chartPreviousClose often missing — derive from OHLC closes (range=5d)
+      const ohlcCloses = chartRes.data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v => v != null) ?? []
+      const ohlcPrev = ohlcCloses.length >= 2 ? ohlcCloses[ohlcCloses.length - 2] : null
+      const rawPrevClose = meta.chartPreviousClose || meta.previousClose || ohlcPrev || rawPrice
       const raw52h = meta.fiftyTwoWeekHigh ?? s.summaryDetail?.fiftyTwoWeekHigh?.raw ?? null
       const raw52l = meta.fiftyTwoWeekLow ?? s.summaryDetail?.fiftyTwoWeekLow?.raw ?? null
       const yfPrice = rawPrice / div
